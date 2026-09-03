@@ -7,14 +7,15 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is in the **PHP application-foundation stage**. It contains a
-minimal Slim Framework 4 application, a production-safe error-handling
-baseline, and automated smoke checks. The single placeholder page is not the
-real website design.
+This repository is in the **database-infrastructure foundation stage**. It
+contains a minimal Slim Framework 4 application, a lazy production-safe PDO
+connection layer, CLI-only forward migrations, and automated checks. The
+single placeholder page is not the real website design.
 
-There is deliberately no database code or schema, Spezi domain implementation,
-rating implementation, authentication, admin panel, frontend framework, Excel
-migration, or deployment automation in this stage.
+The only database object defined is the migrator's `schema_migrations` tracking
+table. There is deliberately no Spezi domain schema, rating implementation,
+authentication, admin panel, frontend framework, Excel migration, image upload,
+or deployment automation in this stage.
 
 ## Repository organization
 
@@ -24,6 +25,7 @@ migration, or deployment automation in this stage.
   constraints.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
+- `docs/DATA_MODEL.md`: proposed, non-final domain and image-storage direction.
 - `docs/RATING_SYSTEM.md`: immutable rating-methodology requirements and the
   verification gate for future implementation.
 - `public/`: the only intended web document root and the minimal front
@@ -31,6 +33,8 @@ migration, or deployment automation in this stage.
 - `src/`: application configuration and construction code.
 - `config/`: environment loading and application bootstrap.
 - `tests/`: HTTP-level application smoke tests.
+- `bin/migrate.php`: CLI-only migration command; never an HTTP endpoint.
+- `database/migrations/`: reviewed, forward-only SQL migration files.
 - `composer.json` and `composer.lock`: PHP dependencies, autoloading, and
   quality commands.
 - `phpunit.xml.dist` and `phpstan.neon.dist`: test and static-analysis
@@ -53,6 +57,10 @@ methodology must remain exactly unchanged. Its formulas and rounding semantics
 must be verified from the Excel workbooks and historical results before any
 implementation is used in production.
 
+Basic drink creation must remain quick: minimum required information first,
+optional enrichment later. A future image is optional and will normally be a
+file on webspace referenced by database metadata, not a MariaDB BLOB.
+
 ## Production target
 
 The known target is Plesk shared hosting with PHP 8.3 running through FPM and
@@ -71,10 +79,16 @@ suppresses detailed HTTP error output.
 `.env.example` contains safe local values only. Never commit a populated `.env`
 file or real credentials.
 
+Database access additionally requires `DB_HOST`, `DB_PORT`, `DB_NAME`,
+`DB_USER`, `DB_PASSWORD`, and `DB_CHARSET=utf8mb4`. Those settings are read and
+validated only when database access is explicitly requested; normal application
+bootstrap does not open a connection.
+
 ## Local development
 
-Prerequisites are PHP 8.3 and Composer 2. No database, external service,
-production credential, Node.js installation, or frontend toolchain is needed.
+Prerequisites are PHP 8.3 with PDO MySQL and Composer 2. Ordinary unit tests and
+the placeholder application need no running database, external service,
+production credential, Node.js installation, or frontend toolchain.
 
 ```bash
 composer install
@@ -94,6 +108,64 @@ composer test
 composer analyse
 ```
 
+`composer check` deliberately runs unit tests and static analysis only. It does
+not connect to or mutate a database.
+
+## Local database and integration tests
+
+Database integration tests require a disposable MariaDB 10.11 database. Docker
+is one optional local/testing method; it is not part of the production
+architecture. For example, start a local disposable server in one terminal:
+
+```bash
+docker run --rm --name spezitest-mariadb-10-11 \
+  -p 127.0.0.1:3307:3306 \
+  -e MARIADB_DATABASE=spezitest_test \
+  -e MARIADB_USER=spezitest_test \
+  -e MARIADB_PASSWORD=local_test_password \
+  -e MARIADB_ROOT_PASSWORD=local_root_password \
+  mariadb:10.11
+```
+
+Then configure the matching disposable credentials in `.env`:
+
+```dotenv
+DB_HOST=127.0.0.1
+DB_PORT=3307
+DB_NAME=spezitest_test
+DB_USER=spezitest_test
+DB_PASSWORD=local_test_password
+DB_CHARSET=utf8mb4
+```
+
+Run the integration suite in another terminal:
+
+```bash
+composer test:integration
+```
+
+The integration suite creates and removes only migration-infrastructure test
+objects in that disposable database. Never point it at production.
+
+## Database migrations
+
+Forward SQL migrations live in `database/migrations/` and use sortable
+`YYYYMMDDHHMMSS_description.sql` filenames. Run pending migrations explicitly:
+
+```bash
+composer migrate
+```
+
+This command requires configured database credentials and mutates the selected
+database. It creates `schema_migrations` itself, applies each unrecorded file in
+filename order, records its SHA-256 checksum only after successful execution,
+and rejects later edits to applied files. A second run with no new files is a
+no-op.
+
+MariaDB DDL can commit implicitly, so migrations are forward-only and do not
+promise automatic rollback. Production use requires one serialized runner,
+careful review, a verified backup, and a recovery plan.
+
 ## Production artifact boundary
 
 The production website document root must point to the deployed `public/`
@@ -107,9 +179,19 @@ Serving HTTP requests does not run Composer commands and does not require
 Composer or command-line access on the server. Production also does not require
 Node.js.
 
+The real production database and user do not exist yet and will be created
+later through Plesk. Creating the empty database and applying/importing its
+schema are separate operations. Database names, users, passwords, and endpoint
+settings are deployment configuration and never belong in migrations.
+
+No final production migration mechanism has been selected. It may later use a
+secure CLI/task facility if Plesk supports one, or an explicitly reviewed
+manual deployment procedure. It will never use an HTTP migration endpoint.
+
 ## Next phase
 
-No next-phase work should begin without explicit instruction. In particular,
-do not design tables, implement domain records, ratings, real pages,
+No next-phase work should begin without explicit instruction and formal review
+of the historical Excel structure and rating semantics. In particular, do not
+create domain tables, implement records, ratings, image uploads, real pages,
 authentication or admin functionality, migrate Excel data, or deploy based
 only on this foundation.

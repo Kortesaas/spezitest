@@ -6,22 +6,26 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-The repository is in the PHP application-foundation stage. The selected
-runtime foundation is PHP 8.3, Composer, Slim Framework 4, a PSR-7
-implementation, and optional local `.env` loading. PHPUnit and PHPStan are the
-development quality tools. The application uses `public/` as its only intended
-web document root.
+The repository is in the database-infrastructure foundation stage. The runtime
+uses PHP 8.3, Composer, Slim Framework 4, a PSR-7 implementation, optional local
+`.env` loading, and a small lazy PDO connection layer. PHPUnit and PHPStan are
+the development quality tools. The application uses `public/` as its only
+intended web document root. Database changes use CLI-only, forward SQL
+migrations outside `public/`.
 
 Do not infer that a database design, deployment process, authentication system,
 or real user interface has been selected. Unless the user explicitly starts a
 later phase, do not:
 
-- introduce a database, database code, or database tables;
+- create domain tables or finalize the domain schema;
 - implement Spezi domain records or ratings;
 - implement authentication, admin functionality, or sessions;
 - build the real frontend or introduce a frontend build pipeline;
 - migrate the existing Excel data; or
 - deploy anything.
+
+The only table currently authorized is the migration runner's infrastructure
+table, `schema_migrations`.
 
 ## Immutable domain rules
 
@@ -50,6 +54,12 @@ The future database will be the single source of truth for Spezitest data.
 Existing Excel workbooks are migration and verification sources only and will
 eventually be retired from day-to-day operation.
 
+Adding a newly discovered Spezi must require as little effort as reasonably
+possible: minimum required information first, optional enrichment later. Basic
+drink creation must never depend on optional metadata. A future phone workflow
+must support quickly recording a name, lifecycle status, and optionally one
+primary product picture.
+
 There are exactly three permanent testers, with these canonical names:
 
 - Manu
@@ -69,6 +79,10 @@ workbooks and historical results before production use. See
 - Represent lifecycle status on one drink record; do not create status-specific
   drink stores, tables, files, or duplicated records.
 - Make database changes only through tracked, reviewable migrations.
+- Never expose migration execution over HTTP. Migrations are CLI/task or an
+  explicitly reviewed manual deployment concern only.
+- Treat migrations as forward changes. Do not add automatic destructive down
+  migrations; MariaDB DDL may commit implicitly.
 - Plan production migrations around backups, rollback or forward-recovery, and
   data safety.
 - Do not hard-code production paths, domains, passwords, database names, or
@@ -125,6 +139,9 @@ Every implementation must preserve these requirements:
 - Do not suppress security-relevant failures with PHP's `@` operator.
 - Give application database credentials only the privileges required at
   runtime. Use separate, appropriately controlled privileges for migrations.
+- Ensure the production database user is restricted to the Spezitest database,
+  not every database within the Plesk subscription.
+- Never place `DB_PASSWORD` in output or logs.
 - Keep dependencies and application code patched, and review changes as
   internet-facing production software.
 

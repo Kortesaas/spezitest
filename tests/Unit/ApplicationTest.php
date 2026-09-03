@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Spezitest\Tests;
+namespace Spezitest\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;

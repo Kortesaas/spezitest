@@ -54,3 +54,16 @@ After the future migration, the database will be the single source of truth.
 The old Excel sheets are migration sources only and will be retired from
 day-to-day operation. They must not be kept as a second writable operational
 dataset.
+
+## Simple entry principle
+
+Adding a newly discovered Spezi must require as little effort as reasonably
+possible. The permanent product direction is:
+
+`minimum required information first -> optional enrichment later`
+
+A future user should be able to record an identified drink quickly from a
+phone—for example, while standing in a Getränkemarkt—without completing a large
+metadata form. Conceptually, basic creation needs only a name, a lifecycle
+status, and an optional picture. Optional metadata must not become a database
+or application prerequisite for creating the drink record.

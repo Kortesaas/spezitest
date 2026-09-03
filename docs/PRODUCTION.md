@@ -47,6 +47,32 @@ Resource-intensive operations must respect the stated PHP limits. Application
 upload limits may be lower than the server's 64M request limits when domain and
 security requirements are later defined.
 
+## Database provisioning and migrations
+
+The production database and database user do not exist yet. They will later be
+created manually through Plesk. Creating that empty database and applying or
+importing its schema are separate operations.
+
+Database host, port, database name, username, password, and charset are
+deployment configuration. They must not be embedded in application code or SQL
+migrations. The currently known production endpoint is `localhost:3306`, but
+those values still come from `DB_HOST` and `DB_PORT`.
+
+Migrations are forward-only SQL files tracked in `schema_migrations` and run by
+the CLI-only `bin/migrate.php` command. The runner itself creates the tracking
+table; no domain table exists yet. There is no HTTP migration endpoint.
+
+The final production execution mechanism is intentionally undecided. Depending
+on verified Plesk capabilities, migrations may later run through a secure CLI
+or task mechanism, or through an explicitly reviewed manual deployment
+process. No convenient production shell access is assumed.
+
+MariaDB DDL may implicitly commit, so automatic transactional rollback cannot
+be promised. Every production migration needs serialized execution, careful
+review, a verified restorable backup, and a specific recovery plan. Failed DDL
+may require operator intervention even when the migration version was not
+recorded. Automatic destructive down migrations are not used.
+
 ## Configuration and secrets
 
 - Supply environment-specific settings through environment configuration.
@@ -56,8 +82,11 @@ security requirements are later defined.
 - When no `.env` file exists, supply configuration through actual environment
   variables; `.env` loading is optional.
 - Use a least-privilege database account for the running application.
+- Restrict the production account to the Spezitest database, not every database
+  in the Plesk subscription.
 - Keep migration privileges separate from routine application privileges where
   the hosting environment permits it.
+- Never print or log `DB_PASSWORD`.
 
 ## Internet-facing security baseline
 
@@ -86,6 +115,18 @@ applicable control below is mandatory:
   administration endpoints publicly.
 - Log operational failures safely without recording passwords, tokens, or
   unnecessary personal/sensitive data.
+
+## Future image storage
+
+Product images will normally live as files on production webspace, with the
+database storing relative references and detected metadata rather than image
+BLOBs. Image upload remains optional for basic drink creation.
+
+Future upload handling must distrust extensions and all user-controlled paths,
+verify actual image content/type, enforce size limits, generate internal
+filenames, prevent executable content, and fail safely during validation or
+processing. No image upload or processing technology is implemented yet, and
+GD/Imagick availability is not assumed.
 
 ## Database change safety
 

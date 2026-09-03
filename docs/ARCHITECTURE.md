@@ -7,8 +7,9 @@ Cola-Mix / Spezi drinks, primarily from Germany and surrounding countries. This
 document records architectural constraints and the PHP runtime foundation.
 Slim Framework 4 with a PSR-7 implementation is selected for HTTP delivery,
 with Composer PSR-4 autoloading under the `Spezitest` namespace. No database
-schema, domain persistence model, template system, or real frontend design is
-selected in this stage.
+domain schema, domain persistence model, template system, or real frontend
+design is selected in this stage. Packet 3 adds only PDO connection and
+migration infrastructure.
 
 ## Runtime structure
 
@@ -40,6 +41,31 @@ Database changes must be expressed as tracked, reviewable migrations. A
 production migration plan must address backup, rollback or forward-recovery,
 and data safety before execution.
 
+## Database infrastructure
+
+Database settings are read from environment configuration only when database
+access is requested. Constructing the Slim application does not connect to the
+database. `DatabaseConfiguration` validates required `DB_*` values, and an
+explicit `ConnectionFactory` creates independent PDO connections without a
+global connection or hidden singleton.
+
+Connections use the MySQL PDO driver, `utf8mb4`, exception error mode,
+associative fetches, and native prepared statements. The current layer contains
+no ORM, query builder, or domain repository.
+
+`bin/migrate.php` is the only migration entry point and is CLI-only. It uses
+the same environment loader and database configuration as future application
+database access. SQL files under `database/migrations/` use sortable
+`YYYYMMDDHHMMSS_description.sql` names. The runner discovers them in bytewise
+filename order, applies only unrecorded versions, records successful versions
+and SHA-256 checksums, and rejects changes to already-applied migrations.
+
+The runner creates `schema_migrations` itself because tracking must exist before
+the first migration can be recorded. It is the only database object authorized
+in this packet. There are no automatic destructive down migrations. MariaDB DDL
+may commit implicitly, so failed migrations can require manual recovery even
+when the version was not recorded.
+
 ## Drink identity and lifecycle
 
 One logical drink must correspond to one drink record. It has exactly one
@@ -51,6 +77,10 @@ Status-specific pages, filters, or lists must be views over the same records.
 They must not be implemented as independent datasets between which records are
 copied or moved. See `DATA_LIFECYCLE.md` for definitions and the historical
 migration rule.
+
+Names are not globally unique and must not later receive a simplistic
+`UNIQUE(name)` rule. See `DATA_MODEL.md` for proposed, non-final entity and
+image-storage direction.
 
 ## Rating boundary
 
