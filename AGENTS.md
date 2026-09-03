@@ -6,12 +6,14 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-The repository is in the database-infrastructure foundation stage. The runtime
-uses PHP 8.3, Composer, Slim Framework 4, a PSR-7 implementation, optional local
-`.env` loading, and a small lazy PDO connection layer. PHPUnit and PHPStan are
-the development quality tools. The application uses `public/` as its only
-intended web document root. Database changes use CLI-only, forward SQL
-migrations outside `public/`.
+The repository has database-infrastructure foundations and a completed
+read-only forensic audit of the two legacy workbooks. The runtime uses PHP 8.3,
+Composer, Slim Framework 4, a PSR-7 implementation, optional local `.env`
+loading, and a small lazy PDO connection layer. PHPUnit and PHPStan are the
+development quality tools. The application uses `public/` as its only intended
+web document root. Database changes use CLI-only, forward SQL migrations
+outside `public/`. The Python utility in `tools/legacy-audit/` is local
+migration/audit tooling and is not production runtime code.
 
 Do not infer that a database design, deployment process, authentication system,
 or real user interface has been selected. Unless the user explicitly starts a
@@ -67,11 +69,13 @@ There are exactly three permanent testers, with these canonical names:
 - Schorsch
 
 The existing rating methodology is immutable. Do not invent, simplify, infer,
-or modify a formula, weighting, scale, aggregation, or rounding rule. The exact
-Excel formulas and rounding semantics are not yet formally verified. Any later
-calculation implementation must be verified against the existing Excel
-workbooks and historical results before production use. See
-`docs/RATING_SYSTEM.md`.
+or modify a formula, weighting, scale, aggregation, or rounding rule. Packet 4
+verified the workbook formulas and representative cached results and recorded
+them in `docs/RATING_SYSTEM.md`; several edge semantics remain explicitly
+unresolved there. Do not reimplement the formulas from memory or promote an
+unresolved behavior to a rule. Any later calculation implementation must pass
+the historical golden fixtures and be verified against the source workbooks
+and historical results before production use.
 
 ## Architecture and data changes
 

@@ -23,6 +23,12 @@
 /.phpunit.result.cache
 /coverage/
 /.cache/
+__pycache__/
+*.py[cod]
+
+# Local legacy workbook sources and generated audit extracts
+/var/legacy-import/*.xlsx
+/var/legacy-audit/
 
 # IDE and operating-system files
 .DS_Store

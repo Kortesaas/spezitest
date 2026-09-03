@@ -3,12 +3,15 @@
 ## Status of this document
 
 This document captures known principles and proposed directions. It is **not a
-final domain schema**. Packet 3 creates only migration infrastructure and the
-`schema_migrations` tracking table. No drink, image, source, test, tester, or
-rating table exists yet.
+final domain schema**. Packet 3 created only migration infrastructure and the
+`schema_migrations` tracking table. Packet 4 audited the legacy workbooks but
+did not add domain storage. No drink, image, source, test, tester, or rating
+table exists yet.
 
-The actual domain schema remains blocked on formal review of the historical
-Excel structure and exact rating semantics.
+The workbook audit in `LEGACY_WORKBOOK_AUDIT.md` now supplies evidence for the
+next design phase. The actual domain schema remains intentionally unfinalized
+until its unresolved identity, event-history, and rating compatibility
+decisions are made explicitly.
 
 ## Authoritative-data principle
 
@@ -34,6 +37,12 @@ the drink or physically move it between separate datasets.
 Drink names must not be assumed globally unique. Duplicate detection is a
 domain and import concern and must not be reduced to a simple `UNIQUE(name)`
 constraint. The distinguishing facts and matching rules remain to be verified.
+
+This is directly supported by the Primärliste: two distinct rows named
+`Spezi` have different manufacturers and locations. Cross-workbook comparison
+also found exact overlaps as well as visually similar names belonging to
+different manufacturers. A future migration therefore needs a reviewable
+candidate-matching process rather than automatic name-based merging.
 
 During historical migration, red-marked drinks in the old Primärliste are not
 currently possessed and must migrate as `identified`, even though they appear
@@ -85,6 +94,37 @@ user-controlled filesystem paths, prevent executable uploads, and fail safely
 when validation or processing fails. GD and Imagick availability has not been
 verified, and no image-processing dependency is selected in this packet.
 
+The workbook audit found one image for 165 of 166 Primärliste records and one
+for every Beschaffungsliste record. One missing image is valid source data, so
+image absence must never block product creation or migration. Source images
+use both PNG and JPEG and have varying dimensions across the workbooks; the
+future model must not infer format or size from a user-supplied filename.
+
+## Audited source facts relevant to design
+
+These facts are supported by the legacy workbooks but do not prescribe exact
+tables or column types:
+
+- A completed historical test has nine raw inputs: Manu, Fabi, and Schorsch
+  each rate Optik, Süffigkeit, and Geschmack.
+- Category averages, Gesamt, rank, and price/performance are formula-derived;
+  raw tester inputs are the authoritative compatibility inputs.
+- Every historical Primärliste row has a stored numeric price, sometimes at
+  greater precision than the two-decimal display format. Its business unit and
+  basis remain unresolved.
+- Tested rows carry a stream number; a subset also has a time-of-day value and
+  an integer duration. These appear test-related, but their precise semantics
+  and cardinality remain unresolved.
+- Location fields are free text that may combine postal code, country prefix,
+  and locality. Beschaffungsliste also has region and informal procurement
+  geography. Raw values must survive staging before any structured parsing.
+- Legacy image relationships can be mapped to product rows and images are
+  optional. Image hashes are useful migration evidence but are not sufficient
+  product identifiers.
+- The source contains anomalies that require traceable review, including a
+  shifted row, duplicate candidates, formula values in metadata columns, and
+  inflated blank ranges.
+
 ## Proposed / non-final entities
 
 The following entities describe likely boundaries only. They are not approved
@@ -114,9 +154,11 @@ indexes, or constraints are finalized here.
 
 ## Deliberately unresolved questions
 
-- The exact test and rating schema remains pending formal Excel verification.
-- Exact formulas, precision, and rounding semantics remain pending verification
-  against historical results.
+- The exact test and rating schema remains pending design from the verified
+  formulas, golden fixtures, and unresolved compatibility edges documented in
+  `RATING_SYSTEM.md`.
+- PHP numeric representation and Excel-compatible boundary behavior remain
+  pending implementation and compatibility testing.
 - Retesting behavior is intentionally undecided.
 - Historical acquisition or inventory-event tracking is intentionally
   undecided.

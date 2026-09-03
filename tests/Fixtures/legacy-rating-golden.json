@@ -1,0 +1,167 @@
+{
+  "provenance": {
+    "workbook": "primaerliste.xlsx",
+    "worksheet": "Spezi Test",
+    "source_sha256": "e426d6ae93ca1f754455772664ffb5ed0175c65d6a6138397dec50532e9b262d",
+    "note": "Inputs and expected values are transcribed from workbook cells and cached formula results; they are not invented expectations."
+  },
+  "price_performance_population": {
+    "intermediate_range": "T2:T109",
+    "minimum": 0.7488789237668161,
+    "maximum": 96.83333333333334
+  },
+  "cases": [
+    {
+      "source_row": 2,
+      "name": "Flötzinger Cola-Mix",
+      "inputs": {
+        "optik": { "Manu": 9, "Fabi": 9, "Schorsch": 8 },
+        "sueffigkeit": { "Manu": 10, "Fabi": 10, "Schorsch": 8 },
+        "geschmack": { "Manu": 10, "Fabi": 10, "Schorsch": 8 },
+        "price": 0.6995
+      },
+      "expected": {
+        "optik_average": 8.666666666666666,
+        "sueffigkeit_average": 9.333333333333334,
+        "geschmack_average": 9.333333333333334,
+        "gesamt": 55.33,
+        "rank": 1,
+        "price_performance_intermediate": 79.09935668334525,
+        "price_performance": 0.8154334459308494
+      }
+    },
+    {
+      "source_row": 9,
+      "name": "Mexi",
+      "inputs": {
+        "optik": { "Manu": 3, "Fabi": 5, "Schorsch": 5 },
+        "sueffigkeit": { "Manu": 7, "Fabi": 8, "Schorsch": 8 },
+        "geschmack": { "Manu": 7, "Fabi": 8, "Schorsch": 9 },
+        "price": 0.736
+      },
+      "expected": {
+        "optik_average": 4.333333333333333,
+        "sueffigkeit_average": 7.666666666666667,
+        "geschmack_average": 8,
+        "gesamt": 43.67,
+        "rank": 8,
+        "price_performance_intermediate": 59.33423913043479,
+        "price_performance": 0.6097277709143655
+      }
+    },
+    {
+      "source_row": 10,
+      "name": "Flensburger Küsten Mix Cola-Orange",
+      "inputs": {
+        "optik": { "Manu": 10, "Fabi": 10, "Schorsch": 10 },
+        "sueffigkeit": { "Manu": 7, "Fabi": 8, "Schorsch": 7 },
+        "geschmack": { "Manu": 6, "Fabi": 7, "Schorsch": 6 },
+        "price": 1.65
+      },
+      "expected": {
+        "optik_average": 10,
+        "sueffigkeit_average": 7.333333333333333,
+        "geschmack_average": 6.333333333333333,
+        "gesamt": 43.67,
+        "rank": 8,
+        "price_performance_intermediate": 26.46666666666667,
+        "price_performance": 0.26765815449475344
+      }
+    },
+    {
+      "source_row": 14,
+      "name": "Dreiser Cola-Mix",
+      "inputs": {
+        "optik": { "Manu": 5, "Fabi": 4, "Schorsch": 4 },
+        "sueffigkeit": { "Manu": 7, "Fabi": 7, "Schorsch": 6 },
+        "geschmack": { "Manu": 8, "Fabi": 8, "Schorsch": 7 },
+        "price": 0.42
+      },
+      "expected": {
+        "optik_average": 4.333333333333333,
+        "sueffigkeit_average": 6.666666666666667,
+        "geschmack_average": 7.666666666666667,
+        "gesamt": 40.67,
+        "rank": 13,
+        "price_performance_intermediate": 96.83333333333334,
+        "price_performance": 1
+      }
+    },
+    {
+      "source_row": 24,
+      "name": "Kola-Mix",
+      "inputs": {
+        "optik": { "Manu": 7, "Fabi": 7, "Schorsch": 2 },
+        "sueffigkeit": { "Manu": 6, "Fabi": 7, "Schorsch": 7 },
+        "geschmack": { "Manu": 6, "Fabi": 7, "Schorsch": 6 },
+        "price": 0.4
+      },
+      "expected": {
+        "optik_average": 5.333333333333333,
+        "sueffigkeit_average": 6.666666666666667,
+        "geschmack_average": 6.333333333333333,
+        "gesamt": 37.67,
+        "rank": 23,
+        "price_performance_intermediate": 94.175,
+        "price_performance": 0.9723333670397709
+      }
+    },
+    {
+      "source_row": 41,
+      "name": "Mezzo Mix",
+      "inputs": {
+        "optik": { "Manu": 6, "Fabi": 4, "Schorsch": 5 },
+        "sueffigkeit": { "Manu": 4, "Fabi": 4, "Schorsch": 4 },
+        "geschmack": { "Manu": 5, "Fabi": 6, "Schorsch": 7 },
+        "price": 1.291
+      },
+      "expected": {
+        "optik_average": 5,
+        "sueffigkeit_average": 4,
+        "geschmack_average": 6,
+        "gesamt": 31,
+        "rank": 39,
+        "price_performance_intermediate": 24.012393493415956,
+        "price_performance": 0.2421152798608485
+      }
+    },
+    {
+      "source_row": 85,
+      "name": "Endlich Cola-Mix",
+      "inputs": {
+        "optik": { "Manu": 9, "Fabi": 9, "Schorsch": 8 },
+        "sueffigkeit": { "Manu": 0, "Fabi": 4, "Schorsch": 4 },
+        "geschmack": { "Manu": 0, "Fabi": 4, "Schorsch": 4 },
+        "price": 5
+      },
+      "expected": {
+        "optik_average": 8.666666666666666,
+        "sueffigkeit_average": 2.6666666666666665,
+        "geschmack_average": 2.6666666666666665,
+        "gesamt": 22,
+        "rank": 82,
+        "price_performance_intermediate": 4.4,
+        "price_performance": 0.037999082147774206
+      }
+    },
+    {
+      "source_row": 109,
+      "name": "Dreh und Trink Cola-Mix",
+      "inputs": {
+        "optik": { "Manu": 0, "Fabi": 1, "Schorsch": 2 },
+        "sueffigkeit": { "Manu": 0, "Fabi": 0, "Schorsch": 1 },
+        "geschmack": { "Manu": 0, "Fabi": 0, "Schorsch": 0 },
+        "price": 2.23
+      },
+      "expected": {
+        "optik_average": 1,
+        "sueffigkeit_average": 0.3333333333333333,
+        "geschmack_average": 0,
+        "gesamt": 1.67,
+        "rank": 108,
+        "price_performance_intermediate": 0.7488789237668161,
+        "price_performance": 0
+      }
+    }
+  ]
+}

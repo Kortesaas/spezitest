@@ -7,10 +7,11 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is in the **database-infrastructure foundation stage**. It
-contains a minimal Slim Framework 4 application, a lazy production-safe PDO
-connection layer, CLI-only forward migrations, and automated checks. The
-single placeholder page is not the real website design.
+This repository has a **database-infrastructure foundation and legacy-source
+audit**. It contains a minimal Slim Framework 4 application, a lazy
+production-safe PDO connection layer, CLI-only forward migrations, automated
+checks, and the Packet 4 forensic workbook findings. The single placeholder
+page is not the real website design.
 
 The only database object defined is the migrator's `schema_migrations` tracking
 table. There is deliberately no Spezi domain schema, rating implementation,
@@ -26,13 +27,17 @@ or deployment automation in this stage.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
 - `docs/DATA_MODEL.md`: proposed, non-final domain and image-storage direction.
-- `docs/RATING_SYSTEM.md`: immutable rating-methodology requirements and the
-  verification gate for future implementation.
+- `docs/RATING_SYSTEM.md`: workbook-verified rating formulas, historical
+  quirks, unresolved edge semantics, and the production verification gate.
+- `docs/LEGACY_WORKBOOK_AUDIT.md`: workbook structure, lifecycle, overlap,
+  image, metadata, anomaly, and migration-risk findings.
 - `public/`: the only intended web document root and the minimal front
   controller.
 - `src/`: application configuration and construction code.
 - `config/`: environment loading and application bootstrap.
-- `tests/`: HTTP-level application smoke tests.
+- `tests/`: application tests and machine-readable historical golden fixtures.
+- `tools/legacy-audit/`: local read-only OOXML audit tooling; never production
+  runtime code.
 - `bin/migrate.php`: CLI-only migration command; never an HTTP endpoint.
 - `database/migrations/`: reviewed, forward-only SQL migration files.
 - `composer.json` and `composer.lock`: PHP dependencies, autoloading, and
@@ -53,9 +58,10 @@ datasets. The future database will be the single source of truth; existing
 Excel workbooks are migration and verification sources only.
 
 The permanent testers are Manu, Fabi, and Schorsch. The existing rating
-methodology must remain exactly unchanged. Its formulas and rounding semantics
-must be verified from the Excel workbooks and historical results before any
-implementation is used in production.
+methodology must remain exactly unchanged. Packet 4 verified and documented
+the formulas and representative cached history, while explicitly retaining
+unresolved edge semantics. Any implementation must still reproduce the golden
+historical fixtures and be checked against Excel before production.
 
 Basic drink creation must remain quick: minimum required information first,
 optional enrichment later. A future image is optional and will normally be a
@@ -188,10 +194,25 @@ No final production migration mechanism has been selected. It may later use a
 secure CLI/task facility if Plesk supports one, or an explicitly reviewed
 manual deployment procedure. It will never use an HTTP migration endpoint.
 
+## Legacy audit tooling
+
+The two source workbooks are local, ignored migration material beneath
+`var/legacy-import/`. Run the read-only reproducibility utility from the
+repository root with:
+
+```bash
+python3 tools/legacy-audit/audit.py
+```
+
+It writes only ignored reports and image extracts beneath
+`var/legacy-audit/`, verifies source hashes before and after inspection, and
+does not connect to a database. See `docs/LEGACY_WORKBOOK_AUDIT.md` for the
+reviewed findings. The source workbooks and extracted image library must not be
+committed.
+
 ## Next phase
 
-No next-phase work should begin without explicit instruction and formal review
-of the historical Excel structure and rating semantics. In particular, do not
-create domain tables, implement records, ratings, image uploads, real pages,
-authentication or admin functionality, migrate Excel data, or deploy based
-only on this foundation.
+No next-phase work should begin without explicit instruction. In particular,
+do not create domain tables, implement records or ratings, build image uploads
+or real pages, add authentication/admin functionality, import Excel data, or
+deploy based only on this foundation and audit.
