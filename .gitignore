@@ -1,0 +1,33 @@
+# Environment configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and build output
+/vendor/
+/node_modules/
+/dist/
+/build/
+
+# Runtime-generated data
+/storage/cache/
+/storage/logs/
+/storage/sessions/
+/storage/uploads/
+*.log
+
+# Test and tooling output
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage/
+/.cache/
+
+# IDE and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
