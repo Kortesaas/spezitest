@@ -6,15 +6,20 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-The repository is in its initial foundation stage. Do not infer that a
-framework, database design, deployment process, authentication system, or user
-interface has already been selected.
+The repository is in the PHP application-foundation stage. The selected
+runtime foundation is PHP 8.3, Composer, Slim Framework 4, a PSR-7
+implementation, and optional local `.env` loading. PHPUnit and PHPStan are the
+development quality tools. The application uses `public/` as its only intended
+web document root.
 
-Unless the user explicitly starts a later phase, do not:
+Do not infer that a database design, deployment process, authentication system,
+or real user interface has been selected. Unless the user explicitly starts a
+later phase, do not:
 
-- install a framework or dependencies;
-- introduce a database or create database tables;
-- implement authentication or frontend pages;
+- introduce a database, database code, or database tables;
+- implement Spezi domain records or ratings;
+- implement authentication, admin functionality, or sessions;
+- build the real frontend or introduce a frontend build pipeline;
 - migrate the existing Excel data; or
 - deploy anything.
 
@@ -111,8 +116,13 @@ Every implementation must preserve these requirements:
   outside the public document root.
 - In production, never display stack traces, SQL errors, local paths, secrets,
   or other sensitive diagnostics.
+- Do not rely on PHP `display_errors` for safe production responses. Keep Slim's
+  production error details disabled and return generic client-facing failures.
 - Never expose installation, migration, `phpinfo`, debug, or database
   administration endpoints publicly in production.
+- Never use `eval`, execute a user-provided path, or select an included file
+  dynamically from untrusted HTTP input.
+- Do not suppress security-relevant failures with PHP's `@` operator.
 - Give application database credentials only the privileges required at
   runtime. Use separate, appropriately controlled privileges for migrations.
 - Keep dependencies and application code patched, and review changes as

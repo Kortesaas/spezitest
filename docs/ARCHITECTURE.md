@@ -4,9 +4,30 @@
 
 Spezitest will be an internet-facing production application that catalogs
 Cola-Mix / Spezi drinks, primarily from Germany and surrounding countries. This
-document records architectural constraints, not an implemented design. No
-framework, schema, or concrete component layout is selected in the foundation
-stage.
+document records architectural constraints and the PHP runtime foundation.
+Slim Framework 4 with a PSR-7 implementation is selected for HTTP delivery,
+with Composer PSR-4 autoloading under the `Spezitest` namespace. No database
+schema, domain persistence model, template system, or real frontend design is
+selected in this stage.
+
+## Runtime structure
+
+- `public/index.php` is the minimal front controller.
+- `config/bootstrap.php` optionally loads local environment configuration and
+  constructs the application.
+- `src/` contains project classes, including configuration and the application
+  factory.
+- `tests/` constructs the same application directly without starting a web
+  server.
+
+Only `public/` is intended to be the Apache/Plesk document root. Its rewrite
+configuration sends requests for non-existing files and directories to the
+front controller. Application source, configuration, `.env`, Composer files,
+tests, and `vendor/` remain outside the public document root.
+
+The application factory owns route and middleware construction. This keeps the
+front controller small and permits HTTP-level tests without a production server
+or network access.
 
 ## Source of truth
 
@@ -58,11 +79,12 @@ if the chosen structure uses different names:
 This separation is a constraint on responsibilities, not a requirement to
 adopt a particular framework or architectural pattern.
 
-Only the intended public entry point and static public assets should live under
+Only the intended public entry point and static public assets may live under
 the web document root. Configuration, source files, logs, migrations, private
-uploads, and credentials should not be directly web-accessible. Uploaded files
-should normally be stored outside the document root and served only through a
-controlled mechanism when access is required.
+uploads, credentials, Composer metadata, dependencies, and tests must not be
+directly web-accessible. Uploaded files should normally be stored outside the
+document root and served only through a controlled mechanism when access is
+required.
 
 ## Environment portability
 
@@ -71,6 +93,10 @@ Environment-specific values must be supplied through configuration. Deployed
 runtime code must be compatible with PHP 8.3 and MariaDB 10.11, work without
 Node.js running on the server, and not rely on command-line access or disabled
 PHP process/shell functions.
+
+Composer installs the dependency artifact before deployment. The HTTP runtime
+loads that artifact but neither executes Composer nor requires Composer to be
+installed on the production host.
 
 ## Security architecture baseline
 
@@ -89,3 +115,9 @@ users.
 No publicly accessible installer, migration runner, `phpinfo`, debug console,
 or database administration endpoint may exist in production. Runtime database
 credentials must follow least privilege.
+
+Slim error middleware is configured explicitly. Detailed error responses are
+available only outside production when `APP_DEBUG` is explicitly enabled.
+Production forces error detail off and logs application exceptions server-side
+through the configured PSR-3 strategy without returning internal exception
+messages to visitors.

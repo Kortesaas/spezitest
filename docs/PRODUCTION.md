@@ -32,6 +32,16 @@ without Node.js. If build tooling is introduced in a later phase, it must
 produce deployable artifacts before or during an available deployment step;
 Node.js must not be a production runtime dependency.
 
+The Plesk website document root must be configured to the deployed `public/`
+directory. The repository or release root must not be exposed. This keeps
+source, configuration, `.env`, Composer metadata, dependencies, tests, and
+other internals outside direct HTTP access.
+
+Composer dependencies must be resolved and installed before deployment so the
+production artifact already contains the required runtime packages. Processing
+HTTP requests does not invoke Composer and does not require Composer, PHP CLI,
+or shell access on the production server.
+
 The PHP and MariaDB compatibility targets are PHP 8.3 and MariaDB 10.11.
 Resource-intensive operations must respect the stated PHP limits. Application
 upload limits may be lower than the server's 64M request limits when domain and
@@ -43,6 +53,8 @@ security requirements are later defined.
 - Never commit secrets, credentials, populated `.env` files, or private keys.
 - Do not hard-code production paths, domains, database names, or passwords.
 - Treat `.env.example` values as local examples, never production defaults.
+- When no `.env` file exists, supply configuration through actual environment
+  variables; `.env` loading is optional.
 - Use a least-privilege database account for the running application.
 - Keep migration privileges separate from routine application privileges where
   the hosting environment permits it.
@@ -67,6 +79,9 @@ applicable control below is mandatory:
   execute as code.
 - Disable public display of stack traces, SQL errors, local filesystem paths,
   secrets, and sensitive configuration.
+- Keep `APP_DEBUG` disabled in production. Application behavior must not rely
+  on PHP `display_errors`; handled failures return generic responses while
+  details are logged server-side.
 - Do not expose installation, migration, `phpinfo`, debug, or database
   administration endpoints publicly.
 - Log operational failures safely without recording passwords, tokens, or

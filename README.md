@@ -7,29 +7,35 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is in the **initial foundation stage**. It currently documents
-the domain invariants, production constraints, security baseline, data
-lifecycle, and rating-system verification requirements.
+This repository is in the **PHP application-foundation stage**. It contains a
+minimal Slim Framework 4 application, a production-safe error-handling
+baseline, and automated smoke checks. The single placeholder page is not the
+real website design.
 
-There is deliberately no framework, application implementation, database
-schema, authentication system, frontend, Excel migration, or deployment in
-this stage.
+There is deliberately no database code or schema, Spezi domain implementation,
+rating implementation, authentication, admin panel, frontend framework, Excel
+migration, or deployment automation in this stage.
 
 ## Repository organization
 
 - `AGENTS.md`: mandatory guidance for future coding agents.
-- `docs/ARCHITECTURE.md`: architectural boundaries and future design
+- `docs/ARCHITECTURE.md`: architectural boundaries and runtime structure.
+- `docs/PRODUCTION.md`: hosting, deployment, and production security
   constraints.
-- `docs/PRODUCTION.md`: known hosting environment, deployment constraints, and
-  production security requirements.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
 - `docs/RATING_SYSTEM.md`: immutable rating-methodology requirements and the
   verification gate for future implementation.
-- `.env.example`: safe names and placeholder values for environment-based
+- `public/`: the only intended web document root and the minimal front
+  controller.
+- `src/`: application configuration and construction code.
+- `config/`: environment loading and application bootstrap.
+- `tests/`: HTTP-level application smoke tests.
+- `composer.json` and `composer.lock`: PHP dependencies, autoloading, and
+  quality commands.
+- `phpunit.xml.dist` and `phpstan.neon.dist`: test and static-analysis
   configuration.
-- `.gitignore`: excludes local configuration, generated artifacts, and common
-  development files.
+- `.env.example`: safe local environment configuration examples.
 
 ## Core domain model
 
@@ -50,18 +56,60 @@ implementation is used in production.
 ## Production target
 
 The known target is Plesk shared hosting with PHP 8.3 running through FPM and
-Apache, plus MariaDB 10.11. Runtime code must work without Node.js, production
-shell access, or PHP shell/process execution functions. See
+Apache, plus MariaDB 10.11 in a later phase. Runtime code must work without
+Node.js, production shell access, or PHP shell/process execution functions. See
 `docs/PRODUCTION.md` for the complete baseline.
 
 ## Configuration
 
-Future runtime configuration must come from the environment. `.env.example`
-contains safe local placeholders only. Never commit a populated `.env` file or
-real credentials.
+Runtime configuration comes from actual environment variables. For local use,
+`vlucas/phpdotenv` optionally loads a repository-root `.env` file when one is
+present; the application also works when no `.env` file exists. The secure
+defaults are `APP_ENV=production` and `APP_DEBUG=false`, and production always
+suppresses detailed HTTP error output.
+
+`.env.example` contains safe local values only. Never commit a populated `.env`
+file or real credentials.
+
+## Local development
+
+Prerequisites are PHP 8.3 and Composer 2. No database, external service,
+production credential, Node.js installation, or frontend toolchain is needed.
+
+```bash
+composer install
+cp .env.example .env
+composer check
+composer serve
+```
+
+The placeholder application is then available at `http://127.0.0.1:8080`.
+`composer serve` uses PHP's built-in server and is for local development only.
+It is not a production start command.
+
+Individual quality commands are:
+
+```bash
+composer test
+composer analyse
+```
+
+## Production artifact boundary
+
+The production website document root must point to the deployed `public/`
+directory, never the repository root. Application source, configuration,
+Composer metadata, `.env`, tests, and `vendor/` must not be directly accessible
+through the web server.
+
+Composer dependencies must be resolved and installed before deployment, and
+the resulting production artifact must include the required runtime packages.
+Serving HTTP requests does not run Composer commands and does not require
+Composer or command-line access on the server. Production also does not require
+Node.js.
 
 ## Next phase
 
 No next-phase work should begin without explicit instruction. In particular,
-do not select or install a framework, design tables, implement pages or
-authentication, migrate Excel data, or deploy based only on this foundation.
+do not design tables, implement domain records, ratings, real pages,
+authentication or admin functionality, migrate Excel data, or deploy based
+only on this foundation.
