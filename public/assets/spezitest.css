@@ -541,3 +541,293 @@ table{border-collapse:collapse;width:100%}
 @media (min-width:1024px){.filter-panel{border:0;padding:0;position:sticky;top:88px}.filter-panel>summary{display:none}.filter-panel>.stack{margin-top:0}}
 
 .card>.pimg{border-radius:0;border-width:0 0 var(--bw-hair) 0}
+
+/* --- local polish (Packet 8 UX cleanup) --------------------------------------
+   Small, targeted rules layered on the vendored design system: long-name
+   wrapping, tighter list rows, and clickable admin stat panels. No new tokens
+   or visual identity. */
+/* Homepage winner: the score sits inside the image panel, not on its corner. */
+.winner{position:relative;display:block;text-decoration:none;color:inherit}
+.winner__tag{position:absolute;left:var(--sp-5);bottom:var(--sp-5);display:grid;gap:2px;background:var(--surface-accent);color:var(--text-on-red);padding:var(--sp-3) var(--sp-5);border-radius:var(--radius-2);box-shadow:var(--shadow-overlay);max-width:calc(100% - var(--sp-8))}
+.winner__score{font-size:var(--fs-h1);font-weight:var(--fw-bold);line-height:1;letter-spacing:var(--ls-display);font-variant-numeric:tabular-nums}
+.winner__label{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;opacity:.85}
+.winner__name{font-size:var(--fs-sm);font-weight:var(--fw-bold);overflow-wrap:anywhere}
+.winner:hover .winner__tag{background:var(--red-900)}
+
+/* Detail verdict: position first, weighted score alongside it. */
+.verdict-row{display:flex;flex-wrap:wrap;gap:var(--sp-6);align-items:flex-end;border-top:var(--bw-strong) solid var(--line-strong);padding-top:var(--sp-4)}
+.verdict-rank{display:inline-flex;flex-direction:column;line-height:1}
+.verdict-rank__num{font-size:clamp(3rem,10vw,4.5rem);font-weight:var(--fw-bold);letter-spacing:var(--ls-display);color:var(--red);font-variant-numeric:tabular-nums}
+.verdict-rank__label{font-size:var(--fs-h4);font-weight:var(--fw-bold);color:var(--text-muted);margin-top:var(--sp-2)}
+.verdict-row .score__num{font-size:var(--fs-d3);color:var(--text-strong)}
+.verdict-row .score__label{font-size:var(--fs-sm);text-transform:none;letter-spacing:0;color:var(--text-muted)}
+
+/* Detail hero: give the title column room; the bottle does not need half the page. */
+@media (min-width:1024px){.hero--detail{grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:var(--sp-8);align-items:start}}
+.hero--detail .pimg--hero{padding:var(--sp-5);aspect-ratio:1/1}
+
+/* Search type-ahead. */
+.search-wrap{position:relative}
+.suggest{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:var(--z-overlay);background:var(--white);border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-2);box-shadow:var(--shadow-overlay);max-height:420px;overflow-y:auto;padding:var(--sp-2)}
+.suggest__item a{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:var(--sp-3);align-items:center;padding:var(--sp-2);border-radius:var(--radius-1);text-decoration:none;color:inherit}
+.suggest__item.is-active a,.suggest__item a:hover{background:var(--surface-tint);color:inherit}
+.suggest__img{display:flex;align-items:center;justify-content:center;height:44px;background:var(--surface-tint);border-radius:var(--radius-1);overflow:hidden}
+.suggest__img img{max-height:38px;width:auto;object-fit:contain}
+.suggest__body{display:grid;gap:1px;min-width:0}
+.suggest__name{font-weight:var(--fw-bold);color:var(--text-strong);overflow-wrap:anywhere}
+.suggest__sub{font-size:var(--fs-xs);color:var(--text-muted);overflow-wrap:anywhere}
+.suggest__rank{font-weight:var(--fw-bold);color:var(--red);font-variant-numeric:tabular-nums}
+
+.team-photo{margin:0;border-radius:var(--radius-3);overflow:hidden;background:var(--surface-tint)}
+.team-photo img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* Stacked definition lists so long drink names are not squeezed into a column. */
+.meta--dl-stack{display:grid;grid-template-columns:1fr;gap:var(--sp-3)}
+.meta--dl-stack dt{margin-bottom:2px}
+.meta--dl-stack dd{overflow-wrap:anywhere}
+/* Label left, number right — for short key/count pairs. */
+.meta--dl-rows{grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-2) var(--sp-4)}
+.meta--dl-rows dt{align-self:center;overflow-wrap:anywhere}
+.meta--dl-rows dd{text-align:right;font-variant-numeric:tabular-nums}
+
+/* Podium: three equal cards with the same internal rhythm. */
+.podium__item{position:relative;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto auto;gap:var(--sp-2);text-decoration:none;color:inherit;align-items:start;align-content:start;overflow:hidden;
+  transition:transform var(--dur-base) var(--ease-out),box-shadow var(--dur-base) var(--ease-out)}
+.podium__item:hover{color:inherit;transform:translateY(-4px);box-shadow:var(--shadow-overlay)}
+.podium__item:active{transform:translateY(-1px)}
+.podium__media{display:flex;align-items:flex-end;justify-content:center;min-height:150px}
+.podium__media img{max-height:150px;width:auto;transition:transform var(--dur-slow) var(--ease-out)}
+.podium__item:hover .podium__media img{transform:scale(1.06)}
+.podium__item:hover .rank__name{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.podium__body{display:grid;gap:2px}
+.podium__score{font-size:var(--fs-h3);font-weight:var(--fw-bold);line-height:1.1;font-variant-numeric:tabular-nums;color:var(--text-muted)}
+.podium__score small{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--gray-300);margin-left:var(--sp-2)}
+.podium__item--1 .podium__score{color:rgba(255,255,255,.9)}
+.podium__item--1 .podium__score small{color:rgba(255,255,255,.65)}
+.podium__num{line-height:.9}
+.podium__num::before{content:"#";font-size:.55em;vertical-align:.35em;opacity:.45;margin-right:.04em}
+.podium__item--1 .podium__num{color:var(--text-on-red)}
+@media (prefers-reduced-motion:reduce){.podium__item:hover{transform:none}.podium__item:hover .podium__media img{transform:none}}
+
+/* The vendored .card sets a radius but no clipping, so the square-cornered
+   .pimg inside it pokes past the rounded corners. (.card--flat already
+   overrides overflow:visible, so hiding it here is the upstream intent.) */
+.card{overflow:hidden}
+
+/* Product cards respond to the pointer: a small lift and scale. */
+.card-link{transition:transform var(--dur-base) var(--ease-out),box-shadow var(--dur-base) var(--ease-out),border-color var(--dur-fast) var(--ease-out)}
+.card-link:hover{transform:translateY(-4px) scale(1.015);box-shadow:var(--shadow-overlay);border-color:var(--navy-100)}
+.card-link:active{transform:translateY(-1px) scale(1.005)}
+.card-link:focus-visible{transform:translateY(-4px) scale(1.015)}
+@media (prefers-reduced-motion:reduce){
+  .card-link:hover,.card-link:active,.card-link:focus-visible{transform:none}
+}
+
+/* Catalog card: the position leads, the score follows. */
+.card__foot{align-items:baseline}
+.card__rank{font-size:var(--fs-h2);font-weight:var(--fw-bold);line-height:1;letter-spacing:var(--ls-display);color:var(--navy);font-variant-numeric:tabular-nums}
+.card__rank--none{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-muted)}
+.card-link:hover .card__rank{color:var(--red)}
+.card__score{text-align:right;font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--text-muted);font-variant-numeric:tabular-nums;line-height:1.2}
+.card__score small{display:block;font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--gray-300)}
+/* An active chip is navy-on-navy; the base :hover recolours the label to navy
+   and makes it vanish. Keep it white and darken the chip instead. */
+.chip--active:hover,.chip[aria-pressed="true"]:hover{background:var(--red);border-color:var(--red);color:var(--white)}
+.chip--reset{border-style:dashed}
+.chip--reset::after{content:none}
+.chip--reset:hover{border-color:var(--red);color:var(--red)}
+
+/* A page always fills its rows: 24 items divide evenly by 2, 3 and 4 columns,
+   so the last row is never short. */
+.grid--cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:640px){.grid--cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){.grid--cards{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ---- Herkunftskarte ------------------------------------------------------
+   An abstracted Germany drawn in the brand palette: navy land, red dots, no
+   tiles and no third-party map. Dots and outline share one projection. */
+.map{display:grid;gap:var(--sp-6)}
+@media (min-width:900px){.map{grid-template-columns:minmax(0,1fr) 340px;gap:var(--sp-8);align-items:start}}
+.map__canvas{position:relative;margin:0;display:grid;gap:var(--sp-4);justify-items:center}
+.map__canvas svg{width:100%;max-width:440px;height:auto;overflow:visible}
+.map__land{fill:var(--white);stroke:var(--navy);stroke-width:2;stroke-linejoin:round}
+.map__dot{cursor:pointer;outline:none}
+.map__halo{fill:var(--red);opacity:0;transition:opacity var(--dur-base) var(--ease-out)}
+.map__pin{fill:var(--red);stroke:var(--white);stroke-width:1.5;transition:transform var(--dur-base) var(--ease-out);transform-box:fill-box;transform-origin:center}
+.map__dot:hover .map__pin,.map__dot:focus-visible .map__pin,.map__dot.is-active .map__pin{transform:scale(1.35)}
+.map__dot:hover .map__halo,.map__dot:focus-visible .map__halo,.map__dot.is-active .map__halo{opacity:.22}
+.map__dot:focus-visible .map__pin{stroke:var(--navy);stroke-width:2.5}
+.map__legend{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-xs);color:var(--text-muted);text-align:center;max-width:38ch}
+.map__legend-dot{width:10px;height:10px;border-radius:var(--radius-pill);background:var(--red);flex:0 0 10px}
+.map__side{min-width:0}
+/* Side panel and map are the same height; both lists scroll inside it and fade
+   at the bottom edge while there is more to come. */
+/* Distance from the readout card's outer edge to its content: border + padding. */
+.map{--map-h:520px;--readout-inset:calc(var(--bw-strong) + var(--sp-5))}
+.map__readout{border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-2);background:var(--white);padding:var(--sp-5);display:flex;flex-direction:column;max-height:var(--map-h)}
+.map__readout .map__drinks{overflow-y:auto;min-height:0;flex:1;padding-right:var(--sp-2)}
+.map__readout .map__entry-title{flex:none}
+.map__readout .map__back{flex:none}
+.map__scroller{position:relative;min-width:0}
+/* The fade sits above the scroll area and switches off once the end is reached. */
+.map__scroller::after{content:"";position:absolute;left:0;right:var(--sp-2);bottom:0;height:56px;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(237,241,244,0),var(--surface-tint));opacity:0;transition:opacity var(--dur-base) var(--ease-out)}
+.map__scroller.is-scrollable::after{opacity:1}
+/* With the readout card open the hint belongs inside its frame, sitting on the
+   scrolling list rather than on the border. */
+.map__scroller.is-detail::after{left:var(--readout-inset);right:var(--readout-inset);bottom:var(--readout-inset);
+  background:linear-gradient(to bottom,rgba(255,255,255,0),var(--white))}
+.map__scroller.is-detail .map__more{bottom:calc(var(--readout-inset) + 4px)}
+.map__more{position:absolute;left:50%;bottom:var(--sp-2);transform:translateX(-50%);display:none;align-items:center;justify-content:center;
+  width:24px;height:24px;background:var(--navy);color:var(--white);border-radius:var(--radius-pill);
+  font-size:11px;line-height:1;pointer-events:none;z-index:1}
+.map__scroller.is-scrollable .map__more{display:inline-flex}
+.map__more::after{content:"\25BE"}
+.map__back{align-self:flex-start;margin-bottom:var(--sp-4);background:transparent;border:0;padding:0;font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--navy);cursor:pointer;border-bottom:var(--bw-strong) solid var(--red)}
+.map__back:hover{color:var(--red)}
+.map__back::before{content:"\2190";margin-right:var(--sp-2)}
+/* The inner scroll area only makes sense beside the map; on narrow screens the
+   list flows with the page instead of nesting a second scroller. */
+.map__list{padding-right:var(--sp-2)}
+@media (min-width:900px){
+  .map__canvas svg{max-height:var(--map-h)}
+  .map__list{max-height:var(--map-h);overflow-y:auto}
+}
+@media (max-width:899px){
+  .map__scroller::after,.map__more{display:none}
+}
+.map__entry{padding-block:var(--sp-3);border-bottom:var(--bw-hair) solid var(--line-hairline)}
+.map__entry:last-child{border-bottom:0}
+.map__entry.is-active{background:var(--white);box-shadow:inset var(--bw-block) 0 0 var(--red);padding-left:var(--sp-4)}
+.map__entry-title{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3);font-size:var(--fs-h4)}
+.map__entry-count{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);color:var(--white);background:var(--navy);border-radius:var(--radius-pill);padding:2px 9px;flex:none}
+.map__drinks{display:grid;gap:var(--sp-1);margin-top:var(--sp-2)}
+.map__drinks li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);align-items:baseline;font-size:var(--fs-sm)}
+.map__drinks a{font-weight:var(--fw-bold);text-decoration:none;overflow-wrap:anywhere}
+.map__drinks a:hover{text-decoration:underline;text-decoration-thickness:2px}
+.map__place{grid-column:1;font-size:var(--fs-xs);color:var(--text-muted)}
+.map__grade{grid-row:1;grid-column:2;font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
+.map__rest{display:grid;gap:var(--sp-1);margin-top:var(--sp-2);font-size:var(--fs-sm);color:var(--text-muted)}
+.map__rest li{display:flex;justify-content:space-between;gap:var(--sp-3)}
+.map__rest span{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.map__pin{transition:none}}
+
+.card__title,.rank__name{overflow-wrap:anywhere}
+.admin-title,.display-1,.display-2,.display-3,.card__title,.rank__name{overflow-wrap:break-word}
+.rank__sub{overflow-wrap:anywhere}
+
+/* Rank rows: the thumbnail column must match the thumbnail's own width, or the
+   image overflows its track and swallows the gap before the name. */
+.rank__row{grid-template-columns:auto 56px minmax(0,1fr) auto;gap:var(--sp-4);align-items:center}
+.rank__row>.pimg--thumb{width:56px;flex:none}
+.rank__row .rank__name{min-width:0;display:block}
+/* A rounded hover block reads as a stray card against the square separators. */
+.rank__row:hover{border-radius:0;box-shadow:inset var(--bw-rule) 0 0 var(--red)}
+/* The default hover tint IS the tinted section's own background, so inside one
+   the row would highlight to exactly the colour it already sits on. Go white
+   there instead. Applies to the homepage Top 5 and to "Nachbarn im Ranking". */
+.section--tint .rank__row:hover{background:var(--white)}
+.rank__row+.rank__row{margin-top:0}
+
+/* The position is the headline; the score supports it. */
+.rank__pos{font-size:var(--fs-h2);color:var(--text-strong);min-width:3.5ch;text-align:right;letter-spacing:var(--ls-display)}
+.rank__pos::before{content:"#";color:var(--gray-300);margin-right:1px}
+.rank__row--podium .rank__pos{color:var(--red)}
+.rank__row--podium .rank__pos::before{color:var(--red);opacity:.5}
+.rank__score{font-size:var(--fs-body);color:var(--text-muted);font-weight:var(--fw-bold)}
+.rank__row--podium .rank__score{font-size:var(--fs-h4);color:var(--text-body)}
+.rank__score{text-align:right}
+.rank__score small{display:block;font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--gray-300);font-weight:var(--fw-bold);line-height:1.4}
+.rank__text{display:grid;gap:2px;min-width:0}
+/* On narrow screens the position and score must give the name room, or long
+   brand names break mid-word. */
+@media (max-width:640px){
+  .rank__row{grid-template-columns:auto 44px minmax(0,1fr) auto;gap:var(--sp-3)}
+  .rank__row>.pimg--thumb{width:44px;flex:none}
+  .rank__pos{font-size:var(--fs-h4);min-width:2.6ch}
+  .rank__row--podium .rank__pos{font-size:var(--fs-h2)}
+  .rank__row--podium .rank__name{font-size:var(--fs-h4)}
+  .rank__score{font-size:var(--fs-sm)}
+  .rank__score small{display:none}
+}
+/* ---- Admin: the private side of the same product -------------------------
+   Same type scale, colours, spacing and image treatment as the public site,
+   only denser and task-first. */
+.admin{grid-template-columns:minmax(0,1fr);overflow-x:clip}
+.admin-top{padding-inline:var(--sp-5)}
+.admin-top__brand{gap:var(--sp-4)}
+.admin-top__brand img{height:26px;width:auto}
+.admin-top__tag{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:rgba(255,255,255,.72);border-left:var(--bw-hair) solid var(--line-on-navy);padding-left:var(--sp-4)}
+.admin-top__link{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.86)!important}
+.admin-top__link:hover{color:#fff!important;text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:2px}
+.admin-top__logout{background:transparent;border:var(--bw-hair) solid var(--line-on-navy);color:#fff}
+.admin-top__logout:hover{background:var(--red);border-color:var(--red);color:#fff}
+.admin-side{padding-top:var(--sp-5)}
+.admin-head{align-items:center;padding-bottom:var(--sp-4);border-bottom:var(--bw-strong) solid var(--line-strong)}
+
+/* Stat tiles mirror the public "In Zahlen" figures. */
+a.panel{transition:var(--motion-hover)}
+a.panel:hover{border-color:var(--navy);color:inherit}
+.stat{display:grid;gap:var(--sp-3);justify-items:start;align-content:start;text-decoration:none;color:inherit;border-top:var(--bw-rule) solid var(--line-accent)}
+.stat__num{font-size:clamp(2rem,4vw,2.75rem);font-weight:var(--fw-bold);line-height:1;letter-spacing:var(--ls-display);color:var(--text-strong);font-variant-numeric:tabular-nums}
+.stat:hover .stat__num{color:var(--red)}
+
+/* Dashboard work queue. */
+.queue{display:grid}
+.queue__row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-3);align-items:center;padding:var(--sp-3) 0;border-bottom:var(--bw-hair) solid var(--line-hairline)}
+.queue__row:last-child{border-bottom:0}
+.queue__body{display:grid;gap:2px;min-width:0}
+.queue__name{font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;overflow-wrap:anywhere}
+.queue__name:hover{color:var(--red)}
+
+/* Drink table. */
+.table--drinks th:first-child,.table--drinks td:first-child{width:56px;padding-right:0}
+.table__actions{text-align:right;white-space:nowrap}
+.select--sm{min-height:38px;padding:6px 30px 6px 10px;font-size:var(--fs-sm);background-position:right 10px center;width:auto}
+.status-form{flex-wrap:nowrap}
+
+/* Branded upload control everywhere a picture is chosen. */
+.uploader--sm{min-height:88px;padding:var(--sp-4);gap:var(--sp-1)}
+.uploader.is-set{border-style:solid;border-color:var(--navy);color:var(--navy)}
+.label__opt{font-weight:var(--fw-regular);letter-spacing:0;text-transform:none;color:var(--text-muted)}
+
+/* Test entry: identify the drink at a glance, keep the running total in view. */
+.test-summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;margin-bottom:var(--sp-5);position:sticky;top:64px;z-index:var(--z-sticky)}
+.test-summary__body{display:grid;gap:2px;min-width:0}
+.test-summary__name{font-size:var(--fs-h3);font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;overflow-wrap:anywhere}
+.test-summary__name:hover{color:var(--red)}
+
+.btn--danger{color:var(--red-900)}
+.btn--danger:hover{color:#fff;background:var(--red)}
+@media (min-width:1024px){.split--wide{grid-template-columns:minmax(0,1fr) 360px}}
+@media (max-width:1023px){
+  .sticky-actions{gap:var(--sp-2)}
+  .sticky-actions .btn{flex:1 1 auto}
+  .sticky-actions .meta{flex-basis:100%;text-align:center}
+  .grade-scale{gap:var(--sp-1)}
+  .grade-scale label{min-width:44px;min-height:48px;font-size:var(--fs-body)}
+  /* Admin shell: give the top bar room and turn the hidden sidebar into a
+     horizontal tab strip so mobile admin keeps its navigation. */
+  .admin-top{flex-wrap:wrap;row-gap:var(--sp-2)}
+  .admin-top__brand span{display:none}
+  .admin-top>.cluster>a[href="/"]{display:none}
+  .admin-body{display:block}
+  .admin-main{overflow-x:clip}
+  .admin-main .panel{max-width:100%}
+  .admin-side{display:flex;overflow-x:auto;border-right:0;border-bottom:var(--bw-hair) solid var(--line-hairline);padding:0}
+  .admin-side__group{display:none}
+  .admin-side a{white-space:nowrap;border-radius:0;margin:0;border-bottom:var(--bw-rule) solid transparent}
+  .admin-side a[aria-current="page"]{box-shadow:none;border-bottom-color:var(--red);background:transparent}
+  .admin-head{flex-direction:column;align-items:stretch}
+  .admin-head .cluster{width:100%}
+  .admin-head .btn{width:100%}
+  /* Drink list: one card per row instead of a horizontally scrolling table. */
+  .admin-main .table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .admin-main .table tr{display:grid;grid-template-columns:56px 1fr;gap:var(--sp-2) var(--sp-3);padding:var(--sp-3) 0;border-bottom:var(--bw-hair) solid var(--line-hairline)}
+  .admin-main .table td{border:0;padding:0}
+  .admin-main .table td:first-child{grid-row:span 3}
+  .admin-main .table td:nth-child(2){align-self:center}
+  .admin-main .table form.cluster{flex-wrap:nowrap}
+  .admin-main .table td .cluster{justify-content:flex-start!important}
+}
+.toolbar>form{flex-wrap:wrap}

@@ -45,34 +45,53 @@ final class HtmlRenderer
         );
     }
 
-    /** @param array{identified: int, acquired: int, tested: int} $counts */
-    public function dashboard(array $counts, string $csrfToken): string
+    /**
+     * @param array{identified: int, acquired: int, tested: int} $counts
+     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool}> $waiting
+     */
+    public function dashboard(array $counts, array $waiting, string $csrfToken): string
     {
         $total = $counts['identified'] + $counts['acquired'] + $counts['tested'];
+        $queue = '';
 
-        $body = $this->head('Verwaltung', 'Übersicht')
+        foreach (array_slice($waiting, 0, 6) as $drink) {
+            $queue .= '<li class="queue__row">'
+                . $this->thumbnail($drink['id'], $drink['has_primary_image'])
+                . '<span class="queue__body"><a class="queue__name" href="/admin/drinks/' . $drink['id'] . '/edit">'
+                . $this->escape($drink['name']) . '</a>'
+                . ($drink['manufacturer'] === null ? '' : '<span class="meta">' . $this->escape($drink['manufacturer']) . '</span>')
+                . '</span>'
+                . '<a class="btn btn--primary btn--sm" href="/admin/drinks/' . $drink['id'] . '/test">Testen</a></li>';
+        }
+
+        $body = $this->head('', 'Übersicht')
             . '<div class="grid grid--4" style="margin-bottom:var(--sp-6)">'
-            . $this->countPanel('identified', $counts['identified'])
-            . $this->countPanel('acquired', $counts['acquired'])
-            . $this->countPanel('tested', $counts['tested'])
-            . '<div class="panel"><span class="badge">Katalog gesamt</span>'
-            . '<span class="figure__num" style="display:block;margin-top:var(--sp-3);font-size:2.25rem">' . $total . '</span></div>'
+            . $this->countPanel('identified', $counts['identified'], '/admin/drinks?lifecycle_status=identified')
+            . $this->countPanel('acquired', $counts['acquired'], '/admin/drinks?lifecycle_status=acquired')
+            . $this->countPanel('tested', $counts['tested'], '/admin/drinks?lifecycle_status=tested')
+            . '<a class="panel stat" href="/admin/drinks"><span class="badge">Gesamt</span>'
+            . '<span class="stat__num">' . $total . '</span></a>'
             . '</div>'
-            . '<div class="split" style="gap:var(--sp-5)">'
-            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Schnell erfassen</h2>'
-            . '<span class="meta">Bild optional</span></div>'
+            . '<div class="split split--wide">'
+            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Warten auf den Test</h2>'
+            . '<a class="link-arrow" href="/admin/drinks?lifecycle_status=acquired">Alle ' . $counts['acquired'] . '</a></div>'
+            . ($queue === ''
+                ? '<p class="meta">Nichts offen – alle erworbenen Spezis sind getestet.</p>'
+                : '<ul class="queue">' . $queue . '</ul>')
+            . '</section>'
+            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Schnell erfassen</h2></div>'
             . $this->quickAddForm($csrfToken)
             . '</section>'
-            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Wie es weitergeht</h2></div>'
-            . '<ul class="stack-sm meta">'
-            . '<li><strong style="color:var(--navy)">Identifiziert →</strong> im Getränkemarkt kaufen, dann auf „Erworben“ setzen.</li>'
-            . '<li><strong style="color:var(--navy)">Erworben →</strong> Testabend, neun Noten erfassen, Test abschließen.</li>'
-            . '<li><strong style="color:var(--navy)">Getestet →</strong> erscheint automatisch im öffentlichen Ranking.</li>'
-            . '</ul>'
-            . '<p style="margin-top:var(--sp-4)"><a class="btn btn--secondary btn--sm" href="/admin/drinks?lifecycle_status=acquired">Spezis, die auf einen Test warten</a></p>'
-            . '</section></div>';
+            . '</div>';
 
         return $this->document('Übersicht', $body, true, $csrfToken, 'dashboard');
+    }
+
+    private function thumbnail(int $id, bool $hasImage): string
+    {
+        return $hasImage
+            ? '<figure class="pimg pimg--thumb"><img src="/admin/drinks/' . $id . '/image" alt="" loading="lazy"></figure>'
+            : '<figure class="pimg pimg--thumb"><div class="pimg__ph"></div></figure>';
     }
 
     /**
@@ -89,39 +108,43 @@ final class HtmlRenderer
 
         foreach ($drinks as $drink) {
             $id = $drink['id'];
-            $image = $drink['has_primary_image']
-                ? '<figure class="pimg pimg--thumb"><img src="/admin/drinks/' . $id . '/image" alt=""></figure>'
-                : '<figure class="pimg pimg--thumb"><div class="pimg__ph"><span>–</span></div></figure>';
             $testAction = in_array($drink['lifecycle_status'], ['acquired', 'tested'], true)
-                ? ' · <a href="/admin/drinks/' . $id . '/test">' . ($drink['lifecycle_status'] === 'tested' ? 'Test bearbeiten' : 'Testen') . '</a>'
-                : '';
-            $rows .= '<tr><td>' . $image . '</td>'
-                . '<td><a href="/admin/drinks/' . $id . '/edit"><strong>' . $this->escape($drink['name']) . '</strong></a></td>'
-                . '<td>' . ($drink['manufacturer'] === null ? '–' : $this->escape($drink['manufacturer'])) . '</td>'
-                . '<td>' . $this->stateBadge($drink['lifecycle_status'])
-                . '<form method="post" action="/admin/drinks/' . $id . '/status" class="cluster cluster--tight" style="margin-top:var(--sp-2)">'
+                ? '<a class="btn btn--secondary btn--sm" href="/admin/drinks/' . $id . '/test">Test</a>'
+                : '<span class="meta">–</span>';
+            $rows .= '<tr><td>' . $this->thumbnail($id, $drink['has_primary_image']) . '</td>'
+                . '<td><a href="/admin/drinks/' . $id . '/edit"><strong>' . $this->escape($drink['name']) . '</strong></a>'
+                . ($drink['manufacturer'] === null ? '' : '<br><span class="meta">' . $this->escape($drink['manufacturer']) . '</span>') . '</td>'
+                . '<td>' . $this->stateBadge($drink['lifecycle_status']) . '</td>'
+                . '<td class="table__actions"><div class="cluster cluster--tight" style="justify-content:flex-end">'
+                . '<form method="post" action="/admin/drinks/' . $id . '/status" class="cluster cluster--tight status-form">'
                 . $this->csrfField($csrfToken)
-                . $this->statusSelect($drink['lifecycle_status'], 'lifecycle_status', false)
-                . '<button class="btn btn--secondary btn--sm" type="submit">Setzen</button></form></td>'
-                . '<td style="text-align:right;white-space:nowrap"><a href="/admin/drinks/' . $id . '/edit">Bearbeiten</a>'
-                . $testAction
-                . ' · <a href="/admin/drinks/' . $id . '/delete">Löschen</a></td></tr>';
+                . $this->statusSelect($drink['lifecycle_status'], 'lifecycle_status', false, 'Status ändern')
+                . '<noscript><button class="btn btn--secondary btn--sm" type="submit">Setzen</button></noscript></form>'
+                . $testAction . '</div></td></tr>';
         }
+
+        $filtered = $search !== '' || $status !== null;
 
         if ($rows === '') {
-            $rows = '<tr><td colspan="5">Keine Getränke gefunden.</td></tr>';
+            $rows = '<tr><td colspan="4"><p class="meta">Nichts gefunden.</p></td></tr>';
         }
 
-        $body = $this->head('Katalog', 'Spezis', '<a class="btn btn--accent" href="/admin/drinks/new">+ Spezi hinzufügen</a>')
+        $body = $this->head('', 'Spezis', '<a class="btn btn--accent" href="/admin/drinks/new">+ Spezi hinzufügen</a>')
             . $this->error($error)
             . '<div class="panel"><form class="toolbar" method="get" action="/admin/drinks" style="margin-bottom:var(--sp-4)">'
             . '<div class="search" style="flex:1;min-width:220px;max-width:420px"><label class="visually-hidden" for="q">Suchen</label>'
-            . '<input id="q" name="q" type="search" placeholder="Name oder Hersteller" value="' . $this->escape($search) . '"></div>'
+            . '<input id="q" name="q" type="search" placeholder="Name oder Hersteller" value="' . $this->escape($search) . '">'
+            . '<button type="submit">Suchen</button></div>'
             . '<div class="cluster cluster--tight"><label class="label" for="st">Status</label>'
-            . $this->statusSelect($status, 'lifecycle_status', true) . '</div>'
-            . '<button class="btn btn--secondary btn--sm" type="submit">Filtern</button></form>'
-            . '<div class="table-scroll"><table class="table"><thead><tr><th style="width:64px">Bild</th><th>Name</th>'
-            . '<th>Hersteller</th><th>Status</th><th><span class="visually-hidden">Aktionen</span></th></tr></thead>'
+            . $this->statusSelect($status, 'lifecycle_status', true, 'Nach Status filtern', 'st')
+            . '<button class="btn btn--secondary btn--sm" type="submit">Filtern</button>'
+            . ($filtered ? '<a class="btn btn--ghost btn--sm" href="/admin/drinks">Zurücksetzen</a>' : '')
+            . '</div></form>'
+            . '<p class="meta" style="margin-bottom:var(--sp-3)"><strong style="color:var(--navy)">' . count($drinks) . '</strong> '
+            . (count($drinks) === 1 ? 'Eintrag' : 'Einträge') . '</p>'
+            . '<div class="table-scroll"><table class="table table--drinks"><thead><tr>'
+            . '<th><span class="visually-hidden">Bild</span></th><th>Name</th><th>Status</th>'
+            . '<th class="table__actions">Aktionen</th></tr></thead>'
             . '<tbody>' . $rows . '</tbody></table></div></div>';
 
         return $this->document('Spezis', $body, true, $csrfToken, 'drinks');
@@ -130,26 +153,22 @@ final class HtmlRenderer
     /** @param array<array-key, mixed> $values */
     public function createForm(string $csrfToken, array $values = [], ?string $error = null): string
     {
-        $body = $this->head('Schnellerfassung', 'Spezi hinzufügen')
+        $body = $this->head('', 'Spezi hinzufügen')
             . '<div style="max-width:var(--w-form)">'
             . '<form class="panel panel--pad stack-lg" method="post" action="/admin/drinks" enctype="multipart/form-data">'
             . $this->csrfField($csrfToken)
             . $this->error($error)
             . '<div class="field"><label class="label" for="name">Name <span class="req">*</span></label>'
             . '<input class="input" id="name" name="name" maxlength="255" required autofocus '
-            . 'style="font-size:var(--fs-body-lg)" value="' . $this->value($values, 'name') . '">'
-            . '<p class="hint">Marke wie auf dem Etikett. Hersteller, Region und Bild später ergänzen.</p></div>'
+            . 'style="font-size:var(--fs-body-lg)" value="' . $this->value($values, 'name') . '"></div>'
             . '<div class="field"><span class="label" id="stl">Status <span class="req">*</span></span>'
-            . $this->statusSegmented($this->stringValue($values, 'lifecycle_status') ?? 'identified', false)
-            . '<p class="hint">Im Regal gesehen → Identifiziert. Im Kasten → Erworben.</p></div>'
-            . '<div class="field"><span class="label">Bild <span class="meta" style="letter-spacing:0;text-transform:none">(optional)</span></span>'
+            . $this->statusSegmented($this->stringValue($values, 'lifecycle_status') ?? 'identified', false) . '</div>'
+            . '<div class="field"><span class="label">Bild <span class="meta" style="letter-spacing:0;text-transform:none">optional</span></span>'
             . '<label class="uploader"><input type="file" name="picture" accept="image/jpeg,image/png,image/webp" class="visually-hidden">'
-            . '<strong>Foto auswählen</strong><span class="meta">JPEG, PNG oder WebP</span></label></div>'
+            . '<strong>Foto auswählen</strong><span class="meta">JPEG, PNG, WebP</span></label></div>'
             . '<div class="form-actions" style="flex-direction:column;align-items:stretch">'
-            . '<button class="btn btn--accent btn--lg btn--block" type="submit">Spezi hinzufügen</button>'
+            . '<button class="btn btn--accent btn--lg btn--block" type="submit">Hinzufügen</button>'
             . '<a class="btn btn--ghost" href="/admin/drinks">Abbrechen</a></div>'
-            . '<p class="notice"><span>Nach dem Speichern landet der Eintrag direkt im Katalog. '
-            . 'Alles Weitere ist optional und jederzeit nachtragbar.</span></p>'
             . '</form></div>';
 
         return $this->document('Spezi hinzufügen', $body, true, $csrfToken, 'create');
@@ -162,9 +181,10 @@ final class HtmlRenderer
     {
         $id = $drink['id'];
         $imageBlock = $hasImage
-            ? '<figure class="pimg" style="border:0"><img src="/admin/drinks/' . $id . '/image" alt="Primärbild"></figure>'
-                . '<label class="check"><input type="checkbox" name="remove_image" value="1"><span>Vorhandenes Bild entfernen</span></label>'
-            : '<p class="meta">Kein Bild vorhanden.</p>';
+            ? '<figure class="pimg pimg--square" style="border:0"><img src="/admin/drinks/' . $id . '/image" alt="Primärbild"></figure>'
+                . '<label class="check" style="margin-top:var(--sp-3)"><input type="checkbox" name="remove_image" value="1">'
+                . '<span>Bild entfernen</span></label>'
+            : '<figure class="pimg pimg--square"><div class="pimg__ph"><span>Kein Bild</span></div></figure>';
 
         $testLink = in_array($drink['lifecycle_status'], ['acquired', 'tested'], true)
             ? '<a class="btn btn--secondary btn--sm" href="/admin/drinks/' . $id . '/test">'
@@ -173,10 +193,11 @@ final class HtmlRenderer
 
         $body = '<div class="admin-head"><div><nav aria-label="Brotkrumen"><ol class="breadcrumb">'
             . '<li><a href="/admin/drinks">Spezis</a></li><li>' . $this->escape($drink['name']) . '</li></ol></nav>'
-            . '<h1 class="admin-title" style="margin-top:var(--sp-2)">' . $this->escape($drink['name']) . '</h1>'
-            . '<div class="cluster cluster--tight" style="margin-top:var(--sp-2)">' . $this->stateBadge($drink['lifecycle_status']) . '</div></div>'
-            . '<div class="cluster cluster--tight">'
-            . '<a class="btn btn--ghost btn--sm" href="/spezi/' . $id . '">Öffentliche Seite</a>' . $testLink . '</div></div>'
+            . '<div class="cluster cluster--tight" style="margin-top:var(--sp-2)">'
+            . '<h1 class="admin-title">' . $this->escape($drink['name']) . '</h1>'
+            . $this->stateBadge($drink['lifecycle_status']) . '</div></div>'
+            . '<div class="cluster cluster--tight">' . $testLink
+            . '<a class="btn btn--ghost btn--sm" href="/spezi/' . $id . '">Öffentliche Seite</a></div></div>'
             . $this->error($error)
             . '<form method="post" action="/admin/drinks/' . $id . '" enctype="multipart/form-data">'
             . $this->csrfField($csrfToken)
@@ -196,16 +217,17 @@ final class HtmlRenderer
             . '</div></section>'
             . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Status</h2></div>'
             . $this->statusSegmented($drink['lifecycle_status'], $drink['lifecycle_status'] === 'tested')
-            . '<p class="hint" style="margin-top:var(--sp-3)">„Getestet“ lässt sich nur über die Testerfassung setzen '
-            . '(neun Noten für alle drei Tester).</p></section>'
+            . '<p class="hint" style="margin-top:var(--sp-3)">„Getestet“ nur über die Testerfassung.</p></section>'
+            . '<div class="form-actions"><button class="btn btn--primary" type="submit">Änderungen speichern</button>'
+            . '<a class="btn btn--ghost" href="/admin/drinks">Abbrechen</a>'
+            . '<a class="btn btn--ghost btn--danger" href="/admin/drinks/' . $id . '/delete" '
+            . 'style="margin-left:auto">Löschen</a></div>'
             . '</div><aside class="stack-lg">'
             . '<section class="panel"><div class="panel__head"><h2 class="panel__title">Bild</h2></div>'
             . $imageBlock
-            . '<div class="field" style="margin-top:var(--sp-3)"><label class="label" for="pic">Bild ersetzen</label>'
-            . '<input type="file" id="pic" name="picture" accept="image/jpeg,image/png,image/webp"></div></section>'
+            . $this->pictureField('pic', $hasImage ? 'Ersetzen' : 'Hinzufügen')
+            . '</section>'
             . '</aside></div>'
-            . '<div class="sticky-actions"><button class="btn btn--primary" type="submit">Änderungen speichern</button>'
-            . '<a class="btn btn--ghost" href="/admin/drinks">Abbrechen</a></div>'
             . '</form>';
 
         return $this->document('Spezi bearbeiten', $body, true, $csrfToken, 'drinks');
@@ -217,7 +239,7 @@ final class HtmlRenderer
     public function deleteConfirmation(array $drink, string $csrfToken, ?string $error = null): string
     {
         $id = $drink['id'];
-        $body = $this->head('Katalog', 'Spezi löschen')
+        $body = $this->head('', 'Spezi löschen')
             . '<div class="panel panel--pad" style="max-width:var(--w-form)">'
             . $this->error($error)
             . '<p>Soll „<strong>' . $this->escape($drink['name']) . '</strong>“ wirklich gelöscht werden? '
@@ -237,6 +259,7 @@ final class HtmlRenderer
         array $drink,
         TestFormData $data,
         string $csrfToken,
+        bool $hasImage = false,
         ?string $error = null,
     ): string {
         $id = $drink['id'];
@@ -252,18 +275,18 @@ final class HtmlRenderer
             }
 
             $panels .= '<section class="panel panel--pad"><div class="panel__head">'
-                . '<h2 class="panel__title">' . $this->escape($label) . '</h2>'
-                . '<span class="meta">Ganze Zahl 0–10 · 0 = niedrig, 10 = hoch</span></div>'
+                . '<h2 class="panel__title">' . $this->escape($label) . '</h2></div>'
                 . '<div class="stack-lg">' . $fields . '</div></section>';
         }
 
-        $summary = '<div class="panel panel--pad" style="margin-bottom:var(--sp-5)"><div class="cluster cluster--between">'
-            . '<div><span class="eyebrow">Getestet wird</span>'
-            . '<p class="h3" style="font-weight:700;color:var(--navy)">' . $this->escape($drink['name']) . '</p>'
-            . '<p class="meta">Status: ' . $this->escape($this->statusLabel($drink['lifecycle_status'])) . '</p></div>'
-            . '<div class="score" style="align-items:flex-end"><span class="score__label">Gesamtwertung (berechnet)</span>'
-            . '<span class="score__num" style="font-size:2.5rem" data-gesamt-preview>'
-            . ($data->result !== null ? $this->grade($data->result->gesamt()) : '–') . '</span></div></div></div>';
+        $summary = '<div class="panel test-summary">'
+            . $this->thumbnail($id, $hasImage)
+            . '<div class="test-summary__body">'
+            . '<a class="test-summary__name" href="/admin/drinks/' . $id . '/edit">' . $this->escape($drink['name']) . '</a>'
+            . '<span class="meta">Noten 0–10 · höher ist besser</span></div>'
+            . '<div class="score" style="align-items:flex-end"><span class="score__label">Gesamt</span>'
+            . '<span class="score__num" style="font-size:2.25rem" data-gesamt-preview>'
+            . ($data->result !== null ? $this->grade($data->result->gesamt()) : '–') . '</span></div></div>';
 
         $priceValue = $this->escape($data->price);
         $notesValue = $this->escape($data->notes);
@@ -288,13 +311,12 @@ final class HtmlRenderer
             . '<div class="field"><label class="label" for="tp">Preis pro Gebinde</label>'
             . '<input class="input" id="tp" name="price" inputmode="decimal" placeholder="0,89" value="' . $priceValue . '"></div>'
             . '</div></section>'
-            . '<p class="notice"><span><strong>Prüfung vor dem Abschließen:</strong> Alle neun Noten müssen gesetzt sein. '
-            . 'Erst dann wird der Status auf „Getestet“ gesetzt.</span></p>'
             . '<div class="sticky-actions">'
             . '<button class="btn btn--accent" type="submit" formaction="/admin/drinks/' . $id . '/test/complete">'
-            . 'Test abschließen &amp; auf „Getestet“ setzen</button>'
+            . 'Abschließen</button>'
             . '<button class="btn btn--secondary" type="submit">Zwischenspeichern</button>'
-            . '<a class="btn btn--ghost" href="/admin/drinks/' . $id . '/edit">Abbrechen</a></div>'
+            . '<a class="btn btn--ghost" href="/admin/drinks/' . $id . '/edit">Abbrechen</a>'
+            . '<span class="meta" style="align-self:center">Abschließen setzt „Getestet“ – alle 9 Noten nötig.</span></div>'
             . '</form>';
 
         return $this->document('Test erfassen', $body, true, $csrfToken, 'drinks');
@@ -304,7 +326,7 @@ final class HtmlRenderer
     {
         return $this->document(
             'Nicht gefunden',
-            $this->head('Verwaltung', 'Nicht gefunden')
+            $this->head('', 'Nicht gefunden')
             . '<div class="panel panel--pad"><p>Der Eintrag wurde nicht gefunden.</p>'
             . '<p style="margin-top:var(--sp-3)"><a class="btn btn--secondary btn--sm" href="/admin/drinks">Zur Übersicht</a></p></div>',
             true,
@@ -318,9 +340,11 @@ final class HtmlRenderer
     private function document(string $title, string $content, bool $authenticated, string $csrfToken = '', string $active = ''): string
     {
         $shellOpen = '<div class="admin"><div class="admin-top">'
-            . '<a class="admin-top__brand" href="/admin"><img src="/assets/spezitest-icon.svg" alt="" width="24" height="24"><span>Spezitest</span> Verwaltung</a>'
+            . '<a class="admin-top__brand" href="/admin">'
+            . '<img src="/assets/spezitest-logo-white.svg" alt="Spezitest" width="120" height="28">'
+            . '<span class="admin-top__tag">Verwaltung</span></a>'
             . '<div class="cluster cluster--tight">'
-            . ($authenticated ? '<a href="/" style="font-size:var(--fs-sm);font-weight:700">Website ansehen</a>' : '')
+            . ($authenticated ? '<a class="admin-top__link" href="/">Website ansehen</a>' : '')
             . ($authenticated ? $this->logoutButton($csrfToken) : '')
             . '</div></div>';
 
@@ -336,9 +360,11 @@ final class HtmlRenderer
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . $this->escape($title) . ' · Spezitest Verwaltung</title>'
             . '<meta name="robots" content="noindex, nofollow">'
-            . '<link rel="stylesheet" href="/assets/spezitest.css">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p16">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
-            . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shellOpen . '</body></html>';
+            . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shellOpen
+            . '<script src="/assets/spezitest.js?v=p16" defer></script>'
+            . '</body></html>';
     }
 
     private function sidebar(string $active): string
@@ -360,16 +386,18 @@ final class HtmlRenderer
 
     private function head(string $eyebrow, string $title, string $actions = ''): string
     {
-        return '<div class="admin-head"><div><span class="eyebrow">' . $this->escape($eyebrow) . '</span>'
+        return '<div class="admin-head"><div>'
+            . ($eyebrow !== '' ? '<span class="eyebrow">' . $this->escape($eyebrow) . '</span>' : '')
             . '<h1 class="admin-title">' . $this->escape($title) . '</h1></div>'
             . ($actions !== '' ? '<div class="cluster cluster--tight">' . $actions . '</div>' : '')
             . '</div>';
     }
 
-    private function countPanel(string $status, int $count): string
+    private function countPanel(string $status, int $count, string $href): string
     {
-        return '<div class="panel"><div class="cluster cluster--between">' . $this->stateBadge($status) . '</div>'
-            . '<span class="figure__num" style="display:block;margin-top:var(--sp-3);font-size:2.25rem">' . $count . '</span></div>';
+        return '<a class="panel stat" href="' . $this->escape($href) . '">'
+            . $this->stateBadge($status)
+            . '<span class="stat__num">' . $count . '</span></a>';
     }
 
     private function quickAddForm(string $csrfToken): string
@@ -380,10 +408,22 @@ final class HtmlRenderer
             . '<input class="input" id="qn" name="name" maxlength="255" required placeholder="z. B. Talbach Cola-Mix"></div>'
             . '<div class="field"><span class="label">Status <span class="req">*</span></span>'
             . $this->statusSegmented('identified', false) . '</div>'
-            . '<div class="field"><span class="label">Bild <span class="meta" style="letter-spacing:0;text-transform:none">(optional)</span></span>'
-            . '<input type="file" name="picture" accept="image/jpeg,image/png,image/webp"></div>'
-            . '<div class="form-actions"><button class="btn btn--accent" type="submit">Spezi hinzufügen</button>'
-            . '<a class="btn btn--ghost" href="/admin/drinks/new">Mit Details →</a></div></form>';
+            . $this->pictureField('qp', 'Bild')
+            . '<button class="btn btn--accent btn--block" type="submit">Spezi hinzufügen</button></form>';
+    }
+
+    /**
+     * The branded upload control, used everywhere a picture is chosen so the
+     * admin never falls back to the unstyled browser file input.
+     */
+    private function pictureField(string $id, string $label): string
+    {
+        return '<div class="field"><span class="label">' . $this->escape($label)
+            . ' <span class="label__opt">optional</span></span>'
+            . '<label class="uploader uploader--sm" for="' . $this->escape($id) . '">'
+            . '<input type="file" id="' . $this->escape($id) . '" name="picture" '
+            . 'accept="image/jpeg,image/png,image/webp" class="visually-hidden" data-uploader>'
+            . '<strong>Foto auswählen</strong><span class="meta" data-uploader-name>JPEG, PNG, WebP</span></label></div>';
     }
 
     private function gradeScale(string $name, string $selected): string
@@ -422,15 +462,27 @@ final class HtmlRenderer
         return '<div class="segmented" role="group">' . $buttons . '</div>';
     }
 
-    private function statusSelect(?string $selected, string $name, bool $includeAll): string
-    {
+    private function statusSelect(
+        ?string $selected,
+        string $name,
+        bool $includeAll,
+        string $label = '',
+        string $id = '',
+    ): string {
         $options = $includeAll ? '<option value="">Alle</option>' : '';
 
-        foreach (['identified' => 'Identifiziert', 'acquired' => 'Erworben', 'tested' => 'Getestet'] as $value => $label) {
-            $options .= '<option value="' . $value . '"' . ($selected === $value ? ' selected' : '') . '>' . $this->escape($label) . '</option>';
+        foreach (['identified' => 'Identifiziert', 'acquired' => 'Erworben', 'tested' => 'Getestet'] as $value => $optionLabel) {
+            $options .= '<option value="' . $value . '"' . ($selected === $value ? ' selected' : '') . '>' . $this->escape($optionLabel) . '</option>';
         }
 
-        return '<select class="select" name="' . $this->escape($name) . '" style="width:auto">' . $options . '</select>';
+        // Row-level status changes submit on change; the noscript button in the
+        // markup keeps the form usable without JavaScript.
+        $submit = $includeAll ? '' : ' data-autosubmit';
+
+        return '<select class="select select--sm" name="' . $this->escape($name) . '"'
+            . ($id !== '' ? ' id="' . $this->escape($id) . '"' : '')
+            . ($label !== '' ? ' aria-label="' . $this->escape($label) . '"' : '')
+            . $submit . '>' . $options . '</select>';
     }
 
     private function stateBadge(string $status): string
@@ -454,7 +506,7 @@ final class HtmlRenderer
     {
         return '<form method="post" action="/admin/logout" style="display:inline">'
             . $this->csrfField($csrfToken)
-            . '<button class="btn btn--sm" type="submit" style="background:var(--red);color:#fff">Abmelden</button></form>';
+            . '<button class="btn btn--sm admin-top__logout" type="submit">Abmelden</button></form>';
     }
 
     private function csrfField(string $token): string

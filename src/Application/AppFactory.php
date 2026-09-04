@@ -123,6 +123,9 @@ final class AppFactory
         $app->group('', static function (RouteCollectorProxy $group) use ($controller): void {
             $group->get('/', [$controller, 'home']);
             $group->get('/spezis', [$controller, 'catalog']);
+            $group->get('/spezis/vorschlaege', [$controller, 'suggestions']);
+            $group->get('/impressum', [$controller, 'impressum']);
+            $group->get('/datenschutz', [$controller, 'datenschutz']);
             $group->get('/ranking', [$controller, 'ranking']);
             $group->get('/statistik', [$controller, 'statistik']);
             $group->get('/ueber', [$controller, 'ueber']);

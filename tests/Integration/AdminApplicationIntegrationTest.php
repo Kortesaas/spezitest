@@ -114,11 +114,11 @@ final class AdminApplicationIntegrationTest extends TestCase
 
         $dashboard = (string) $this->request('GET', '/admin')->getBody();
         self::assertMatchesRegularExpression(
-            '/state--identified">Identifiziert<\/span><\/div><span class="figure__num"[^>]*>1<\/span>/',
+            '/state--identified">Identifiziert<\/span><span class="stat__num">1<\/span>/',
             $dashboard,
         );
         self::assertMatchesRegularExpression(
-            '/state--acquired">Erworben<\/span><\/div><span class="figure__num"[^>]*>1<\/span>/',
+            '/state--acquired">Erworben<\/span><span class="stat__num">1<\/span>/',
             $dashboard,
         );
 
@@ -127,7 +127,7 @@ final class AdminApplicationIntegrationTest extends TestCase
             ->withQueryParams(['lifecycle_status' => 'acquired', 'q' => 'Doppelter']);
         $filtered = $this->app->handle($filteredRequest);
         self::assertSame(200, $filtered->getStatusCode());
-        self::assertSame(1, substr_count((string) $filtered->getBody(), 'Bearbeiten</a>'));
+        self::assertSame(1, substr_count((string) $filtered->getBody(), '/edit"><strong>'));
 
         $edit = $this->request('POST', '/admin/drinks/' . $firstId, [
             '_csrf' => $this->csrfToken(),

@@ -6,6 +6,7 @@ namespace Spezitest\Website\View;
 
 use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
+use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrink;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Statistics;
@@ -28,63 +29,54 @@ final class WebsiteRenderer
 
         $hero = '<section class="wrap section"><div class="hero">'
             . '<div class="stack-lg"><div class="stack">'
-            . '<span class="eyebrow eyebrow--accent">Qualitätsurteil – Gesamt</span>'
+            . '<span class="eyebrow eyebrow--accent">Spezitest</span>'
             . '<h1 class="display-1">' . Html::e($this->headline($counts['tested'])) . '</h1>'
-            . '<p class="lede">Die Abteilung Spezitest identifiziert, erwirbt und testet Cola-Mix-Getränke aus '
-            . 'Deutschland und den Nachbarländern. Gleiche Kriterien, gleiche Gläser, drei Tester.</p></div>'
-            . '<div class="cluster"><a class="btn btn--primary btn--lg" href="/spezis">Katalog durchsuchen</a>'
-            . '<a class="btn btn--secondary btn--lg" href="/ranking">Zum Ranking</a></div>'
-            . '<dl class="meta--dl" style="max-width:520px">'
-            . '<dt>Kriterien</dt><dd>Optik · Süffigkeit · Geschmack</dd>'
-            . '<dt>Tester</dt><dd>Manu · Fabi · Schorsch</dd>'
-            . '<dt>Skala</dt><dd>0 bis 10 je Kriterium, höher ist besser</dd></dl></div>';
+            . '<p class="lede">Wir haben jedes Cola-Mix-Getränk aus Deutschland und den Nachbarländern gefunden, gekauft '
+            . 'und nach Optik, Süffigkeit und Geschmack bewertet.</p></div>'
+            . '<div class="cluster"><a class="btn btn--primary btn--lg" href="/spezis">Zum Katalog</a>'
+            . '<a class="btn btn--secondary btn--lg" href="/ranking">Zum Ranking</a></div></div>';
 
         if ($top !== [] && $best !== null) {
             $leader = $top[0];
-            $hero .= '<div style="position:relative">'
+            $hero .= '<a class="winner" href="/spezi/' . Html::e($leader->slug()) . '">'
                 . $this->productImage($leader, 'pimg--hero')
-                . '<div class="score score--block" style="position:absolute;left:0;bottom:0">'
-                . '<span class="score__num" style="font-size:var(--fs-h1)">' . Html::grade($best->gesamt()) . '</span>'
-                . '<span class="score__label">Testsieger · ' . Html::e($leader->name) . '</span></div></div>';
+                . '<span class="winner__tag"><span class="winner__score">' . Html::grade($best->gesamt()) . '</span>'
+                . '<span class="winner__label">Testsieger</span><span class="winner__name">' . Html::e($leader->name) . '</span></span></a>';
         } else {
-            $hero .= '<div class="empty"><span class="eyebrow">Noch kein Testsieger</span>'
-                . '<p class="empty__title">Der erste Test steht noch aus</p>'
-                . '<p>Sobald ein Getränk getestet ist, erscheint hier das beste Gesamturteil.</p></div>';
+            $hero .= '<div class="empty"><p class="empty__title">Noch kein Testsieger</p>'
+                . '<p>Erscheint mit dem ersten abgeschlossenen Test.</p></div>';
         }
 
         $hero .= '</div></section>';
 
         $topSection = '<section class="section section--tint"><div class="wrap stack-lg">'
-            . '<div class="cluster cluster--between"><div><span class="eyebrow">Bestenliste</span>'
-            . '<h2 class="display-3">' . ($top === [] ? 'Die besten Spezis' : 'Die Top ' . count($top) . ' im Test') . '</h2></div>'
-            . '<a class="link-arrow" href="/ranking">Vollständiges Ranking</a></div>'
+            . '<div class="cluster cluster--between"><h2 class="display-3">'
+            . ($top === [] ? 'Bestenliste' : 'Top ' . count($top)) . '</h2>'
+            . '<a class="link-arrow" href="/ranking">Ganzes Ranking</a></div>'
             . ($top === []
-                ? '<div class="empty"><p class="empty__title">Noch keine getesteten Spezis</p><p>Die Bestenliste füllt sich mit dem ersten abgeschlossenen Test.</p></div>'
+                ? '<div class="empty"><p class="empty__title">Noch keine getesteten Spezis</p><p>Füllt sich mit dem ersten abgeschlossenen Test.</p></div>'
                 : '<div class="rank">' . $this->rankRows($top, 3) . '</div>')
             . '</div></section>';
 
-        $activity = $collection->recent(5);
-        $activitySection = '<section class="section"><div class="wrap split split--sidebar">'
-            . '<div class="stack-lg"><div class="cluster cluster--between"><div>'
-            . '<span class="eyebrow">Neu im Katalog</span><h2 class="display-3">Zuletzt passiert</h2></div>'
-            . '<a class="link-arrow" href="/spezis?sort=recent">Alle ansehen</a></div>'
-            . ($activity === []
-                ? '<div class="empty"><p class="empty__title">Der Katalog ist noch leer</p><p>Neu erfasste Spezis erscheinen hier.</p></div>'
-                : '<ul class="stack">' . implode('', array_map($this->activityRow(...), $activity)) . '</ul>')
+        $worst = array_slice(array_reverse($ranked), 0, 5);
+        $tailSection = '<section class="section"><div class="wrap split split--sidebar">'
+            . '<div class="stack-lg"><div class="cluster cluster--between">'
+            . '<h2 class="display-3">Schlusslichter</h2>'
+            . '<a class="link-arrow" href="/ranking">Ganzes Ranking</a></div>'
+            . ($worst === []
+                ? '<div class="empty"><p class="empty__title">Noch nichts getestet</p></div>'
+                : '<div class="rank">' . $this->rankRows($worst, 0) . '</div>')
             . '</div>'
-            . '<aside class="stack-lg"><div class="panel card--strong">'
-            . '<span class="eyebrow">Fehlt uns noch</span>'
-            . '<p class="h3" style="margin-top:var(--sp-2);font-weight:700;color:var(--navy)">'
-            . $counts['identified'] . ' ' . ($counts['identified'] === 1 ? 'Spezi ist' : 'Spezis sind')
-            . ' identifiziert, aber noch nicht im Kasten.</p>'
-            . '<p class="meta" style="margin-top:var(--sp-3)">Wer eines davon im Getränkemarkt sieht: '
-            . 'Regal fotografieren, Standort melden.</p>'
-            . '<p style="margin-top:var(--sp-4)"><a class="btn btn--secondary btn--block" href="/spezis?status%5B%5D=identified">Liste ansehen</a></p></div>'
+            . '<aside><div class="panel card--strong sticky-side">'
+            . '<span class="eyebrow eyebrow--accent">Noch gesucht</span>'
+            . '<p class="figure__num" style="display:block;margin-top:var(--sp-3);font-size:var(--fs-d3)">' . $counts['identified'] . '</p>'
+            . '<p class="meta" style="margin-top:var(--sp-2)">Spezis sind identifiziert, aber noch nicht im Kasten.</p>'
+            . '<p style="margin-top:var(--sp-5)"><a class="btn btn--secondary btn--block" href="/spezis?status%5B%5D=identified">Liste ansehen</a></p></div>'
             . '</aside></div></section>';
 
         return Layout::page(
             'Start',
-            $hero . $topSection . $activitySection . $this->figuresSection($collection),
+            $hero . $topSection . $tailSection . $this->figuresSection($collection),
             'start',
             'Cola-Mix und Spezi im Test: Katalog, Ranking und Statistik der Abteilung Spezitest.',
         );
@@ -96,17 +88,19 @@ final class WebsiteRenderer
 
         $body = '<div class="wrap section" style="padding-bottom:var(--sp-5)">'
             . '<nav aria-label="Brotkrumen"><ol class="breadcrumb"><li><a href="/">Start</a></li><li>Spezis</li></ol></nav>'
-            . '<div class="stack" style="margin-top:var(--sp-3)"><h1 class="display-3">Spezi-Katalog</h1>'
-            . '<p class="lede">' . $this->catalogSummary($page) . '</p>'
-            . '<form class="search" role="search" method="get" action="/spezis">'
+            . '<div class="stack" style="margin-top:var(--sp-3)"><h1 class="display-3">Spezis</h1>'
+            . '<form class="search-wrap" role="search" method="get" action="/spezis" data-suggest>'
+            . '<div class="search">'
             . '<label class="visually-hidden" for="q">Spezi suchen</label>'
-            . '<input id="q" name="q" type="search" placeholder="Marke, Hersteller, Region …" value="' . Html::e($query->search) . '">'
+            . '<input id="q" name="q" type="search" placeholder="Marke, Hersteller, Region …" '
+            . 'autocomplete="off" role="combobox" aria-expanded="false" aria-controls="q-suggest" '
+            . 'aria-autocomplete="list" value="' . Html::e($query->search) . '">'
             . $this->hiddenSortField($query)
-            . '<button type="submit">Suchen</button></form></div></div>';
+            . '<button type="submit">Suchen</button></div>'
+            . '<ul class="suggest" id="q-suggest" role="listbox" aria-label="Vorschläge" hidden></ul>'
+            . '</form></div></div>';
 
-        $body .= '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="split split--filters">'
-            . '<aside>' . $this->catalogFilters($page) . '</aside>'
-            . '<div class="stack-lg">'
+        $body .= '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="stack-lg">'
             . $this->catalogToolbar($page)
             . '<p class="meta"><strong style="color:var(--navy)">' . $page->totalMatches . ' '
             . ($page->totalMatches === 1 ? 'Ergebnis' : 'Ergebnisse') . '</strong>'
@@ -118,7 +112,7 @@ final class WebsiteRenderer
                     . '</div>'
                 : '<div class="grid grid--cards">' . implode('', array_map($this->catalogCard(...), $page->items)) . '</div>')
             . $this->pagination($page)
-            . '</div></div></div>';
+            . '</div></div>';
 
         return Layout::page('Spezis', $body, 'spezis', 'Alle katalogisierten Cola-Mix- und Spezi-Getränke mit Status und Gesamtwertung.');
     }
@@ -131,32 +125,29 @@ final class WebsiteRenderer
 
         $hero = '<div class="wrap" style="padding-top:var(--sp-4)"><nav aria-label="Brotkrumen"><ol class="breadcrumb">'
             . '<li><a href="/">Start</a></li><li><a href="/spezis">Spezis</a></li><li>' . Html::e($drink->name) . '</li></ol></nav></div>'
-            . '<article><section class="wrap section" style="padding-top:var(--sp-5)"><div class="hero">'
-            . '<div style="max-width:440px">' . $this->productImage($drink, 'pimg--hero') . '</div>'
+            . '<article><section class="wrap section" style="padding-top:var(--sp-5)"><div class="hero hero--detail">'
+            . '<div>' . $this->productImage($drink, 'pimg--hero') . '</div>'
             . '<div class="stack-lg"><div class="stack">'
             . '<div class="cluster cluster--tight">' . Html::stateBadge($drink->lifecycleStatus, true)
-            . ($drink->isTested() && $drink->rank !== null
-                ? '<span class="badge badge--outline">Rang ' . $drink->rank . ' von ' . count($collection->tested()) . '</span>'
-                : '')
             . '</div><h1 class="display-2">' . Html::e($drink->name) . '</h1>'
             . ($subtitleParts !== [] ? '<p class="lede">' . Html::e(implode(' · ', $subtitleParts)) . '</p>' : '')
             . '</div>';
 
         if ($result !== null) {
-            $hero .= '<div class="cluster" style="gap:var(--sp-6);align-items:flex-end;border-top:var(--bw-strong) solid var(--line-strong);padding-top:var(--sp-4)">'
-                . '<div class="score score--hero"><span class="score__num">' . Html::grade($result->gesamt()) . '</span>'
-                . '<span class="score__label">Gesamtwertung</span></div>'
-                . '<p class="meta" style="max-width:26ch">Skala 0 bis 60, höher ist besser. Gewichtet aus Optik, '
-                . 'Süffigkeit und Geschmack. Keine Sterne, keine Prozent.</p></div>'
+            $hero .= '<div class="verdict-row">'
+                . ($drink->rank !== null
+                    ? '<div class="verdict-rank"><span class="verdict-rank__num">#' . $drink->rank . '</span>'
+                        . '<span class="verdict-rank__label">von ' . count($collection->tested()) . ' getesteten</span></div>'
+                    : '')
+                . '<div class="score"><span class="score__num">' . Html::grade($result->gesamt()) . '</span>'
+                . '<span class="score__label">Gesamtwertung · 0–60</span></div></div>'
                 . $this->ratingBreakdown($result)
                 . $this->testerGrid($drink);
         } else {
-            $hero .= '<div class="notice"><span>Dieses Getränk ist noch nicht getestet. '
-                . 'Sobald ein Testabend stattgefunden hat, erscheinen hier Gesamtwertung und Einzelnoten.</span></div>';
+            $hero .= '<div class="notice"><span>Noch nicht getestet – Wertung und Einzelnoten folgen nach dem Testabend.</span></div>';
         }
 
-        $hero .= '<div class="cluster"><a class="btn btn--ghost" href="/spezis">← Zurück zum Katalog</a></div>'
-            . '</div></div></section>';
+        $hero .= '</div></div></section>';
 
         $body = $hero . $this->detailSidebar($drink, $collection) . '</article>';
 
@@ -177,12 +168,11 @@ final class WebsiteRenderer
         $rest = array_slice($ranked, 3);
 
         $band = '<div class="band"><div class="wrap band__inner"><div class="cluster cluster--between" style="align-items:flex-end">'
-            . '<div class="stack"><span class="eyebrow" style="color:rgba(255,255,255,.85)">Qualitätsurteil – Gesamt</span>'
-            . '<h1 class="display-2" style="color:#fff">Ranking</h1></div>'
-            . '<p style="max-width:36ch;font-weight:700;font-size:var(--fs-body-lg)">'
+            . '<h1 class="display-2" style="color:#fff">Ranking</h1>'
+            . '<p style="font-weight:700;font-size:var(--fs-body-lg)">'
             . ($ranked === []
-                ? 'Sobald Spezis getestet sind, stehen sie hier – sortiert nach Gesamtwertung.'
-                : 'Alle ' . count($ranked) . ' getesteten Spezis, sortiert nach Gesamtwertung. Höher ist besser.')
+                ? 'Noch kein Test abgeschlossen.'
+                : count($ranked) . ' getestete Spezis · nach Gesamtwertung (0–60)')
             . '</p></div></div></div>';
 
         if ($ranked === []) {
@@ -194,35 +184,30 @@ final class WebsiteRenderer
         $body = $band . '<div class="wrap section">'
             . ($podium !== [] ? '<div class="podium" style="margin-block:var(--sp-6)">' . $this->podium($podium) . '</div>' : '')
             . '<div class="rank">' . $this->rankRows($rest, 0) . '</div>'
-            . '<p class="notice" style="margin-top:var(--sp-6)"><span><strong>Zur Skala:</strong> '
-            . 'Jedes Kriterium wird von 0 bis 10 bewertet, höher ist besser. Die Gesamtwertung entsteht gewichtet '
-            . 'aus Optik (×1), Süffigkeit (×2) und Geschmack (×3) und wird nicht in Sterne oder Prozent umgerechnet.</span></p>'
+            . '<p class="meta" style="margin-top:var(--sp-6)">Gesamtwertung = Optik ×1 + Süffigkeit ×2 + Geschmack ×3, je 0–10. '
+            . '<a href="/ueber#methode">Methode</a></p>'
             . '</div>';
 
         return Layout::page('Ranking', $body, 'ranking', 'Das vollständige Spezitest-Ranking nach Gesamtwertung.');
     }
 
-    public function statistik(Statistics $stats): string
+    public function statistik(Statistics $stats, OriginMap $map): string
     {
-        $intro = '<section class="wrap section"><div class="split" style="align-items:end">'
-            . '<div class="stack"><span class="eyebrow eyebrow--accent">Statistik</span>'
-            . '<h1 class="display-2">Was die Testabende über Cola-Mix verraten.</h1></div>'
-            . '<p class="lede">Der Katalog ist kein Dashboard. Alle Werte hier werden aus den erfassten Tests '
-            . 'berechnet – nichts ist geschätzt oder erfunden.</p></div>';
+        $intro = '<section class="wrap section">'
+            . '<h1 class="display-2">Statistik</h1>';
 
         if ($stats->testedCount === 0) {
-            $intro .= '<div class="empty" style="margin-top:var(--sp-7)"><p class="empty__title">Noch keine Auswertung</p>'
-                . '<p>Statistiken erscheinen, sobald mindestens ein Test abgeschlossen ist. '
-                . 'Aktuell erfasst: ' . $stats->total . ' ' . ($stats->total === 1 ? 'Eintrag' : 'Einträge') . '.</p></div></section>';
+            $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Noch keine Auswertung</p>'
+                . '<p>Erscheint mit dem ersten abgeschlossenen Test. Erfasst: ' . $stats->total . '.</p></div></section>';
 
             return Layout::page('Statistik', $intro, 'statistik');
         }
 
-        $intro .= '<div class="figure-row" style="margin-top:var(--sp-7)">'
-            . $this->figure((string) $stats->testedCount, 'Spezis getestet')
-            . $this->figure((string) $stats->total, 'Einträge im Katalog')
-            . $this->figure(Html::gradeOrDash($stats->averageGesamt), 'Ø Gesamtwertung')
-            . $this->figure((string) $stats->lifecycleCounts['identified'], 'noch nicht erworben')
+        $intro .= '<div class="figure-row" style="margin-top:var(--sp-6)">'
+            . $this->figure((string) $stats->testedCount, 'getestet')
+            . $this->figure((string) $stats->total, 'im Katalog')
+            . $this->figure(Html::gradeOrDash($stats->averageGesamt), 'Ø Gesamt')
+            . $this->figure((string) $stats->lifecycleCounts['identified'], 'noch gesucht')
             . '</div></section>';
 
         $distribution = '<section class="section section--tint"><div class="wrap split">'
@@ -246,10 +231,14 @@ final class WebsiteRenderer
                     . $this->manufacturerRows($stats) . '</tbody></table></div>')
             . '</div><aside class="stack-lg">'
             . $this->bestByCategoryPanel($stats)
-            . $this->regionPanel($stats)
             . '</aside></div></section>';
 
-        return Layout::page('Statistik', $intro . $distribution . $tables, 'statistik', 'Auswertung der Spezitest-Testabende: Verteilung, Tester, Hersteller, Herkunft.');
+        return Layout::page(
+            'Statistik',
+            $intro . $this->originMapSection($map) . $distribution . $tables,
+            'statistik',
+            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester und Hersteller.',
+        );
     }
 
     public function ueber(RatedDrinkCollection $collection): string
@@ -258,28 +247,24 @@ final class WebsiteRenderer
         $body = '<section class="wrap section"><div class="split" style="align-items:center">'
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Über das Projekt</span>'
             . '<h1 class="display-2">Wir trinken das, damit du es nicht musst.</h1>'
-            . '<p class="lede">Spezitest ist eine private Abteilung mit einer Aufgabe: jedes Cola-Mix-Getränk finden, '
-            . 'kaufen und nach denselben drei Kriterien bewerten. Aktuell '
+            . '<p class="lede">Ein privates Projekt mit einer Aufgabe: jedes Cola-Mix-Getränk finden, kaufen und '
+            . 'nach denselben Kriterien bewerten. Bisher '
             . $counts['tested'] . ' ' . ($counts['tested'] === 1 ? 'getesteter Spezi' : 'getestete Spezis') . '.</p></div>'
-            . '<div style="background:var(--surface-tint);padding:var(--sp-6);display:flex;justify-content:center">'
-            . '<img src="/assets/spezitest-icon.svg" alt="Logo der Abteilung Spezitest" width="180" height="180"></div></div></section>'
+            . '<figure class="team-photo"><img src="/assets/spezitest-team.jpg" '
+            . 'alt="Manu, Fabi und Schorsch hinter einem Tisch voller Cola-Mix-Flaschen" '
+            . 'width="1600" height="921" loading="lazy"></figure></div></section>'
 
             . '<section class="section section--tint" id="methode"><div class="wrap split split--sidebar">'
             . '<div class="prose stack-lg"><div class="stack"><span class="eyebrow">Methode</span>'
             . '<h2 class="display-3">Wie getestet wird</h2></div>'
-            . '<p>Jedes Getränk wird bei gleicher Temperatur aus dem gleichen Glas probiert. Jeder der drei Tester '
-            . 'vergibt für Optik, Süffigkeit und Geschmack eine Note von 0 bis 10 – höher ist besser. '
-            . 'Aus den neun Noten entsteht die Gesamtwertung.</p>'
-            . '<h3>Optik</h3><p>Farbe im Glas, Kohlensäure, Schaum, Erscheinung der Flasche oder Dose.</p>'
-            . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Kohlensäurestärke, Abgang.</p>'
+            . '<p>Gleiche Temperatur, gleiches Glas. Jeder der drei Tester vergibt für Optik, Süffigkeit und '
+            . 'Geschmack eine Note von 0 bis 10 – höher ist besser.</p>'
+            . '<h3>Optik</h3><p>Farbe im Glas, Kohlensäure, Schaum, Flasche oder Dose.</p>'
+            . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Abgang.</p>'
             . '<h3>Geschmack</h3><p>Verhältnis von Cola zu Orange, Aromatik, Eigenständigkeit.</p>'
-            . '<h3>Gesamtwertung</h3><p>Die Kriterien werden gewichtet zusammengezählt: Optik einfach, Süffigkeit '
-            . 'doppelt, Geschmack dreifach. Das Ergebnis liegt zwischen 0 und 60.</p>'
-            . '<h3>Preis / Leistung</h3><p>Optional. Wird nur ausgewiesen, wenn ein Preis erfasst wurde.</p>'
-            . '<h2>Was wir nicht machen</h2><ul>'
-            . '<li>Keine Sterne, keine Prozentwerte, keine Emoji.</li>'
-            . '<li>Keine nachträgliche Änderung der Methodik.</li>'
-            . '<li>Keine bezahlten Tests, keine Kooperationen.</li></ul></div>'
+            . '<h3>Gesamtwertung</h3><p>Gewichtet: Optik ×1, Süffigkeit ×2, Geschmack ×3. Ergebnis 0 bis 60.</p>'
+            . '<h3>Preis / Leistung</h3><p>Nur, wenn ein Preis erfasst wurde.</p>'
+            . '<p class="meta">Keine bezahlten Tests. Keine nachträgliche Änderung der Methodik.</p></div>'
             . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Lebenszyklus</span>'
             . '<div class="cluster cluster--tight" style="margin-top:var(--sp-3)">'
             . Html::stateBadge('identified') . Html::stateBadge('acquired') . Html::stateBadge('tested') . '</div>'
@@ -295,29 +280,143 @@ final class WebsiteRenderer
             . '</div></div></section>'
 
             . '<section class="section section--navy"><div class="wrap on-navy split" style="align-items:center">'
-            . '<h2 class="display-3" style="color:#fff">Spezi im Regal entdeckt, das uns fehlt?</h2>'
-            . '<div class="stack"><p class="lede" style="color:rgba(255,255,255,.86)">Foto, Marke, Markt – das genügt.</p>'
+            . '<h2 class="display-3" style="color:#fff">Fehlt uns ein Spezi?</h2>'
+            . '<div class="stack"><p class="lede" style="color:rgba(255,255,255,.86)">Erst im Katalog nachsehen – '
+            . 'was dort fehlt, suchen wir.</p>'
             . '<div class="cluster"><a class="btn btn--on-navy" href="/spezis">Katalog prüfen</a></div></div></div></section>';
 
         return Layout::page('Über Spezitest', $body, 'ueber', 'Die Testmethode und die Tester hinter Spezitest.');
     }
 
+    /**
+     * Legal notice, carried over from the previous spezitest.de site. The
+     * operator address was corrected to Zeppelinstraße 16 1/2.
+     */
+    public function impressum(): string
+    {
+        $body = '<section class="wrap section"><div class="prose stack-lg">'
+            . '<div class="stack"><span class="eyebrow eyebrow--accent">Rechtliches</span>'
+            . '<h1 class="display-2">Impressum</h1></div>'
+            . '<div><h2>Anbieter</h2>'
+            . '<p>ABOUT US Media GmbH<br>Zeppelinstraße 16 1/2<br>86343 Königsbrunn</p></div>'
+            . '<div><h2>Kontakt</h2>'
+            . '<p>E-Mail: <a href="mailto:hallo@aboutusmedia.de">hallo@aboutusmedia.de</a><br>'
+            . 'Telefon: <a href="tel:+4915902608764">+49 1590 2608764</a></p></div>'
+            . '<div><h2>Registereintrag</h2>'
+            . '<p>Handelsregister: HRB 37022<br>Registergericht: Amtsgericht Augsburg</p></div>'
+            . '<div><h2>Umsatzsteuer</h2>'
+            . '<p>Umsatzsteuer-Identifikationsnummer gem. § 27a UStG: DE350459301</p></div>'
+            . '<div><h2>Vertretungsberechtigter Geschäftsführer</h2>'
+            . '<p>Fabian Heißerer<br>'
+            . 'E-Mail: <a href="mailto:fabian@aboutusmedia.de">fabian@aboutusmedia.de</a><br>'
+            . 'Telefon: <a href="tel:+4917681646809">+49 176 81646809</a></p></div>'
+            . '<div><h2>Inhaltlich Verantwortlicher gem. § 18 Abs. 2 MStV</h2>'
+            . '<p>Fabian Heißerer (Anschrift und Kontakt s.&nbsp;o.)</p></div>'
+            . '<div><h2>Haftung für Inhalte</h2>'
+            . '<p>Wir sind gemäß § 7 Abs. 1 TMG als Diensteanbieter für eigene Inhalte auf diesen Seiten nach den '
+            . 'allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir jedoch nicht verpflichtet, '
+            . 'übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, '
+            . 'die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der '
+            . 'Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt. Eine Haftung ist '
+            . 'jedoch erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei '
+            . 'Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.</p></div>'
+            . '<div><h2>Haftung für Links</h2>'
+            . '<p>Unser Blog kann Links zu externen Websites Dritter enthalten, auf deren Inhalte wir keinen '
+            . 'Einfluss haben. Daher können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die '
+            . 'Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. '
+            . 'Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente '
+            . 'inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung '
+            . 'nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend '
+            . 'entfernen.</p></div>'
+            . '<div><h2>Urheberrecht</h2>'
+            . '<p>Die durch uns erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen '
+            . 'Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet. Die Vervielfältigung, Bearbeitung, '
+            . 'Verbreitung sowie jede Art der Verwertung außerhalb der Grenzen des Urheberrechts bedürfen der '
+            . 'schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers. Downloads und Kopien dieser Seite '
+            . 'sind nur für den privaten, nicht kommerziellen Gebrauch gestattet.</p></div>'
+            . '</div></section>';
+
+        return Layout::page('Impressum', $body, 'impressum', 'Impressum und Anbieterkennzeichnung von Spezitest.');
+    }
+
+    /**
+     * Privacy policy, carried over from the previous spezitest.de site. The
+     * address of the responsible party was corrected to Zeppelinstraße 16 1/2;
+     * the wording is otherwise unchanged.
+     */
+    public function datenschutz(): string
+    {
+        $body = '<section class="wrap section"><div class="prose stack-lg">'
+            . '<div class="stack"><span class="eyebrow eyebrow--accent">Rechtliches</span>'
+            . '<h1 class="display-2">Datenschutz</h1></div>'
+
+            . '<div><h2>1. Datenschutz auf einen Blick</h2>'
+            . '<h3>Allgemeine Hinweise</h3>'
+            . '<p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen '
+            . 'Daten passiert, wenn Sie unsere Website besuchen. Personenbezogene Daten sind alle Daten, mit denen '
+            . 'Sie persönlich identifiziert werden können. Ausführliche Informationen zum Thema Datenschutz '
+            . 'entnehmen Sie unserer unter diesem Text aufgeführten Datenschutzerklärung.</p>'
+            . '<h3>Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>'
+            . '<p>Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten '
+            . 'können Sie dem <a href="/impressum">Impressum</a> dieser Website entnehmen.</p>'
+            . '<h3>Wie erfassen wir Ihre Daten?</h3>'
+            . '<p>Ihre Daten werden zum einen dadurch erhoben, dass Sie uns diese mitteilen. Hierbei kann es sich '
+            . 'z.&nbsp;B. um Daten handeln, die Sie in ein Kontaktformular eingeben. Andere Daten werden automatisch '
+            . 'beim Besuch der Website durch unsere IT-Systeme erfasst. Das sind vor allem technische Daten '
+            . '(z.&nbsp;B. Internetbrowser, Betriebssystem oder Uhrzeit des Seitenaufrufs). Die Erfassung dieser '
+            . 'Daten erfolgt automatisch, sobald Sie unsere Website betreten.</p>'
+            . '<h3>Wofür nutzen wir Ihre Daten?</h3>'
+            . '<p>Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten. '
+            . 'Andere Daten können zur Analyse Ihres Nutzerverhaltens verwendet werden.</p>'
+            . '<h3>Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>'
+            . '<p>Sie haben jederzeit das Recht unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer '
+            . 'gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung, '
+            . 'Sperrung oder Löschung dieser Daten zu verlangen. Hierzu sowie zu weiteren Fragen zum Thema '
+            . 'Datenschutz können Sie sich jederzeit unter der im Impressum angegebenen Adresse an uns wenden. Des '
+            . 'Weiteren steht Ihnen ein Beschwerderecht bei der zuständigen Aufsichtsbehörde zu.</p>'
+            . '<h3>Analyse-Tools und Tools von Drittanbietern</h3>'
+            . '<p>Beim Besuch unserer Website kann Ihr Surf-Verhalten statistisch ausgewertet werden. Das geschieht '
+            . 'vor allem mit Cookies und mit sogenannten Analyseprogrammen. Die Analyse Ihres Surf-Verhaltens '
+            . 'erfolgt in der Regel anonym; das Surf-Verhalten kann nicht zu Ihnen zurückverfolgt werden. Sie '
+            . 'können dieser Analyse widersprechen oder sie durch die Nichtbenutzung bestimmter Tools verhindern. '
+            . 'Detaillierte Informationen dazu finden Sie in der folgenden Datenschutzerklärung. Sie können dieser '
+            . 'Analyse widersprechen. Über die Widerspruchsmöglichkeiten werden wir Sie in dieser '
+            . 'Datenschutzerklärung informieren.</p></div>'
+
+            . '<div><h2>2. Allgemeine Hinweise und Pflichtinformationen</h2>'
+            . '<h3>Hinweis zur verantwortlichen Stelle</h3>'
+            . '<p>Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:</p>'
+            . '<p>ABOUT US Media GmbH<br>Zeppelinstraße 16 1/2<br>86343 Königsbrunn</p>'
+            . '<p>Telefon: <a href="tel:+4915902608764">+49 (0) 1590 2608764</a><br>'
+            . 'E-Mail: <a href="mailto:hallo@aboutusmedia.de">hallo@aboutusmedia.de</a></p>'
+            . '<p>Verantwortliche Stelle ist die natürliche oder juristische Person, die allein oder gemeinsam mit '
+            . 'anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten (z.&nbsp;B. Namen, '
+            . 'E-Mail-Adressen o.&nbsp;Ä.) entscheidet.</p>'
+            . '<h3>SSL- bzw. TLS-Verschlüsselung</h3>'
+            . '<p>Diese Seite nutzt aus Sicherheitsgründen und zum Schutz der Übertragung vertraulicher Inhalte, '
+            . 'wie zum Beispiel Bestellungen oder Anfragen, die Sie an uns als Seitenbetreiber senden, eine SSL- '
+            . 'bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennen Sie daran, dass die Adresszeile '
+            . 'des Browsers von „http://“ auf „https://“ wechselt und an dem Schloss-Symbol in Ihrer Browserzeile. '
+            . 'Wenn die SSL- bzw. TLS-Verschlüsselung aktiviert ist, können die Daten, die Sie an uns übermitteln, '
+            . 'nicht von Dritten mitgelesen werden.</p></div>'
+            . '</div></section>';
+
+        return Layout::page('Datenschutz', $body, 'datenschutz', 'Datenschutzerklärung von Spezitest.');
+    }
+
     public function notFound(): string
     {
-        $body = '<section class="wrap section section--lg" style="min-height:60vh;display:flex;align-items:center">'
-            . '<div class="split" style="align-items:center;width:100%"><div class="stack-lg"><div class="stack">'
+        $body = '<section class="wrap section section--lg" style="min-height:55vh;display:flex;align-items:center">'
+            . '<div class="stack-lg" style="max-width:520px"><div class="stack">'
             . '<span class="mark display-2" style="line-height:1">404</span>'
             . '<h1 class="display-3">Diese Flasche ist leer.</h1>'
-            . '<p class="lede">Die Seite existiert nicht – oder hat es nie in den Katalog geschafft.</p></div>'
-            . '<form class="search" role="search" method="get" action="/spezis" style="max-width:520px">'
+            . '<p class="lede">Diese Seite gibt es nicht.</p></div>'
+            . '<form class="search" role="search" method="get" action="/spezis">'
             . '<label class="visually-hidden" for="q404">Spezi suchen</label>'
             . '<input id="q404" name="q" type="search" placeholder="Marke, Hersteller, Region …">'
             . '<button type="submit">Suchen</button></form>'
-            . '<div class="cluster"><a class="btn btn--primary" href="/">Zur Startseite</a>'
-            . '<a class="btn btn--secondary" href="/spezis">Alle Spezis</a>'
-            . '<a class="btn btn--ghost" href="/ranking">Ranking</a></div></div>'
-            . '<div class="empty" style="min-height:320px;align-content:center"><span class="eyebrow">Fehlercode 404</span>'
-            . '<p class="empty__title">Kein Eintrag unter dieser Adresse</p></div></div></section>';
+            . '<div class="cluster"><a class="btn btn--primary" href="/">Startseite</a>'
+            . '<a class="btn btn--secondary" href="/spezis">Alle Spezis</a></div></div></section>';
 
         return Layout::page('Seite nicht gefunden', $body, '');
     }
@@ -330,7 +429,7 @@ final class WebsiteRenderer
             return 'Cola-Mix. Ein Urteil.';
         }
 
-        return $tested . ($tested === 1 ? ' Spezi. Ein Urteil.' : ' Spezis. Ein Urteil.');
+        return $tested . ($tested === 1 ? ' Spezi. Ein Urteil.' : ' Spezis getestet.');
     }
 
     private function productImage(RatedDrink $drink, string $modifier = ''): string
@@ -362,9 +461,9 @@ final class WebsiteRenderer
             $rows .= '<a class="rank__row' . $podium . '" href="/spezi/' . Html::e($drink->slug()) . '">'
                 . '<span class="rank__pos">' . ($drink->rank ?? ($index + 1)) . '</span>'
                 . $this->productImage($drink, 'pimg--thumb')
-                . '<span><span class="rank__name">' . Html::e($drink->name) . '</span><br>'
+                . '<span class="rank__text"><span class="rank__name">' . Html::e($drink->name) . '</span>'
                 . '<span class="rank__sub">' . Html::e($drink->manufacturer ?? '–') . '</span></span>'
-                . '<span class="rank__score">' . Html::grade($result->gesamt()) . '</span></a>';
+                . '<span class="rank__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span></a>';
         }
 
         return $rows;
@@ -384,16 +483,17 @@ final class WebsiteRenderer
                 continue;
             }
 
-            $items .= '<div class="podium__item podium__item--' . ($index + 1) . '">'
+            $items .= '<a class="podium__item podium__item--' . ($index + 1) . '" href="/spezi/' . Html::e($drink->slug()) . '">'
                 . '<span class="podium__num">' . ($drink->rank ?? ($index + 1)) . '</span>'
-                . '<div class="stack-sm">'
+                . '<span class="podium__media">'
                 . ($drink->hasImage
-                    ? '<img src="/spezi/' . $drink->id . '/bild" alt="' . Html::e($drink->name) . '" style="height:120px;width:auto;margin-bottom:var(--sp-2)" loading="lazy">'
+                    ? '<img src="/spezi/' . $drink->id . '/bild" alt="" loading="lazy">'
                     : '')
-                . '<a class="rank__name" href="/spezi/' . Html::e($drink->slug()) . '" style="display:block;text-decoration:none">' . Html::e($drink->name) . '</a>'
-                . '<span class="rank__sub" style="display:block">' . Html::e($drink->manufacturer ?? '–') . '</span>'
-                . '<span class="rank__score" style="display:block;text-align:left;font-size:var(--fs-h1);margin-top:var(--sp-2)">' . Html::grade($result->gesamt()) . '</span>'
-                . '</div></div>';
+                . '</span>'
+                . '<span class="podium__body"><span class="rank__name">' . Html::e($drink->name) . '</span>'
+                . '<span class="rank__sub">' . Html::e($drink->manufacturer ?? '–') . '</span></span>'
+                . '<span class="podium__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span>'
+                . '</a>';
         }
 
         return $items;
@@ -442,24 +542,21 @@ final class WebsiteRenderer
                 . '<span class="tester__val">' . Html::grade($mean, 1) . '</span></div>';
         }
 
-        return '<div class="stack"><span class="eyebrow">Einzelnoten der Tester <span class="meta" style="letter-spacing:0;text-transform:none">· Mittel über die drei Kriterien</span></span>'
+        return '<div class="stack"><span class="eyebrow">Tester · Mittel</span>'
             . '<div class="testers">' . $cells . '</div></div>';
     }
 
     private function detailSidebar(RatedDrink $drink, RatedDrinkCollection $collection): string
     {
+        // The hero subtitle already carries the manufacturer and the display
+        // origin; the panel only adds what is not visible there.
+        $shown = array_filter([$drink->manufacturer, $drink->displayOrigin()]);
         $facts = [];
 
-        if ($drink->manufacturer !== null) {
-            $facts[] = ['Hersteller', $drink->manufacturer];
-        }
-
-        if ($drink->originLocation !== null) {
-            $facts[] = ['Ort', $drink->originLocation];
-        }
-
-        if ($drink->originRegion !== null) {
-            $facts[] = ['Region', $drink->originRegion];
+        foreach ([['Ort', $drink->originLocation], ['Region', $drink->originRegion]] as [$term, $value]) {
+            if ($value !== null && !in_array($value, $shown, true)) {
+                $facts[] = [$term, $value];
+            }
         }
 
         $testedDate = Html::isoToGermanDate($drink->testedAt);
@@ -485,27 +582,33 @@ final class WebsiteRenderer
 
         if ($drink->priceAmount !== null) {
             $pp = $drink->pricePerformance;
-            $priceHtml = '<div class="stack"><span class="eyebrow">Preis / Leistung</span><div class="barchart">'
+            $priceHtml = '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
+                . '<div class="cluster" style="gap:var(--sp-6)">'
+                . '<div class="score"><span class="score__num">' . Html::e(Html::price($drink->priceAmount)) . '</span>'
+                . '<span class="score__label">pro Gebinde</span></div>'
                 . ($pp !== null
-                    ? '<div class="barchart__row barchart__row--accent"><span class="barchart__label">Preis / Leistung</span>'
-                        . '<span class="barchart__track"><i style="width:' . Html::barWidth((float) $pp->normalized() * 100, 100) . '%"></i></span>'
-                        . '<span class="barchart__val">' . Html::grade((float) $pp->normalized() * 100, 0) . ' / 100</span></div>'
+                    ? '<div class="score"><span class="score__num">' . Html::grade((float) $pp->normalized() * 100, 0) . '</span>'
+                        . '<span class="score__label">von 100 · Preis / Leistung</span></div>'
                     : '')
-                . '<div class="barchart__row"><span class="barchart__label">Preis</span>'
-                . '<span class="barchart__track"><i style="width:0%"></i></span>'
-                . '<span class="barchart__val">' . Html::e(Html::price($drink->priceAmount)) . '</span></div>'
-                . '</div><p class="meta">Normalisiert über alle getesteten Spezis mit erfasstem Preis.</p></div>';
+                . '</div>'
+                . ($pp !== null ? '<p class="meta">100 = bestes Verhältnis aus Gesamtwertung und Preis unter allen '
+                    . 'getesteten Spezis mit erfasstem Preis.</p>' : '')
+                . '</div>';
         }
 
         $neighbours = $this->rankingNeighbours($drink, $collection);
 
+        if ($noteHtml === '' && $priceHtml === '' && $factsHtml === '' && $neighbours === '') {
+            return '';
+        }
+
         return '<section class="section section--tint"><div class="wrap split split--sidebar"><div class="stack-lg">'
             . $noteHtml
             . $priceHtml
-            . ($noteHtml === '' && $priceHtml === '' ? '<p class="meta">Für dieses Getränk sind noch keine weiteren Angaben erfasst.</p>' : '')
+            . ($noteHtml === '' && $priceHtml === '' ? '<p class="meta">Keine weiteren Angaben erfasst.</p>' : '')
             . '</div><aside class="stack-lg">'
             . ($factsHtml !== ''
-                ? '<div class="panel"><span class="eyebrow">Stammdaten</span><dl class="meta--dl" style="margin-top:var(--sp-3)">' . $factsHtml . '</dl></div>'
+                ? '<div class="panel"><span class="eyebrow">Details</span><dl class="meta--dl meta--dl-stack" style="margin-top:var(--sp-3)">' . $factsHtml . '</dl></div>'
                 : '')
             . $neighbours
             . '</aside></div></section>';
@@ -556,15 +659,14 @@ final class WebsiteRenderer
 
     private function catalogCard(RatedDrink $drink): string
     {
-        $foot = '<div class="card__foot">' . Html::stateBadge($drink->lifecycleStatus);
-
-        if ($drink->isTested() && $drink->result !== null) {
-            $foot .= '<span class="score"><span class="score__num">' . Html::grade($drink->result->gesamt()) . '</span></span>';
-        } else {
-            $foot .= '<span class="meta">–</span>';
-        }
-
-        $foot .= '</div>';
+        $result = $drink->isTested() ? $drink->result : null;
+        $foot = $result !== null
+            ? '<div class="card__foot">'
+                . ($drink->rank !== null
+                    ? '<span class="card__rank">#' . $drink->rank . '</span>'
+                    : '<span class="card__rank card__rank--none">Getestet</span>')
+                . '<span class="card__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span></div>'
+            : '<div class="card__foot">' . Html::stateBadge($drink->lifecycleStatus) . '</div>';
 
         return '<a class="card card-link" href="/spezi/' . Html::e($drink->slug()) . '">'
             . $this->productImage($drink)
@@ -573,37 +675,8 @@ final class WebsiteRenderer
             . $foot . '</div></a>';
     }
 
-    private function catalogFilters(CatalogPage $page): string
+    private function catalogChips(CatalogQuery $query): string
     {
-        $query = $page->query;
-        $groups = '<div class="filter-group" style="border-top:0"><span class="filter-group__title">Status</span>';
-
-        foreach (CatalogQuery::STATUSES as $status) {
-            $checked = in_array($status, $query->statuses, true) ? ' checked' : '';
-            $groups .= '<label class="check"><input type="checkbox" name="status[]" value="' . $status . '"' . $checked . '>'
-                . '<span>' . Html::e(Html::stateLabel($status)) . '</span></label>';
-        }
-
-        $groups .= '</div><div class="filter-group"><span class="filter-group__title">Bild</span>'
-            . '<label class="check"><input type="checkbox" name="with_image" value="1"' . ($query->withImageOnly ? ' checked' : '') . '>'
-            . '<span>Nur mit Bild</span></label></div>'
-            . '<div class="filter-group"><button class="btn btn--primary btn--block" type="submit">Anwenden</button>'
-            . ($query->isFiltered() ? '<a class="btn btn--ghost" href="/spezis">Alle Filter zurücksetzen</a>' : '')
-            . '</div>';
-
-        $activeCount = count($query->statuses) + ($query->withImageOnly ? 1 : 0);
-
-        return '<form method="get" action="/spezis">'
-            . ($query->search !== '' ? '<input type="hidden" name="q" value="' . Html::e($query->search) . '">' : '')
-            . $this->hiddenSortField($query)
-            . '<details class="filter-panel"' . ($activeCount > 0 ? ' open' : '') . '>'
-            . '<summary>Filter' . ($activeCount > 0 ? ' <span class="badge badge--red">' . $activeCount . '</span>' : '') . '</summary>'
-            . '<div class="stack">' . $groups . '</div></details></form>';
-    }
-
-    private function catalogToolbar(CatalogPage $page): string
-    {
-        $query = $page->query;
         $chips = '';
 
         foreach (CatalogQuery::STATUSES as $status) {
@@ -613,6 +686,21 @@ final class WebsiteRenderer
             $chips .= '<a class="chip' . ($active ? ' chip--active' : '') . '" href="' . Html::e($href) . '">'
                 . Html::e(Html::stateLabel($status)) . '</a>';
         }
+
+        $imageTarget = $query->withImageFilter(!$query->withImageOnly);
+        $imageHref = '/spezis' . ($imageTarget->toQueryString() !== '' ? '?' . $imageTarget->toQueryString() : '');
+        $chips .= '<a class="chip' . ($query->withImageOnly ? ' chip--active' : '') . '" href="' . Html::e($imageHref) . '">Nur mit Bild</a>';
+
+        if ($query->isFiltered()) {
+            $chips .= '<a class="chip chip--reset" href="/spezis">Zurücksetzen</a>';
+        }
+
+        return '<div class="filters">' . $chips . '</div>';
+    }
+
+    private function catalogToolbar(CatalogPage $page): string
+    {
+        $query = $page->query;
 
         $sorts = [
             'best' => 'Beste Wertung',
@@ -626,12 +714,15 @@ final class WebsiteRenderer
             $options .= '<option value="' . $value . '"' . ($query->sort === $value ? ' selected' : '') . '>' . Html::e($label) . '</option>';
         }
 
-        return '<div class="toolbar" style="margin:0"><div class="filters">' . $chips . '</div>'
+        return '<div class="toolbar" style="margin:0">'
+            . $this->catalogChips($query)
             . '<form method="get" action="/spezis" class="cluster cluster--tight">'
             . ($query->search !== '' ? '<input type="hidden" name="q" value="' . Html::e($query->search) . '">' : '')
             . $this->hiddenStatusFields($query)
             . '<label class="label" for="sort">Sortierung</label>'
-            . '<select class="select" id="sort" name="sort" style="width:auto" onchange="this.form.submit()">' . $options . '</select>'
+            // Submitting happens in spezitest.js: the Content-Security-Policy
+            // has no 'unsafe-inline', so an inline onchange never runs.
+            . '<select class="select" id="sort" name="sort" style="width:auto" data-autosubmit>' . $options . '</select>'
             . '<noscript><button class="btn btn--secondary btn--sm" type="submit">Sortieren</button></noscript>'
             . '</form></div>';
     }
@@ -680,25 +771,28 @@ final class WebsiteRenderer
         return '<nav class="pagination" aria-label="Seiten">' . $links . '</nav>';
     }
 
-    private function catalogSummary(CatalogPage $page): string
-    {
-        return sprintf('%d %s im Katalog.', $page->totalMatches, $page->totalMatches === 1 ? 'Eintrag' : 'Einträge');
-    }
-
     private function figuresSection(RatedDrinkCollection $collection): string
     {
         $tested = $collection->tested();
         $best = $collection->ranked()[0]->result ?? null;
+        $values = [];
 
-        return '<section class="section"><div class="wrap stack-lg">'
-            . '<div class="cluster cluster--between"><div><span class="eyebrow">Zahlen zum Projekt</span>'
-            . '<h2 class="display-3">Der Katalog in Zahlen</h2></div>'
-            . '<a class="link-arrow" href="/statistik">Alle Statistiken</a></div>'
+        foreach ($tested as $drink) {
+            if ($drink->result !== null) {
+                $values[] = $drink->result->gesamt();
+            }
+        }
+
+        $average = $values === [] ? null : array_sum($values) / count($values);
+
+        return '<section class="section section--tint"><div class="wrap stack-lg">'
+            . '<div class="cluster cluster--between"><h2 class="display-3">In Zahlen</h2>'
+            . '<a class="link-arrow" href="/statistik">Statistik</a></div>'
             . '<div class="figure-row">'
-            . $this->figure((string) count($tested), 'Spezis getestet')
-            . $this->figure((string) $collection->count(), 'Einträge im Katalog')
-            . $this->figure($best !== null ? Html::grade($best->gesamt()) : '–', 'Beste Gesamtwertung')
-            . $this->figure('3', 'Tester seit Beginn')
+            . $this->figure((string) count($tested), 'getestet')
+            . $this->figure((string) $collection->count(), 'im Katalog')
+            . $this->figure($best !== null ? Html::grade($best->gesamt()) : '–', 'beste Wertung')
+            . $this->figure(Html::gradeOrDash($average), 'Ø Wertung')
             . '</div></div></section>';
     }
 
@@ -706,22 +800,6 @@ final class WebsiteRenderer
     {
         return '<div class="figure"><span class="figure__num">' . Html::e($value) . '</span>'
             . '<p class="figure__label">' . Html::e($label) . '</p></div>';
-    }
-
-    private function activityRow(RatedDrink $drink): string
-    {
-        $line = match (true) {
-            $drink->isTested() && $drink->result !== null => 'Getestet · Gesamtwertung ' . Html::grade($drink->result->gesamt()),
-            $drink->lifecycleStatus === 'acquired' => 'Erworben, wartet auf den Testabend',
-            default => 'Identifiziert, noch nicht im Kasten',
-        };
-        $date = Html::isoToGermanDate($drink->updatedAt) ?? '';
-
-        return '<li class="card card--flat" style="padding-top:var(--sp-3)"><div class="cluster cluster--between" style="align-items:flex-start">'
-            . '<div class="stack-sm"><a href="/spezi/' . Html::e($drink->slug()) . '" style="font-weight:700;text-decoration:none;font-size:var(--fs-h4)">'
-            . Html::e($drink->name) . '</a><p class="meta">' . Html::e($line) . '</p></div>'
-            . '<div class="cluster cluster--tight">' . Html::stateBadge($drink->lifecycleStatus)
-            . '<span class="meta">' . Html::e($date) . '</span></div></div></li>';
     }
 
     private function distributionRows(Statistics $stats): string
@@ -774,15 +852,40 @@ final class WebsiteRenderer
         return $rows;
     }
 
+    /**
+     * Manufacturers that have a comparable average come first; the rest are
+     * still listed, but they no longer push the useful rows off the screen.
+     */
     private function manufacturerRows(Statistics $stats): string
     {
+        $entries = $stats->manufacturers;
+        usort($entries, static function (array $a, array $b): int {
+            $left = $a['averageGesamt'];
+            $right = $b['averageGesamt'];
+
+            if ($left === null && $right === null) {
+                return $b['count'] <=> $a['count'];
+            }
+
+            if ($left === null) {
+                return 1;
+            }
+
+            if ($right === null) {
+                return -1;
+            }
+
+            return $right <=> $left;
+        });
+
         $rows = '';
 
-        foreach ($stats->manufacturers as $manufacturer) {
+        foreach ($entries as $manufacturer) {
             $best = $manufacturer['best'];
             $rows .= '<tr><td><strong>' . Html::e($manufacturer['name']) . '</strong></td>'
                 . '<td class="table__num">' . $manufacturer['count'] . '</td>'
-                . '<td class="table__num">' . Html::gradeOrDash($manufacturer['averageGesamt']) . '</td>'
+                . '<td class="table__num">'
+                . ($manufacturer['averageGesamt'] === null ? '–' : Html::grade($manufacturer['averageGesamt'])) . '</td>'
                 . '<td>' . ($best !== null ? Html::e($best['name']) . ' (' . Html::grade($best['gesamt']) . ')' : '–') . '</td></tr>';
         }
 
@@ -809,24 +912,75 @@ final class WebsiteRenderer
         }
 
         return '<div class="panel"><span class="eyebrow">Beste Einzelkriterien</span>'
-            . '<dl class="meta--dl" style="margin-top:var(--sp-3)">' . $items . '</dl></div>';
+            . '<dl class="meta--dl meta--dl-stack" style="margin-top:var(--sp-3)">' . $items . '</dl></div>';
     }
 
-    private function regionPanel(Statistics $stats): string
+    /**
+     * The origin map: an abstracted Germany in the Spezitest palette with one
+     * dot per postal region. Without JavaScript every dot is an anchor to its
+     * own entry in the list beside it; with JavaScript the list turns into a
+     * readout that follows the pointer.
+     */
+    private function originMapSection(OriginMap $map): string
     {
-        if ($stats->regionCounts === []) {
+        if ($map->points === []) {
             return '';
         }
 
-        $items = '';
+        $dots = '';
+        $entries = '';
 
-        foreach (array_slice($stats->regionCounts, 0, 8) as $entry) {
-            $items .= '<dt>' . Html::e($entry['region']) . '</dt><dd>' . $entry['count'] . '</dd>';
+        foreach ($map->points as $point) {
+            $radius = $map->radius($point['count']);
+            $label = $point['area'] . ': ' . $point['count'] . ' ' . ($point['count'] === 1 ? 'Spezi' : 'Spezis');
+            $dots .= '<a class="map__dot" href="#ort-' . Html::e($point['key']) . '"'
+                . ' data-map-dot="' . Html::e($point['key']) . '"'
+                . ' data-map-area="' . Html::e($point['area']) . '"'
+                . ' data-map-count="' . $point['count'] . '">'
+                . '<circle class="map__halo" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . ($radius + 6) . '"></circle>'
+                . '<circle class="map__pin" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . $radius . '"></circle>'
+                . '<title>' . Html::e($label) . '</title></a>';
+
+            $items = '';
+
+            foreach ($point['drinks'] as $drink) {
+                $items .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                    . '<span class="map__place">' . Html::e($drink['place']) . '</span>'
+                    . ($drink['gesamt'] !== null ? '<span class="map__grade">' . Html::grade($drink['gesamt']) . '</span>' : '')
+                    . '</li>';
+            }
+
+            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['key']) . '" data-map-entry="' . Html::e($point['key']) . '">'
+                . '<h3 class="map__entry-title">' . Html::e($point['area'])
+                . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
+                . '<ul class="map__drinks">' . $items . '</ul></section>';
         }
 
-        return '<div class="panel"><span class="eyebrow">Herkunft</span>'
-            . '<dl class="meta--dl" style="margin-top:var(--sp-3)">' . $items . '</dl>'
-            . '<p class="meta" style="margin-top:var(--sp-3)">Aus dem Feld „Region“ bzw. „Ort“, soweit erfasst.</p></div>';
+        $elsewhere = '';
+
+        foreach ($map->elsewhere as $entry) {
+            $elsewhere .= '<li>' . Html::e($entry['label']) . ' <span>' . $entry['count'] . '</span></li>';
+        }
+
+        return '<section class="section section--tint" id="karte"><div class="wrap stack-lg">'
+            . '<div class="cluster cluster--between"><h2 class="display-3">Woher die Spezis kommen</h2>'
+            . '<p class="meta">' . $map->placed . ' von ' . ($map->placed + $map->unplaced) . ' Einträgen verortet</p></div>'
+            . '<div class="map">'
+            . '<figure class="map__canvas" data-map>'
+            . '<svg viewBox="' . $map->viewBox() . '" role="img" aria-label="Karte von Deutschland mit den Herkunftsregionen der Spezis" preserveAspectRatio="xMidYMid meet">'
+            . '<path class="map__land" d="' . $map->outlinePath() . '"></path>'
+            . $dots . '</svg>'
+            . '<figcaption class="map__legend"><span class="map__legend-dot"></span>'
+            . 'Punkt = PLZ-Region, Größe = Anzahl.</figcaption></figure>'
+            . '<div class="map__side map__scroller" data-map-scroller>'
+            . '<span class="map__more" aria-hidden="true"></span>'
+            . '<div class="map__readout" data-map-readout hidden></div>'
+            . '<div class="map__list" data-map-list>' . $entries
+            . ($elsewhere !== ''
+                ? '<section class="map__entry map__entry--rest"><h3 class="map__entry-title">Nicht verortet</h3>'
+                    . '<ul class="map__rest">' . $elsewhere . '</ul></section>'
+                : '')
+            . '</div></div></div></div></section>';
     }
 
     private function testerCard(string $name, string $description): string

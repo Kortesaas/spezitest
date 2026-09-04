@@ -30,14 +30,14 @@ final class Layout
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . Html::e($title) . ' · Spezitest</title>'
             . $descriptionMeta
-            . '<link rel="stylesheet" href="/assets/spezitest.css">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p16">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body>'
             . '<a class="skip-link" href="#main">Zum Inhalt springen</a>'
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p16" defer></script>'
             . '</body></html>';
     }
 
@@ -65,15 +65,17 @@ final class Layout
     {
         return '<footer class="site-footer"><div class="wrap">'
             . '<div class="split" style="gap:var(--sp-6)">'
-            . '<div class="stack"><img src="/assets/spezitest-logo-white.svg" alt="Abteilung Spezitest" width="120" height="28">'
-            . '<p style="font-size:var(--fs-sm);color:rgba(255,255,255,.8);max-width:36ch">'
-            . 'Wir identifizieren, erwerben und testen Cola-Mix-Getränke aus Deutschland und den Nachbarländern.</p></div>'
+            . '<div class="stack"><img src="/assets/spezitest-logo-white.svg" alt="Spezitest" width="120" height="28">'
+            . '<p style="font-size:var(--fs-sm);color:rgba(255,255,255,.8);max-width:34ch">'
+            . 'Cola-Mix aus Deutschland und den Nachbarländern im Test.</p></div>'
             . '<div class="grid grid--3" style="gap:var(--sp-5)">'
             . '<div><h3>Katalog</h3><ul class="stack-sm">'
             . '<li><a href="/spezis">Alle Spezis</a></li><li><a href="/ranking">Ranking</a></li><li><a href="/statistik">Statistik</a></li></ul></div>'
             . '<div><h3>Projekt</h3><ul class="stack-sm">'
             . '<li><a href="/ueber">Über Spezitest</a></li><li><a href="/ueber#methode">Testmethode</a></li><li><a href="/ueber#tester">Tester</a></li></ul></div>'
-            . '<div><h3>Intern</h3><ul class="stack-sm"><li><a href="/admin">Verwaltung</a></li></ul></div>'
+            . '<div><h3>Rechtliches</h3><ul class="stack-sm">'
+            . '<li><a href="/impressum">Impressum</a></li><li><a href="/datenschutz">Datenschutz</a></li>'
+            . '<li><a href="/admin">Verwaltung</a></li></ul></div>'
             . '</div></div>'
             . '<hr class="rule" style="margin-block:var(--sp-6)">'
             . '<p style="font-size:var(--fs-xs);color:rgba(255,255,255,.7)">spezitest.de · Beta</p>'

@@ -121,7 +121,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $response = $this->request('POST', "/admin/drinks/$id/test/complete", $body);
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertStringContainsString('neun Noten', (string) $response->getBody());
+        self::assertStringContainsString('9 Noten', (string) $response->getBody());
         self::assertSame('acquired', $this->drinkStatus($id));
         self::assertContains($this->testStatus($id), ['draft', 'none']);
     }
@@ -190,7 +190,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
 
         $statistik = $this->request('GET', '/statistik');
         self::assertSame(200, $statistik->getStatusCode());
-        self::assertStringContainsString('Spezis getestet', (string) $statistik->getBody());
+        self::assertStringContainsString('>getestet</p>', (string) $statistik->getBody());
 
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }

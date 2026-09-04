@@ -121,4 +121,9 @@ final readonly class CatalogQuery
 
         return new self($this->search, $statuses, $this->withImageOnly, $this->sort, 1);
     }
+
+    public function withImageFilter(bool $withImageOnly): self
+    {
+        return new self($this->search, $this->statuses, $withImageOnly, $this->sort, 1);
+    }
 }

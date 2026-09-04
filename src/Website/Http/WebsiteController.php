@@ -14,6 +14,7 @@ use Spezitest\Media\ImageResponder;
 use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
 use Spezitest\Website\Catalog\CatalogRepository;
+use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\Slug;
 use Spezitest\Website\Catalog\Statistics;
 use Spezitest\Website\View\WebsiteRenderer;
@@ -88,15 +89,77 @@ final class WebsiteController
 
     public function statistik(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
     {
+        $collection = $this->catalogRepository()->ratedDrinks();
+
         return $this->html(
             $response,
-            $this->renderer->statistik(Statistics::fromCollection($this->catalogRepository()->ratedDrinks())),
+            $this->renderer->statistik(
+                Statistics::fromCollection($collection),
+                OriginMap::fromCollection($collection),
+            ),
         );
     }
 
     public function ueber(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
     {
         return $this->html($response, $this->renderer->ueber($this->catalogRepository()->ratedDrinks()));
+    }
+
+    public function impressum(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->html($response, $this->renderer->impressum());
+    }
+
+    public function datenschutz(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->html($response, $this->renderer->datenschutz());
+    }
+
+    /**
+     * Type-ahead for the catalog search box. Read-only JSON, matched against
+     * the same fields as the catalog itself so a suggestion always yields
+     * results when it is submitted.
+     */
+    public function suggestions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $term = $request->getQueryParams()['q'] ?? '';
+        $term = is_string($term) ? trim(mb_substr($term, 0, 120)) : '';
+        $matches = [];
+
+        if (mb_strlen($term) >= 2) {
+            $needle = mb_strtolower($term);
+
+            foreach ($this->catalogRepository()->ratedDrinks()->ranked() as $drink) {
+                $haystack = mb_strtolower(
+                    $drink->name . ' ' . ($drink->manufacturer ?? '') . ' ' . ($drink->displayOrigin() ?? ''),
+                );
+
+                if (!str_contains($haystack, $needle)) {
+                    continue;
+                }
+
+                $matches[] = [
+                    'name' => $drink->name,
+                    'sub' => $drink->manufacturer ?? $drink->displayOrigin() ?? '',
+                    'slug' => $drink->slug(),
+                    'image' => $drink->hasImage ? '/spezi/' . $drink->id . '/bild' : null,
+                    'rank' => $drink->rank,
+                ];
+
+                if (count($matches) === 8) {
+                    break;
+                }
+            }
+        }
+
+        $response->getBody()->write((string) json_encode(
+            ['items' => $matches],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ));
+
+        return $response
+            ->withHeader('Content-Type', 'application/json; charset=UTF-8')
+            ->withHeader('Cache-Control', 'no-store');
     }
 
     /** @param array<string, string> $arguments */

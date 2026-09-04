@@ -106,6 +106,7 @@ final class AdminController
             $response,
             $this->renderer->dashboard(
                 $this->repository()->lifecycleCounts(),
+                $this->repository()->search('', 'acquired'),
                 $this->csrfTokens->token(),
             ),
         );
@@ -362,7 +363,12 @@ final class AdminController
 
         return $this->html(
             $response,
-            $this->renderer->testForm($drink, $this->loadTestFormData($drinkId), $this->csrfTokens->token()),
+            $this->renderer->testForm(
+                $drink,
+                $this->loadTestFormData($drinkId),
+                $this->csrfTokens->token(),
+                $this->repository()->primaryImage($drinkId) !== null,
+            ),
         );
     }
 
@@ -415,6 +421,7 @@ final class AdminController
                     $drink,
                     $this->testFormDataFromBody($body, $drink['lifecycle_status']),
                     $this->csrfTokens->token(),
+                    $this->repository()->primaryImage($drinkId) !== null,
                     $exception->getMessage(),
                 ),
                 422,
