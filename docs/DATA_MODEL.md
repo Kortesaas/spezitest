@@ -106,9 +106,11 @@ pixel `width` and `height`, `display_order`, and creation time.
 The storage path is globally unique and constrained to a nonblank relative
 reference rather than an absolute path or URL. `(drink_id, display_order)` is
 unique. The image with the lowest order is the normal primary display image,
-so multiple images are possible while a future ordinary UI can still present
-one simple optional picture control. Uploading, detecting metadata, generating
-paths, processing files, and deletion are not implemented.
+so multiple images remain structurally possible while Packet 7 intentionally
+presents only one optional primary picture. The admin verifies actual image
+bytes and detected metadata, generates safe filenames, stores portable paths,
+and coordinates replacement/removal with database transactions. Gallery
+management and automatic processing are not implemented.
 
 ## Relationship summary
 
@@ -157,10 +159,9 @@ editable truth.
 - The exact meaning/unit of duration and the semantics of recorded time and
   stream reference remain unresolved; the raw columns must not be embellished
   during import.
-- Additional-image UI, upload validation, conversion/resizing, safe serving,
-  and deletion behavior remain future work.
-- Image-processing technology remains unselected until production PHP
-  capabilities are verified.
+- Additional-image/gallery UI and automatic conversion/resizing remain future
+  work. Image-processing technology remains unselected until production PHP
+  capabilities are verified; Packet 7 safely retains validated originals.
 
 ## Legacy-import infrastructure
 

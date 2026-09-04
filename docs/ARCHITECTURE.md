@@ -7,9 +7,10 @@ Cola-Mix / Spezi drinks, primarily from Germany and surrounding countries. This
 document records architectural constraints and the PHP/runtime foundation.
 Slim Framework 4 with a PSR-7 implementation is selected for HTTP delivery,
 with Composer PSR-4 autoloading under the `Spezitest` namespace. Packet 5 adds
-the first MariaDB domain schema and an HTTP- and persistence-independent rating
-engine. There is still no domain repository, template system, authentication,
-admin UI, upload pipeline, or real frontend design.
+the first MariaDB domain schema and rating engine, Packet 6 adds controlled
+legacy import, and Packet 7 adds the first functional admin application. There
+is still no public catalog, rating-entry workflow, template system, image
+gallery/optimization, or final frontend design.
 
 ## Runtime structure
 
@@ -17,7 +18,8 @@ admin UI, upload pipeline, or real frontend design.
 - `config/bootstrap.php` optionally loads local environment configuration and
   constructs the application.
 - `src/` contains project classes, including configuration, the application
-  factory, database infrastructure, and isolated rating domain logic.
+  factory, admin HTTP/security/persistence/image services, database
+  infrastructure, and isolated rating domain logic.
 - `tests/` constructs the same application directly without starting a web
   server.
 
@@ -29,6 +31,18 @@ tests, and `vendor/` remain outside the public document root.
 The application factory owns route and middleware construction. This keeps the
 front controller small and permits HTTP-level tests without a production server
 or network access.
+
+Admin database connections remain lazy: the public placeholder and login form
+do not connect to MariaDB. `AdminRuntime` supplies environment configuration,
+the session store, and a connection factory. HTTP controllers validate input,
+`DrinkService` coordinates database/file changes, and `DrinkRepository` uses
+native PDO prepared statements without an ORM.
+
+All `/admin` routes other than login require session authentication. POST
+routes additionally pass through CSRF middleware. Production sessions use
+strict cookie-only mode and Secure, HttpOnly, SameSite=Strict cookies. The one
+initial identity is an environment-configured username plus `password_hash()`
+output; no account database, registration, reset, or role model exists yet.
 
 ## Source of truth
 
@@ -50,8 +64,8 @@ explicit `ConnectionFactory` creates independent PDO connections without a
 global connection or hidden singleton.
 
 Connections use the MySQL PDO driver, `utf8mb4`, exception error mode,
-associative fetches, and native prepared statements. The current layer contains
-no ORM, query builder, or domain repository.
+associative fetches, and native prepared statements. The admin has a small
+drink repository; there is no ORM or general query builder.
 
 `bin/migrate.php` is the only migration entry point and is CLI-only. It uses
 the same environment loader and database configuration as future application
@@ -86,7 +100,8 @@ migration rule.
 Names are not globally unique and do not have a `UNIQUE(name)` rule. Optional
 metadata remains nullable so a drink can be created from name and status alone.
 Images are file-backed: only relative references and detected metadata are
-modeled, with no BLOB or upload implementation.
+modeled, never BLOBs. Packet 7 implements the single-primary-image workflow
+described below.
 
 ## Rating boundary
 
@@ -122,10 +137,9 @@ otherwise-empty domain tables.
 silent second import. Generated reports and images are ignored local artifacts.
 Python and workbook parsing libraries are not production web dependencies.
 
-## Future application boundaries
+## Application boundaries
 
-Any later implementation should separate at least these responsibilities even
-if the chosen structure uses different names:
+Implementations separate at least these responsibilities:
 
 - HTTP delivery and request handling;
 - input validation and authorization;
@@ -143,6 +157,15 @@ uploads, credentials, Composer metadata, dependencies, and tests must not be
 directly web-accessible. Uploaded files should normally be stored outside the
 document root and served only through a controlled mechanism when access is
 required.
+
+Packet 7 implements one primary-image workflow. `UploadedImageValidator`
+checks complete payload size, Fileinfo MIME, image parser MIME, and positive
+dimensions for JPEG/PNG/WebP. `ImageStorage` ignores client names, generates a
+random filename, and accepts only controlled portable database paths. Admin
+images live outside `public/` and are streamed through an authenticated route
+with nosniff and no-store headers. Replacement/removal changes database rows in
+a transaction and removes superseded files only after commit. Resizing and
+conversion remain deferred until production GD/Imagick availability is known.
 
 ## Environment portability
 

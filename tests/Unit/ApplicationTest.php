@@ -10,8 +10,11 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Spezitest\Admin\Configuration\AdminConfiguration;
+use Spezitest\Application\AdminRuntime;
 use Spezitest\Application\AppFactory;
 use Spezitest\Configuration\AppConfiguration;
+use Spezitest\Tests\Support\InMemorySessionStore;
 
 final class ApplicationTest extends TestCase
 {
@@ -66,6 +69,54 @@ final class ApplicationTest extends TestCase
         self::assertStringNotContainsString($internalMessage, $body);
         self::assertStringNotContainsString(RuntimeException::class, $body);
         self::assertStringNotContainsString(__FILE__, $body);
+    }
+
+    public function testAdminDatabaseFailureDoesNotExposeInternalDetails(): void
+    {
+        $internalMessage = 'private admin database marker';
+        $session = new InMemorySessionStore();
+        $session->set('admin_authenticated', true);
+        $configuration = new AdminConfiguration(
+            'admin',
+            password_hash('unused-test-password', PASSWORD_DEFAULT),
+            'SPEZITEST_TEST',
+            true,
+            sys_get_temp_dir() . '/spezitest-unused-admin-images',
+            null,
+            1024,
+        );
+        $runtime = new AdminRuntime(
+            $configuration,
+            $session,
+            static function () use ($internalMessage): never {
+                throw new RuntimeException($internalMessage);
+            },
+        );
+        $app = AppFactory::create(
+            new AppConfiguration('production', true),
+            new NullLogger(),
+            $runtime,
+        );
+
+        $response = $app->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', '/admin'),
+        );
+        $body = (string) $response->getBody();
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertStringNotContainsString($internalMessage, $body);
+        self::assertStringNotContainsString(RuntimeException::class, $body);
+        self::assertStringNotContainsString(__FILE__, $body);
+    }
+
+    public function testProductionAdminConfigurationRequiresSecureCookies(): void
+    {
+        $configuration = AdminConfiguration::fromEnvironment(
+            new AppConfiguration('production', false),
+            dirname(__DIR__, 2),
+        );
+
+        self::assertTrue($configuration->secureCookie());
     }
 
     /**

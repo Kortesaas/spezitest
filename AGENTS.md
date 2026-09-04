@@ -6,8 +6,11 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-Packet 6 adds a controlled, two-stage legacy import plan/apply tool to the
-Packet 5 domain schema and independently testable rating engine. The runtime
+Packet 7 adds the first functional, deliberately minimally styled admin area
+to the Packet 6 controlled-import and Packet 5 domain/rating foundation. The
+admin supports one environment-configured account, secure sessions, CSRF
+protection, dashboard lifecycle counts, drink CRUD/filtering, and one optional
+validated primary image. The runtime
 uses PHP 8.3, Composer, Slim Framework 4, a PSR-7 implementation, optional
 local `.env` loading, and a small lazy PDO connection layer. PHPUnit and
 PHPStan are the development quality tools. The
@@ -24,12 +27,14 @@ Never edit an applied
 migration; add a reviewed forward migration.
 
 Unless explicitly performing the reviewed Packet 6 workflow documented in
-`docs/LEGACY_IMPORT.md`, do not import or merge workbook data. Unless the user
-explicitly starts a later phase, do not:
+`docs/LEGACY_IMPORT.md`, do not import or merge workbook data. Read
+`docs/ADMIN.md` before modifying authentication, sessions, admin persistence,
+or images. Unless the user explicitly starts a later phase, do not:
 
-- implement image upload, processing, conversion, or deletion;
-- implement authentication, admin functionality, or sessions;
-- build the real frontend or introduce a frontend build pipeline;
+- implement rating/test entry, self-registration, password reset, multiple
+  accounts, roles, a gallery, or automatic image processing;
+- build public catalog pages, redesign the admin, or introduce a frontend
+  build pipeline;
 - connect to or create the production database; or
 - deploy anything.
 
@@ -66,6 +71,13 @@ possible: minimum required information first, optional enrichment later. Basic
 drink creation must never depend on optional metadata. A future phone workflow
 must support quickly recording a name, lifecycle status, and optionally one
 primary product picture.
+
+Packet 7 implements that quick-entry boundary. Do not add optional metadata to
+the create form; it belongs on the edit form after creation. Duplicate names
+remain valid and must not be rejected or silently merged.
+Because Packet 7 has no test-entry workflow, it must not create or transition a
+drink to `tested` without an existing completed test. Existing/imported tested
+records remain editable without inventing new test data.
 
 There are exactly three permanent testers, with these canonical names:
 
@@ -107,6 +119,18 @@ results before production use.
 - Legacy import must remain CLI-only, verify source hashes, require an otherwise
   empty target, record its run, and store generated image filenames outside
   `public/`. It must not become a normal Python-dependent HTTP path.
+- All `/admin` routes except the login form/submission require the existing
+  session authentication middleware. Every state-changing route, including
+  login and logout, requires the existing CSRF middleware.
+- The initial admin username and `password_hash()` output come only from
+  environment configuration. Never add a default password, committed hash,
+  registration route, reset route, or plaintext credential logging.
+- Ordinary primary images are validated originals only: accept detected
+  JPEG/PNG/WebP within the configured size limit, use generated filenames,
+  store portable relative paths outside `public/`, and serve them through the
+  authenticated controller. Do not trust client names or MIME headers.
+- Keep image replacement/removal coordinated with database transactions and
+  never construct a filesystem path directly from HTTP input.
 - Make database changes only through tracked, reviewable migrations.
 - Never expose migration execution over HTTP. Migrations are CLI/task or an
   explicitly reviewed manual deployment concern only.

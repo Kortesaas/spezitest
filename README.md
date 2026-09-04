@@ -7,17 +7,18 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is at the **Packet 6 controlled-import stage**. It contains a
+This repository is at the **Packet 7 first-admin stage**. It contains a
 minimal Slim Framework 4 application, a lazy production-safe PDO connection
 layer, CLI-only forward migrations, the first real Spezitest domain schema, an
 independently testable rating engine, automated checks, the Packet 4 forensic
-workbook findings, and a local two-stage legacy importer. The single
-placeholder page is not the real website design.
+workbook findings, a local two-stage legacy importer, and the first functional
+admin area. The HTML and CSS are intentionally minimal pending a dedicated
+frontend pass.
 
-There is deliberately no authentication, admin panel, public drink browser,
-normal image upload/processing, or deployment automation yet. The controlled
-import has been validated only against disposable MariaDB. No production
-database has been created or contacted.
+There is deliberately no public drink browser, rating/test entry, image
+gallery, automatic image optimization, or deployment automation yet. The
+admin and controlled import have been validated only against disposable
+MariaDB. No production database has been created or contacted.
 
 ## Repository organization
 
@@ -35,6 +36,8 @@ database has been created or contacted.
   image, metadata, anomaly, and migration-risk findings.
 - `docs/LEGACY_IMPORT.md`: dry-run, duplicate review, local apply, image
   recovery, corrections, and import safety procedure.
+- `docs/ADMIN.md`: authentication, admin routes, image-storage controls, and
+  current operational limitations.
 - `public/`: the only intended web document root and the minimal front
   controller.
 - `src/`: application/configuration code, database infrastructure, and isolated
@@ -71,9 +74,10 @@ rating methodology remains exactly unchanged: the Packet 5 engine reproduces
 all eight historical golden cases and ranking evidence. Remaining Excel
 boundary semantics are still a production gate; see `docs/RATING_SYSTEM.md`.
 
-Basic drink creation must remain quick: minimum required information first,
-optional enrichment later. A future image is optional and will normally be a
-file on webspace referenced by database metadata, not a MariaDB BLOB.
+Basic drink creation remains quick: name and status are required, and one
+primary picture is optional. Other metadata is edited later. Image binaries
+are files outside the public document root, referenced by database metadata,
+not MariaDB BLOBs.
 
 Current Preis/Leistung preserves the historical calculation but dynamically
 normalizes over all eligible completed/tested results with valid positive
@@ -103,11 +107,30 @@ Database access additionally requires `DB_HOST`, `DB_PORT`, `DB_NAME`,
 validated only when database access is explicitly requested; normal application
 bootstrap does not open a connection.
 
+The initial admin identity is configured with `ADMIN_USERNAME` and a
+`ADMIN_PASSWORD_HASH` produced by PHP's `password_hash()`. Never store the
+plaintext password in environment configuration. `ADMIN_IMAGE_STORAGE_ROOT`
+must resolve outside `public/`; the default application limit is 5 MiB and can
+be lowered with `ADMIN_IMAGE_MAX_BYTES`.
+
+## Admin area
+
+The minimally styled admin begins at `/admin/login`. It provides lifecycle
+counts plus drink listing, search, status filtering, quick creation, full
+metadata editing, explicit delete confirmation, status changes, and a single
+optional primary picture. All admin pages except login require session
+authentication. Every POST is CSRF-protected.
+
+Uploaded JPEG, PNG, and WebP files are checked by actual bytes, dimensions,
+and detected MIME type; client filenames and MIME headers are ignored. Files
+receive generated names under `ADMIN_IMAGE_STORAGE_ROOT` outside `public/` and
+are served only through an authenticated route. See `docs/ADMIN.md`.
+
 ## Local development
 
-Prerequisites are PHP 8.3 with PDO MySQL and Composer 2. Ordinary unit tests and
-the placeholder application need no running database, external service,
-production credential, Node.js installation, or frontend toolchain.
+Prerequisites are PHP 8.3 with PDO MySQL, Fileinfo, and Composer 2. Ordinary
+unit tests and the public placeholder page need no running database, external
+service, production credential, Node.js installation, or frontend toolchain.
 
 ```bash
 composer install
@@ -116,7 +139,8 @@ composer check
 composer serve
 ```
 
-The placeholder application is then available at `http://127.0.0.1:8080`.
+The application is then available at `http://127.0.0.1:8080`. Admin routes
+also require a migrated local database and configured admin credentials.
 `composer serve` uses PHP's built-in server and is for local development only.
 It is not a production start command.
 
@@ -163,6 +187,19 @@ DB_USER=spezitest_test
 DB_PASSWORD=local_test_password
 DB_CHARSET=utf8mb4
 ```
+
+Generate a local admin password hash and add the resulting values only to the
+ignored `.env` file:
+
+```dotenv
+ADMIN_USERNAME=your_local_admin_name
+ADMIN_PASSWORD_HASH=the_password_hash_output
+ADMIN_IMAGE_STORAGE_ROOT=var/admin-images
+ADMIN_IMAGE_MAX_BYTES=5242880
+```
+
+In production the admin session cookie is automatically Secure, HttpOnly, and
+SameSite=Strict, and PHP strict cookie-only sessions are enabled.
 
 Run the integration suite in another terminal:
 
@@ -268,6 +305,6 @@ See `docs/DATA_MODEL.md` for exact fields and relationships and
 ## Next phase
 
 No next packet may begin without explicit instruction. Do not treat test-only
-duplicate decisions as product-owner decisions, import into production, add
-normal upload handling, build real pages, add authentication/admin
-functionality, create/connect to Plesk, or deploy based only on Packet 6.
+duplicate decisions as product-owner decisions, import into production, build
+public pages, redesign the admin, add rating/test entry, create/connect to
+Plesk, or deploy based only on Packet 7.

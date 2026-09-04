@@ -119,17 +119,32 @@ applicable control below is mandatory:
 - Log operational failures safely without recording passwords, tokens, or
   unnecessary personal/sensitive data.
 
-## Future image storage
+## Admin image storage
 
-Product images will normally live as files on production webspace, with the
+Product images live as files on production webspace, with the
 database storing relative references and detected metadata rather than image
-BLOBs. Image upload remains optional for basic drink creation.
+BLOBs. One primary image remains optional for basic drink creation.
 
-Future upload handling must distrust extensions and all user-controlled paths,
-verify actual image content/type, enforce size limits, generate internal
-filenames, prevent executable content, and fail safely during validation or
-processing. No image upload or processing technology is implemented yet, and
-GD/Imagick availability is not assumed.
+Packet 7 upload handling distrusts extensions, client MIME, and all
+user-controlled paths. It verifies actual JPEG/PNG/WebP bytes, dimensions, and
+Fileinfo MIME, enforces a configurable limit no greater than the known 64 MiB
+server request limit, generates internal filenames, and stores files under
+`ADMIN_IMAGE_STORAGE_ROOT` outside `public/`. Images are served through an
+authenticated route and cannot execute as PHP. Production must provision a
+writable private directory and retain it across releases. GD/Imagick
+availability remains unverified, so validated originals are retained without
+resizing or conversion; optimization remains pending.
+
+The production PHP build must provide Fileinfo and safe image-header parsing;
+Composer declares Fileinfo as a runtime extension. WebP is accepted only when
+the deployed PHP image parser recognizes it. A deployment capability check is
+still required before advertising WebP upload support to administrators.
+
+The initial admin username and password hash are deployment secrets supplied
+as `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`. Generate the hash with PHP's
+`password_hash()` and never put a plaintext password in configuration.
+Production forces Secure, HttpOnly, SameSite=Strict, strict cookie-only admin
+sessions. TLS therefore must be active before production login testing.
 
 ## Database change safety
 
