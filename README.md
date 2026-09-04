@@ -7,16 +7,16 @@ eventual public site will be available at
 
 ## Project status
 
-This repository has a **database-infrastructure foundation and legacy-source
-audit**. It contains a minimal Slim Framework 4 application, a lazy
-production-safe PDO connection layer, CLI-only forward migrations, automated
-checks, and the Packet 4 forensic workbook findings. The single placeholder
-page is not the real website design.
+This repository is at the **Packet 5 domain-foundation stage**. It contains a
+minimal Slim Framework 4 application, a lazy production-safe PDO connection
+layer, CLI-only forward migrations, the first real Spezitest domain schema, an
+independently testable rating engine, automated checks, and the Packet 4
+forensic workbook findings. The single placeholder page is not the real
+website design.
 
-The only database object defined is the migrator's `schema_migrations` tracking
-table. There is deliberately no Spezi domain schema, rating implementation,
-authentication, admin panel, frontend framework, Excel migration, image upload,
-or deployment automation in this stage.
+There is deliberately no authentication, admin panel, public drink browser,
+Excel import, image upload/processing, or deployment automation yet. No
+production database has been created or contacted.
 
 ## Repository organization
 
@@ -26,14 +26,16 @@ or deployment automation in this stage.
   constraints.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
-- `docs/DATA_MODEL.md`: proposed, non-final domain and image-storage direction.
+- `docs/DATA_MODEL.md`: implemented tables/relationships and clearly separated
+  future or unresolved decisions.
 - `docs/RATING_SYSTEM.md`: workbook-verified rating formulas, historical
   quirks, unresolved edge semantics, and the production verification gate.
 - `docs/LEGACY_WORKBOOK_AUDIT.md`: workbook structure, lifecycle, overlap,
   image, metadata, anomaly, and migration-risk findings.
 - `public/`: the only intended web document root and the minimal front
   controller.
-- `src/`: application configuration and construction code.
+- `src/`: application/configuration code, database infrastructure, and isolated
+  rating domain logic.
 - `config/`: environment loading and application bootstrap.
 - `tests/`: application tests and machine-readable historical golden fixtures.
 - `tools/legacy-audit/`: local read-only OOXML audit tooling; never production
@@ -54,14 +56,14 @@ A drink has exactly one current lifecycle status:
 
 The statuses are views/states of one drink record. A status change must never
 be represented by duplicating a drink or moving it between independent
-datasets. The future database will be the single source of truth; existing
+datasets. The MariaDB database will be the single source of truth; existing
 Excel workbooks are migration and verification sources only.
 
-The permanent testers are Manu, Fabi, and Schorsch. The existing rating
-methodology must remain exactly unchanged. Packet 4 verified and documented
-the formulas and representative cached history, while explicitly retaining
-unresolved edge semantics. Any implementation must still reproduce the golden
-historical fixtures and be checked against Excel before production.
+The permanent testers are Manu, Fabi, and Schorsch. The implemented schema uses
+stable codes rather than relying on row IDs or display names. The existing
+rating methodology remains exactly unchanged: the Packet 5 engine reproduces
+all eight historical golden cases and ranking evidence. Remaining Excel
+boundary semantics are still a production gate; see `docs/RATING_SYSTEM.md`.
 
 Basic drink creation must remain quick: minimum required information first,
 optional enrichment later. A future image is optional and will normally be a
@@ -70,7 +72,7 @@ file on webspace referenced by database metadata, not a MariaDB BLOB.
 ## Production target
 
 The known target is Plesk shared hosting with PHP 8.3 running through FPM and
-Apache, plus MariaDB 10.11 in a later phase. Runtime code must work without
+Apache, plus MariaDB 10.11. Runtime code must work without
 Node.js, production shell access, or PHP shell/process execution functions. See
 `docs/PRODUCTION.md` for the complete baseline.
 
@@ -150,8 +152,10 @@ Run the integration suite in another terminal:
 composer test:integration
 ```
 
-The integration suite creates and removes only migration-infrastructure test
-objects in that disposable database. Never point it at production.
+The integration suite creates, constrains, inspects, and removes the Packet 5
+domain schema and migration-infrastructure test objects in that disposable
+database. It is destructive within the configured database. Never point it at
+production or a database containing data you care about.
 
 ## Database migrations
 
@@ -210,9 +214,22 @@ does not connect to a database. See `docs/LEGACY_WORKBOOK_AUDIT.md` for the
 reviewed findings. The source workbooks and extracted image library must not be
 committed.
 
+## Domain schema and rating engine
+
+The migrations create `drinks`, `testers`, `drink_tests`, `ratings`, and
+`drink_images`, plus the migrator-owned `schema_migrations` table. Derived
+rating results are not authoritative columns. The calculation classes under
+`src/Domain/Rating/` implement three-tester category averages, weighted and
+Excel-compatible rounded Gesamt, competition ranking, and explicit-set
+price/performance normalization without database access.
+
+See `docs/DATA_MODEL.md` for exact fields and relationships and
+`docs/RATING_SYSTEM.md` for compatibility rules and remaining unknowns.
+
 ## Next phase
 
-No next-phase work should begin without explicit instruction. In particular,
-do not create domain tables, implement records or ratings, build image uploads
-or real pages, add authentication/admin functionality, import Excel data, or
-deploy based only on this foundation and audit.
+Packet 6 is the controlled legacy import/migration tooling, but it must not
+begin without explicit instruction. Do not import or merge workbook data,
+extract/import production images, add upload handling, build real pages, add
+authentication/admin functionality, create/connect to production, or deploy
+based only on Packet 5.

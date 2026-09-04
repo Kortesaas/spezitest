@@ -44,13 +44,13 @@ Red-marked drinks in the old Primärliste are **not currently possessed** and
 must migrate as `identified`, even though they appear in the Primärliste.
 List membership alone must not override the red marking during migration.
 
-No Excel data is migrated during the foundation stage. When migration is later
-authorized, the mapping must be repeatable, auditable, and checked for duplicate
-logical drinks.
+No Excel data has been migrated through Packet 5. When migration is later
+authorized, the mapping must be repeatable, auditable, and checked for
+duplicate logical drinks.
 
 ## Source-of-truth rule
 
-After the future migration, the database will be the single source of truth.
+After the controlled migration, the database will be the single source of truth.
 The old Excel sheets are migration sources only and will be retired from
 day-to-day operation. They must not be kept as a second writable operational
 dataset.

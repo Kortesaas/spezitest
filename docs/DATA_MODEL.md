@@ -1,168 +1,160 @@
-# Data Model Direction
+# Data Model
 
-## Status of this document
+## Implemented in Packet 5
 
-This document captures known principles and proposed directions. It is **not a
-final domain schema**. Packet 3 created only migration infrastructure and the
-`schema_migrations` tracking table. Packet 4 audited the legacy workbooks but
-did not add domain storage. No drink, image, source, test, tester, or rating
-table exists yet.
+The MariaDB domain schema is defined by the tracked migrations in
+`database/migrations/`. It is the first operational model for Spezitest, not a
+literal copy of either workbook. MariaDB will be the single operational source
+of truth; the Excel workbooks remain migration and verification inputs only.
 
-The workbook audit in `LEGACY_WORKBOOK_AUDIT.md` now supplies evidence for the
-next design phase. The actual domain schema remains intentionally unfinalized
-until its unresolved identity, event-history, and rating compatibility
-decisions are made explicitly.
+The schema stores authoritative facts and relationships. It deliberately does
+not store category averages, Gesamtwertung, rank, or normalized
+Preis/Leistung as editable data. Those values are reproducibly calculated from
+raw ratings and the explicitly selected comparison population.
 
-## Authoritative-data principle
+All tables use InnoDB, `utf8mb4`, and `utf8mb4_unicode_ci`. Internal identifiers
+are unsigned numeric primary keys. Foreign-key deletion is restrictive so a
+drink, test, or tester cannot silently take historical facts with it.
 
-The future database will be Spezitest's single operational source of truth.
-Existing Excel workbooks are migration and verification material only and will
-eventually be retired from day-to-day operation.
+### `drinks`
 
-Store authoritative/raw facts. Calculate derived scores and rankings from
-those facts unless a proven technical reason justifies caching them. Derived
-rankings or scoring values must not be blindly duplicated into authoritative
-columns where they can drift from their inputs.
+One row is one persistent Cola-Mix product. The minimum creation facts are
+`name` and `lifecycle_status`; all enrichment fields are nullable.
 
-## Core drink principle
+| Column | Type | Purpose |
+| --- | --- | --- |
+| `id` | `BIGINT UNSIGNED` | Stable internal identity |
+| `name` | `VARCHAR(255)` | Required, nonblank product name |
+| `lifecycle_status` | `VARCHAR(16)` | Exactly `identified`, `acquired`, or `tested` |
+| `manufacturer` | `VARCHAR(255) NULL` | Free-text manufacturer/brand when known |
+| `origin_location` | `VARCHAR(255) NULL` | Raw locality/origin text when known |
+| `origin_region` | `VARCHAR(128) NULL` | Raw region text when known |
+| `notes` | `TEXT NULL` | Optional operational notes |
+| `created_at`, `updated_at` | `DATETIME(6)` | Record timestamps |
 
-One database record represents one distinct Cola-Mix / Spezi product. Each
-drink has one current lifecycle state:
+MariaDB enforces both the nonblank name and allowed lifecycle values. There is
+intentionally no `UNIQUE(name)`: audited history contains same-name products
+that are not necessarily the same drink. Lifecycle lists are views over this
+single table; a status transition updates the same row.
 
-`identified -> acquired -> tested`
+### `testers`
 
-Status changes update the state of that same record. They must never duplicate
-the drink or physically move it between separate datasets.
+The table contains the three permanent tester identities. A tracked migration
+seeds `manu` / Manu, `fabi` / Fabi, and `schorsch` / Schorsch. `code` and
+`display_order` are unique. Application logic uses the stable code and must not
+assume the generated row IDs or derive identity from display-name spelling.
 
-Drink names must not be assumed globally unique. Duplicate detection is a
-domain and import concern and must not be reduced to a simple `UNIQUE(name)`
-constraint. The distinguishing facts and matching rules remain to be verified.
+The allowed-code check makes the current permanent membership explicit. A
+future change to that immutable domain rule requires a deliberate migration
+and a rating-compatibility review.
 
-This is directly supported by the Primärliste: two distinct rows named
-`Spezi` have different manufacturers and locations. Cross-workbook comparison
-also found exact overlaps as well as visually similar names belonging to
-different manufacturers. A future migration therefore needs a reviewable
-candidate-matching process rather than automatic name-based merging.
+### `drink_tests`
 
-During historical migration, red-marked drinks in the old Primärliste are not
-currently possessed and must migrate as `identified`, even though they appear
-in the Primärliste.
+A test is separate from its drink: `drinks 1 -> many drink_tests`. This makes
+more than one test structurally possible without defining a retesting product
+workflow now.
 
-## Simple entry is permanent
+Each test has a database-constrained `draft` or `completed` status. Only a
+completed test with a valid official result may be placed in public rating,
+ranking, or price/performance comparison sets. The schema does not use a
+trigger to synchronize test status with drink lifecycle; the future
+application service must update these consistently in one controlled action.
 
-Adding a newly discovered Spezi must require as little effort as reasonably
-possible:
+Nullable fields preserve useful audited test facts without claiming more than
+the workbooks establish:
 
-`minimum required information first -> optional enrichment later`
+- `price_amount DECIMAL(12,4)` stores the price associated with the test when
+  its meaning is known;
+- `recorded_time TIME`, `duration_value INT UNSIGNED`, and
+  `stream_reference SMALLINT UNSIGNED` retain the workbook-shaped values
+  without assigning an unverified unit or business meaning;
+- `completed_at` and `notes` are optional; and
+- creation and update timestamps are recorded.
 
-A future phone workflow—for example, while standing in a Getränkemarkt—should
-allow rapid creation with conceptually only:
+The four-decimal price scale preserves source values such as `0.6995` instead
+of scraping a two-decimal display. Price unit and basis remain unresolved.
+Prices found on legacy untested records are not forced into fake test rows;
+their exact import destination must be decided during controlled import.
 
-- name;
-- lifecycle status; and
-- one optional picture.
+### `ratings`
 
-Optional metadata must not block creation or force a large initial form. The
-record can be enriched later.
+One row stores one canonical tester's three raw inputs for one test:
 
-## Product-image direction
+`drink_tests 1 -> many ratings <- 1 testers`
 
-Product pictures are a core requirement, but an image is optional when a drink
-is created. The standard admin workflow should behave as though a drink has one
-main picture: one file input or phone-camera upload. Additional images may be a
-future capability, but must not complicate basic creation.
+The authoritative categories are `optik`, `sueffigkeit`, and `geschmack`.
+Each is `DECIMAL(8,4)`, which safely preserves the historical integer inputs
+and permits decimal granularity without asserting an unverified integer-only
+rule. A unique constraint on `(test_id, tester_id)` prevents two rating rows
+for the same tester and test.
 
-The intended storage architecture is:
+No database range check such as 1–10 is present. The observed historical range
+does not formally establish the accepted future range or granularity. Future
+HTTP validation must resolve that question before accepting input; it must not
+quietly invent a rule at the persistence layer.
 
-- the image file lives safely on production webspace; and
-- the database stores the metadata and relative reference associating that
-  file with its drink.
+### `drink_images`
 
-Uploaded image binaries should not be stored in MariaDB BLOB columns by
-default. If no image exists, the future public site should display a clean
-placeholder.
+Image binaries are files on webspace, never database BLOBs. The table stores a
+drink relationship, relative `storage_path`, detected `mime_type`, positive
+pixel `width` and `height`, `display_order`, and creation time.
 
-Users must never have to enter filenames, MIME types, dimensions, or storage
-paths manually. A future upload implementation must detect or generate those
-values, validate genuine supported image content, create a safe internal
-filename, resize/compress for web delivery, store the result safely, and link
-it to the drink.
+`drinks 1 -> many drink_images`
 
-All uploaded content is untrusted. File extensions alone are insufficient.
-Future handling must verify image content and type, enforce size limits, ignore
-user-controlled filesystem paths, prevent executable uploads, and fail safely
-when validation or processing fails. GD and Imagick availability has not been
-verified, and no image-processing dependency is selected in this packet.
+The storage path is globally unique and constrained to a nonblank relative
+reference rather than an absolute path or URL. `(drink_id, display_order)` is
+unique. The image with the lowest order is the normal primary display image,
+so multiple images are possible while a future ordinary UI can still present
+one simple optional picture control. Uploading, detecting metadata, generating
+paths, processing files, and deletion are not implemented.
 
-The workbook audit found one image for 165 of 166 Primärliste records and one
-for every Beschaffungsliste record. One missing image is valid source data, so
-image absence must never block product creation or migration. Source images
-use both PNG and JPEG and have varying dimensions across the workbooks; the
-future model must not infer format or size from a user-supplied filename.
+## Relationship summary
 
-## Audited source facts relevant to design
+```text
+drinks 1 ─── * drink_tests 1 ─── * ratings * ─── 1 testers
+   │
+   └──────── * drink_images
+```
 
-These facts are supported by the legacy workbooks but do not prescribe exact
-tables or column types:
+There are no source, manufacturer, city, region, inventory, or acquisition
+lookup tables. The audited evidence does not justify that normalization, and
+simple entry remains more important than speculative structure.
 
-- A completed historical test has nine raw inputs: Manu, Fabi, and Schorsch
-  each rate Optik, Süffigkeit, and Geschmack.
-- Category averages, Gesamt, rank, and price/performance are formula-derived;
-  raw tester inputs are the authoritative compatibility inputs.
-- Every historical Primärliste row has a stored numeric price, sometimes at
-  greater precision than the two-decimal display format. Its business unit and
-  basis remain unresolved.
-- Tested rows carry a stream number; a subset also has a time-of-day value and
-  an integer duration. These appear test-related, but their precise semantics
-  and cardinality remain unresolved.
-- Location fields are free text that may combine postal code, country prefix,
-  and locality. Beschaffungsliste also has region and informal procurement
-  geography. Raw values must survive staging before any structured parsing.
-- Legacy image relationships can be mapped to product rows and images are
-  optional. Image hashes are useful migration evidence but are not sufficient
-  product identifiers.
-- The source contains anomalies that require traceable review, including a
-  shifted row, duplicate candidates, formula values in metadata columns, and
-  inflated blank ranges.
+## Derived-result policy
 
-## Proposed / non-final entities
+The database stores the nine individual rating inputs and optional test price.
+The PHP domain layer calculates:
 
-The following entities describe likely boundaries only. They are not approved
-tables and must not be created from this document:
+- three unrounded category averages;
+- rounded Gesamtwertung;
+- descending competition rank over a caller-supplied completed-result set; and
+- price/performance over a caller-supplied comparison set.
 
-- `drinks`: one distinct product and its current lifecycle state, with only
-  genuinely required creation fields enforced.
-- `drink_images`: image references and metadata associated with a drink.
-- `drink_sources`: possible provenance or discovery/source facts.
-- `tests`: recorded tasting/test events.
-- `testers`: the permanent testers Manu, Fabi, and Schorsch.
-- `ratings`: authoritative/raw rating inputs associated with tests and testers.
+Not storing those outputs prevents stale values when raw ratings or the chosen
+comparison population changes. If profiling later proves caching necessary,
+it must be added as explicitly invalidated cache data, not as independently
+editable truth.
 
-A proposed, non-final `drink_images` entity might eventually contain:
+## Future / unresolved
 
-- a stable image ID;
-- a drink ID;
-- a relative storage path;
-- detected MIME type;
-- detected width and height;
-- whether the image is primary; and
-- a creation timestamp.
-
-The relationship and constraints needed to guarantee at most one primary image
-without complicating creation remain undecided. No exact columns, types,
-indexes, or constraints are finalized here.
-
-## Deliberately unresolved questions
-
-- The exact test and rating schema remains pending design from the verified
-  formulas, golden fixtures, and unresolved compatibility edges documented in
-  `RATING_SYSTEM.md`.
-- PHP numeric representation and Excel-compatible boundary behavior remain
-  pending implementation and compatibility testing.
-- Retesting behavior is intentionally undecided.
-- Historical acquisition or inventory-event tracking is intentionally
-  undecided.
-- Duplicate matching rules are intentionally undecided.
-- Additional-image behavior is optional future scope.
+- Retesting is structurally possible, but which test is public and how
+  historical results are presented remain product decisions.
+- The valid rating input range and granularity remain unverified beyond the
+  observed historical values.
+- Price unit and basis are unknown. Missing, zero, or otherwise unavailable
+  prices do not produce Preis/Leistung; placement of untested legacy prices is
+  deferred to the import design.
+- Historical acquisition/inventory events are not modeled. Lifecycle remains
+  the current state on the drink.
+- Duplicate matching and merge rules remain part of the controlled import;
+  names alone are insufficient.
+- The exact meaning/unit of duration and the semantics of recorded time and
+  stream reference remain unresolved; the raw columns must not be embellished
+  during import.
+- Additional-image UI, upload validation, conversion/resizing, safe serving,
+  and deletion behavior remain future work.
 - Image-processing technology remains unselected until production PHP
   capabilities are verified.
+
+During historical migration, red-marked drinks in the old Primärliste must be
+classified as `identified`, even though they appear in that list.

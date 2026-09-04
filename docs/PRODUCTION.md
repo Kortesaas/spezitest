@@ -60,7 +60,9 @@ those values still come from `DB_HOST` and `DB_PORT`.
 
 Migrations are forward-only SQL files tracked in `schema_migrations` and run by
 the CLI-only `bin/migrate.php` command. The runner itself creates the tracking
-table; no domain table exists yet. There is no HTTP migration endpoint.
+table. Packet 5 migrations define the domain tables and canonical tester seed,
+but they have been exercised only against disposable local MariaDB 10.11; they
+have not been applied to production. There is no HTTP migration endpoint.
 
 The final production execution mechanism is intentionally undecided. Depending
 on verified Plesk capabilities, migrations may later run through a secure CLI

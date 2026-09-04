@@ -6,28 +6,29 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-The repository has database-infrastructure foundations and a completed
-read-only forensic audit of the two legacy workbooks. The runtime uses PHP 8.3,
-Composer, Slim Framework 4, a PSR-7 implementation, optional local `.env`
-loading, and a small lazy PDO connection layer. PHPUnit and PHPStan are the
-development quality tools. The application uses `public/` as its only intended
-web document root. Database changes use CLI-only, forward SQL migrations
-outside `public/`. The Python utility in `tools/legacy-audit/` is local
-migration/audit tooling and is not production runtime code.
+Packet 5 established the first real domain schema and an independently
+testable rating engine. The runtime uses PHP 8.3, Composer, Slim Framework 4, a
+PSR-7 implementation, optional local `.env` loading, and a small lazy PDO
+connection layer. PHPUnit and PHPStan are the development quality tools. The
+application uses `public/` as its only intended web document root. Database
+changes use CLI-only, forward SQL migrations outside `public/`. The Python
+utility in `tools/legacy-audit/` is local migration/audit tooling and is not
+production runtime code.
 
-Do not infer that a database design, deployment process, authentication system,
-or real user interface has been selected. Unless the user explicitly starts a
-later phase, do not:
+The implemented domain tables are `drinks`, `testers`, `drink_tests`,
+`ratings`, and `drink_images`; `schema_migrations` is infrastructure. The
+rating services live under `src/Domain/Rating/`. See `docs/DATA_MODEL.md` and
+`docs/RATING_SYSTEM.md` before changing either design. Never edit an applied
+migration; add a reviewed forward migration.
 
-- create domain tables or finalize the domain schema;
-- implement Spezi domain records or ratings;
+Unless the user explicitly starts a later phase, do not:
+
+- import or merge either Excel workbook or extracted image library;
+- implement image upload, processing, conversion, or deletion;
 - implement authentication, admin functionality, or sessions;
 - build the real frontend or introduce a frontend build pipeline;
-- migrate the existing Excel data; or
+- connect to or create the production database; or
 - deploy anything.
-
-The only table currently authorized is the migration runner's infrastructure
-table, `schema_migrations`.
 
 ## Immutable domain rules
 
@@ -52,7 +53,8 @@ Historical migration exception: drinks marked red in the old Primärliste are
 not currently possessed. They must migrate as `identified`, even though they
 appear in the Primärliste.
 
-The future database will be the single source of truth for Spezitest data.
+The database will be the single source of truth for Spezitest data once
+populated.
 Existing Excel workbooks are migration and verification sources only and will
 eventually be retired from day-to-day operation.
 
@@ -69,19 +71,30 @@ There are exactly three permanent testers, with these canonical names:
 - Schorsch
 
 The existing rating methodology is immutable. Do not invent, simplify, infer,
-or modify a formula, weighting, scale, aggregation, or rounding rule. Packet 4
-verified the workbook formulas and representative cached results and recorded
-them in `docs/RATING_SYSTEM.md`; several edge semantics remain explicitly
-unresolved there. Do not reimplement the formulas from memory or promote an
-unresolved behavior to a rule. Any later calculation implementation must pass
-the historical golden fixtures and be verified against the source workbooks
-and historical results before production use.
+or modify a formula, weighting, scale, aggregation, or rounding rule. Packet 5
+implements the Packet 4 workbook findings and checks all historical golden
+cases. Several edge semantics remain explicitly unresolved in
+`docs/RATING_SYSTEM.md`; do not promote one to a rule. Rating mathematics must
+remain independent of HTTP and persistence. Do not replace exact decimal input
+handling or the isolated Excel-compatible rounding policy with an assumed
+floating-point equivalent. Any change must continue to pass the golden
+fixtures and must be rechecked against the source workbooks and historical
+results before production use.
 
 ## Architecture and data changes
 
-- Treat the future relational database as the sole operational source of truth.
+- Treat the relational database as the sole operational source of truth once
+  populated; never create a parallel live workbook datastore.
 - Represent lifecycle status on one drink record; do not create status-specific
   drink stores, tables, files, or duplicated records.
+- Store the raw rating entered by each canonical tester. Category averages,
+  Gesamt, rank, and normalized price/performance are derived and must not become
+  ordinary manually editable authoritative columns.
+- Tester application logic must use stable codes (`manu`, `fabi`, `schorsch`),
+  never assume database IDs 1, 2, and 3, and never key behavior from display
+  name spelling.
+- Preserve non-unique drink names. Never add `UNIQUE(name)` as a substitute for
+  a reviewed duplicate-matching policy.
 - Make database changes only through tracked, reviewable migrations.
 - Never expose migration execution over HTTP. Migrations are CLI/task or an
   explicitly reviewed manual deployment concern only.

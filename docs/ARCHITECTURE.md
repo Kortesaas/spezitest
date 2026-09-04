@@ -4,20 +4,20 @@
 
 Spezitest will be an internet-facing production application that catalogs
 Cola-Mix / Spezi drinks, primarily from Germany and surrounding countries. This
-document records architectural constraints and the PHP runtime foundation.
+document records architectural constraints and the PHP/runtime foundation.
 Slim Framework 4 with a PSR-7 implementation is selected for HTTP delivery,
-with Composer PSR-4 autoloading under the `Spezitest` namespace. No database
-domain schema, domain persistence model, template system, or real frontend
-design is selected in this stage. Packet 3 adds only PDO connection and
-migration infrastructure.
+with Composer PSR-4 autoloading under the `Spezitest` namespace. Packet 5 adds
+the first MariaDB domain schema and an HTTP- and persistence-independent rating
+engine. There is still no domain repository, template system, authentication,
+admin UI, upload pipeline, or real frontend design.
 
 ## Runtime structure
 
 - `public/index.php` is the minimal front controller.
 - `config/bootstrap.php` optionally loads local environment configuration and
   constructs the application.
-- `src/` contains project classes, including configuration and the application
-  factory.
+- `src/` contains project classes, including configuration, the application
+  factory, database infrastructure, and isolated rating domain logic.
 - `tests/` constructs the same application directly without starting a web
   server.
 
@@ -32,8 +32,8 @@ or network access.
 
 ## Source of truth
 
-The future relational database will be the single operational source of truth
-for Spezitest data. Existing Excel workbooks are migration inputs and rating
+The relational database is the intended single operational source of truth for
+Spezitest data. Existing Excel workbooks are migration inputs and rating
 verification references only. They will eventually be retired from day-to-day
 operation and must not become a parallel live datastore.
 
@@ -61,10 +61,15 @@ filename order, applies only unrecorded versions, records successful versions
 and SHA-256 checksums, and rejects changes to already-applied migrations.
 
 The runner creates `schema_migrations` itself because tracking must exist before
-the first migration can be recorded. It is the only database object authorized
-in this packet. There are no automatic destructive down migrations. MariaDB DDL
-may commit implicitly, so failed migrations can require manual recovery even
-when the version was not recorded.
+the first migration can be recorded. Tracked Packet 5 migrations create
+`drinks`, `testers`, `drink_tests`, `ratings`, and `drink_images`, then seed the
+three canonical testers. The schema uses InnoDB, utf8mb4, foreign keys, database
+checks for controlled states, and restrictive deletes. See `DATA_MODEL.md` for
+the authoritative field and relationship description.
+
+There are no automatic destructive down migrations. MariaDB DDL may commit
+implicitly, so failed migrations can require manual recovery even when the
+version was not recorded.
 
 ## Drink identity and lifecycle
 
@@ -78,21 +83,29 @@ They must not be implemented as independent datasets between which records are
 copied or moved. See `DATA_LIFECYCLE.md` for definitions and the historical
 migration rule.
 
-Names are not globally unique and must not later receive a simplistic
-`UNIQUE(name)` rule. See `DATA_MODEL.md` for proposed, non-final entity and
-image-storage direction.
+Names are not globally unique and do not have a `UNIQUE(name)` rule. Optional
+metadata remains nullable so a drink can be created from name and status alone.
+Images are file-backed: only relative references and detected metadata are
+modeled, with no BLOB or upload implementation.
 
 ## Rating boundary
 
 Rating calculation is a compatibility requirement, not a greenfield design
-exercise. The three permanent testers are Manu, Fabi, and Schorsch. The
-existing methodology must remain exactly unchanged.
+exercise. The three permanent testers are Manu, Fabi, and Schorsch, identified
+in code by stable codes rather than database IDs or display names.
 
-No calculation code may be derived from memory or assumptions. Before a future
-implementation can enter production, its formulas, inputs, weighting,
-aggregation, and exact rounding behavior must be established from the existing
-Excel workbooks and verified against historical results. See
-`RATING_SYSTEM.md`.
+`src/Domain/Rating/` contains small services/value objects for category and
+Gesamt calculation, exact decimal input handling, isolated Excel-compatible
+rounding, competition ranking, and price/performance normalization. These
+classes do not query MariaDB and do not depend on Slim. Persistence stores the
+raw tester inputs; category averages, Gesamt, rank, and normalized
+price/performance are derived.
+
+Ranking and price/performance services operate only on explicit comparison
+populations. A future application query/service boundary is responsible for
+selecting completed tests with valid official results; the mathematics does
+not hard-code workbook ranges. Formula details, historical quirks, and the
+remaining Excel boundary verification gate are in `RATING_SYSTEM.md`.
 
 ## Future application boundaries
 

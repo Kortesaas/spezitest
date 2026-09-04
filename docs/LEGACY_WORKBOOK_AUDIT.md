@@ -283,7 +283,7 @@ which facts are authoritative, derived, display-only, or historical metadata.
 10. The one missing product image needs a placeholder or later enrichment;
     its absence must not block drink migration.
 
-## Firm implications for the future data model
+## Firm audit inputs to the data model
 
 - One product record must carry lifecycle state; workbook/list membership is
   migration provenance, not a permanent partition.
@@ -302,7 +302,9 @@ which facts are authoritative, derived, display-only, or historical metadata.
 - Import provenance and anomaly/review decisions should be traceable without
   making the Excel files operational sources of truth.
 
-These are constraints and design inputs, not an approved schema.
+These remain audit constraints and import inputs. Packet 5 implemented the
+core product/test/rating/image relationships; `DATA_MODEL.md` is authoritative
+for the resulting schema and records which import questions remain deferred.
 
 ## Unresolved questions for a later packet
 
@@ -318,4 +320,5 @@ These are constraints and design inputs, not an approved schema.
 - Decide retest/history semantics and whether rank and price/performance are
   dynamic or snapshot values.
 - Establish Excel-compatible error and rounding behavior for cases absent
-  from populated history before implementing the rating engine.
+  from populated history before allowing the implemented rating engine into
+  production.

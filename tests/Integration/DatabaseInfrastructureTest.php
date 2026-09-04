@@ -199,6 +199,11 @@ final class DatabaseInfrastructureTest extends TestCase
         $this->connection->exec(
             <<<'SQL'
                 DROP TABLE IF EXISTS
+                    ratings,
+                    drink_images,
+                    drink_tests,
+                    testers,
+                    drinks,
                     migration_test_applied,
                     migration_test_repeat,
                     migration_order_test,

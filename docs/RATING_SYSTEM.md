@@ -23,9 +23,43 @@ The labels below are deliberate:
 - **UNRESOLVED** means the populated workbook does not prove the behavior. It
   must not be guessed during implementation.
 
-No PHP rating engine is implemented in this packet. The golden cases in
-`tests/Fixtures/legacy-rating-golden.json` preserve representative source
-inputs and cached outputs for the later compatibility implementation.
+Packet 5 implements the verified formulas as independent PHP domain logic under
+`src/Domain/Rating/`. The golden fixture in
+`tests/Fixtures/legacy-rating-golden.json` remains the compatibility authority:
+all eight representative cases, their ranking results, and their verified
+price/performance values are exercised by unit tests.
+
+The workbook formula and populated historical results are verified. The source
+data still does not formally verify every possible Excel coercion or exact
+half-boundary rounding case. The implementation must therefore never be
+rewritten from memory or assumptions, and its isolated rounding policy must be
+rechecked against Excel boundary cases before production.
+
+## Implemented calculation boundary
+
+The calculation layer has no HTTP, PDO, or MariaDB dependency:
+
+- `TesterRating` holds the three raw category values for one stable
+  `TesterCode`.
+- `RatingCalculator` requires exactly one rating from each of Manu, Fabi, and
+  Schorsch, retains unrounded category averages, applies weights 1/2/3, and
+  rounds Gesamt once to two decimals.
+- `ExactNumber` parses bounded decimal inputs as rational values. Database
+  `DECIMAL` values should be passed as strings so calculation does not begin
+  with a binary floating-point conversion.
+- `ExcelRounder` is the single replaceable compatibility boundary. It applies
+  half-away-from-zero rounding to exact rational inputs rather than delegating
+  the decision to PHP's binary `round()` behavior.
+- `CompetitionRanking` derives descending Excel-style competition ranks from
+  exactly the score population supplied by its caller.
+- `PricePerformanceCalculator` derives the intermediate and normalized values
+  from an explicitly supplied comparison population.
+
+The result objects expose floats at their outside boundary for convenient
+consumption, while rating aggregation and Gesamt rounding use exact rational
+arithmetic. The intentionally bounded implementation matches the schema's
+`DECIMAL` rating/price sizes and the historical fixtures; it is not a
+general-purpose arbitrary-precision mathematics library.
 
 ## Source columns
 
@@ -101,6 +135,12 @@ example, rows 9 and 10 both have Gesamt `43.67`, both rank 8, and the next
 record ranks 10. Four records with Gesamt `37.67` all rank 23 and the next
 record ranks 27.
 
+The PHP ranker does not know workbook row numbers or query the database. Its
+caller must supply the intended population of valid Gesamt values. Production
+application code must include only completed tests with official results. This
+keeps the formula compatible while preventing the workbook's fixed/oversized
+ranges from becoming a domain rule.
+
 ### Ranking range — HISTORICAL QUIRK
 
 The R formula was accidentally propagated through row 381,077, even though
@@ -146,6 +186,26 @@ maps the historical minimum to 0 and maximum to 1. U is displayed with
   authoritative rating.
 - T and U are not involved in the Gesamt or ranking formulas.
 
+### PHP price/performance policy
+
+The PHP service accepts rounded Gesamt, an optional price, and the intermediate
+values for an explicit comparison set. It computes:
+
+```text
+intermediate = rounded Gesamt / price
+normalized = (intermediate - minimum) / (maximum - minimum)
+```
+
+Historical compatibility can therefore pass the exact T2:T109 population;
+future behavior may pass a different set only after the product owner chooses
+it explicitly. Excel row references are not embedded in the service.
+
+A missing or non-positive price, an empty population, or a zero-width
+population returns unavailable rather than inventing a value. Preis/Leistung
+is optional even for a completed test. Negative prices are treated as
+unavailable because division can be performed safely only for a positive
+price; this is a safety policy, not a claim about workbook behavior.
+
 ## Other formula anomalies — HISTORICAL QUIRK
 
 Columns V (`Timestamp`) and W (`Dauer`) usually contain time-of-day and integer
@@ -190,14 +250,15 @@ not change the verified rating formulas above.
   coercion/error rules; a future implementation must define compatibility
   from Excel tests before accepting such inputs.
 - No tested row has a blank or zero price. The intended business behavior for
-  either case is therefore unresolved even though the unguarded division
-  formula is known.
+  either case remains unresolved even though the unguarded division formula is
+  known; current PHP behavior deliberately returns unavailable.
 - No historical case establishes what to do when all T values are equal and
-  the min-max denominator becomes zero.
+  the min-max denominator becomes zero; current PHP behavior returns
+  unavailable.
 - The formula proves use of Excel `ROUND(..., 2)`, but the data has no known
-  exact half-boundary case that validates a PHP decimal/floating-point
-  implementation. Excel-compatible boundary behavior must be tested, not
-  approximated from memory.
+  exact half-boundary case. `ExcelRounder` isolates a half-away-from-zero exact
+  rational policy and has direct boundary tests, but Excel boundary fixtures
+  remain a pre-production verification requirement.
 - Whether ranking and price/performance are historical snapshots or should be
   dynamically recalculated after later tests is a product decision not proved
   by the workbook.
@@ -205,8 +266,10 @@ not change the verified rating formulas above.
 
 ## Production gate
 
-Before any rating implementation goes to production, it must be verified
-against the actual Excel formulas, cached historical results, and the golden
-fixtures. A mismatch is evidence to investigate, not permission to silently
-change the historical methodology. Any remaining ambiguity requires a
-project-owner decision.
+Before this rating implementation goes to production, it must be verified
+again against the actual Excel formulas, cached historical results, and the
+golden fixtures, including deliberately constructed Excel half-boundary cases.
+All eight current golden cases pass, but that does not waive the remaining
+edge verification. A mismatch is evidence to investigate, not permission to
+silently change the historical methodology. Any remaining ambiguity requires
+a project-owner decision.
