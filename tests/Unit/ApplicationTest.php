@@ -18,32 +18,28 @@ use Spezitest\Tests\Support\InMemorySessionStore;
 
 final class ApplicationTest extends TestCase
 {
-    public function testRootReturnsSuccessfulResponse(): void
-    {
-        $response = $this->app()->handle(
-            (new ServerRequestFactory())->createServerRequest('GET', '/'),
-        );
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertSame('text/html; charset=UTF-8', $response->getHeaderLine('Content-Type'));
-    }
-
-    public function testRootResponseIdentifiesSpezitest(): void
-    {
-        $response = $this->app()->handle(
-            (new ServerRequestFactory())->createServerRequest('GET', '/'),
-        );
-
-        self::assertStringContainsString('Spezitest', (string) $response->getBody());
-    }
-
-    public function testUnknownRouteReturnsNotFoundResponse(): void
+    public function testUnknownRouteReturnsBrandedNotFoundWithoutDatabase(): void
     {
         $response = $this->app()->handle(
             (new ServerRequestFactory())->createServerRequest('GET', '/not-a-real-route'),
         );
+        $body = (string) $response->getBody();
 
         self::assertSame(404, $response->getStatusCode());
+        self::assertSame('text/html; charset=UTF-8', $response->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('Spezitest', $body);
+        self::assertStringContainsString('Diese Flasche ist leer', $body);
+    }
+
+    public function testNotFoundResponseCarriesWebsiteSecurityHeaders(): void
+    {
+        $response = $this->app()->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', '/nope'),
+        );
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertStringContainsString("default-src 'self'", $response->getHeaderLine('Content-Security-Policy'));
+        self::assertSame('nosniff', $response->getHeaderLine('X-Content-Type-Options'));
     }
 
     public function testProductionErrorResponseDoesNotExposeInternalDetails(): void

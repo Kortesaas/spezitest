@@ -65,10 +65,13 @@ and Packet 6 adds price precision plus isolated legacy-import run tracking.
 They have been exercised only against disposable local MariaDB 10.11 and have
 not been applied to production. There is no HTTP migration or import endpoint.
 
-The final production execution mechanism is intentionally undecided. Depending
-on verified Plesk capabilities, migrations may later run through a secure CLI
-or task mechanism, or through an explicitly reviewed manual deployment
-process. No convenient production shell access is assumed.
+The production execution mechanism is now decided and documented in
+`docs/DEPLOYMENT.md`: the initial schema and reviewed historical catalogue are
+loaded by importing one verified SQL dump through Plesk phpMyAdmin, and future
+forward migrations run as a one-off **Plesk Scheduled Task** invoking
+`bin/migrate.php`. No SSH is assumed. The legacy importer never runs on
+production — it is run locally against a disposable database and its output
+(SQL + images) is what gets uploaded.
 
 MariaDB DDL may implicitly commit, so automatic transactional rollback cannot
 be promised. Every production migration needs serialized execution, careful
@@ -163,7 +166,9 @@ left in production.
 
 ## Production release gate
 
-The eventual release process must confirm at minimum:
+The step-by-step Plesk procedure, environment checklist, and verification
+checklist live in `docs/DEPLOYMENT.md`. The release process must confirm at
+minimum:
 
 - configuration and secrets are supplied securely;
 - debug output is disabled;

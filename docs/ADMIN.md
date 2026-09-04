@@ -2,11 +2,13 @@
 
 ## Scope
 
-Packet 7 provides the first usable, intentionally minimally styled admin area.
-It supports a single environment-configured administrator, lifecycle counts,
-drink search/filtering and CRUD, status changes, and one optional primary
-image. It does not provide public catalog pages, rating/test entry, accounts,
-roles, self-registration, password reset, or an image gallery.
+The admin (Design System admin shell as of Packet 8, deliberately compact)
+supports a single environment-configured administrator, lifecycle counts, drink
+search/filtering and CRUD, status changes, one optional primary image, and
+test/rating entry. It does not provide accounts, roles, self-registration,
+password reset, or an image gallery. The public website is separate (see
+`README.md`); admin image uploads are also read on the public detail pages
+through a controlled route.
 
 ## Configuration
 
@@ -54,6 +56,9 @@ is still CSRF-protected.
 | GET | `/admin/drinks/{id}/delete` | Explicit delete confirmation |
 | POST | `/admin/drinks/{id}/delete` | Delete when no restrictive dependencies exist |
 | GET | `/admin/drinks/{id}/image` | Authenticated primary-image response |
+| GET | `/admin/drinks/{id}/test` | Nine-grade test-entry form (draft or completed) |
+| POST | `/admin/drinks/{id}/test` | Save a draft test (partial grades allowed) |
+| POST | `/admin/drinks/{id}/test/complete` | Validate all nine grades, run the engine, set `tested` |
 
 All state changes use POST and require a session-bound random CSRF token.
 Unauthenticated protected requests redirect to `/admin/login`. Production
@@ -111,6 +116,26 @@ Uploaded files live outside the web document root and are streamed only after
 admin authentication. Generated non-executable extensions, private storage,
 controlled response MIME, CSP, and `X-Content-Type-Options: nosniff` prevent an
 upload from becoming executable application code.
+
+## Test / rating entry
+
+`/admin/drinks/{id}/test` is available for a drink that is `acquired` (or
+already `tested`, for corrections). An `identified` drink must be moved to
+`acquired` first.
+
+Each of the three canonical testers (Manu, Fabi, Schorsch) grades Optik,
+Süffigkeit and Geschmack as an integer 0–10, higher is better. A tester's three
+grades are entered together or not at all, so every saved row maps cleanly onto
+the `ratings` table. An optional test price is parsed from German or plain
+decimal notation and stored on `drink_tests.price_amount`; an optional note is
+stored on `drink_tests.notes`.
+
+"Zwischenspeichern" persists a partial draft and leaves the drink on `acquired`.
+"Test abschließen" requires all nine grades: the raw grades are stored, the
+verified `RatingCalculator` is asked for an official result, and in one
+database transaction the test becomes `completed` and the drink becomes
+`tested`. An incomplete rating set returns 422 and changes nothing. Category
+averages, Gesamt and rank are always derived on read and never written.
 
 ## Current limitations
 

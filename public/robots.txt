@@ -1,0 +1,10 @@
+# Spezitest — https://www.spezitest.de
+#
+# The administration area is never for search engines.
+User-agent: *
+Disallow: /admin
+
+# Soft-launch option: to keep the whole site out of search indexes until you
+# are happy with the public content, replace the line above with:
+#   Disallow: /
+# and revert once ready.

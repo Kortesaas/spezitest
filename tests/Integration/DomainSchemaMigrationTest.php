@@ -7,19 +7,20 @@ namespace Spezitest\Tests\Integration;
 use PDO;
 use PDOException;
 use PHPUnit\Framework\TestCase;
-use Spezitest\Database\ConnectionFactory;
-use Spezitest\Database\DatabaseConfiguration;
 use Spezitest\Database\Migration\Migrator;
+use Spezitest\Tests\Support\InteractsWithTestDatabase;
 
 final class DomainSchemaMigrationTest extends TestCase
 {
+    use InteractsWithTestDatabase;
+
     private PDO $connection;
 
     private Migrator $migrator;
 
     protected function setUp(): void
     {
-        $this->connection = (new ConnectionFactory(DatabaseConfiguration::fromEnvironment()))->create();
+        $this->connection = $this->connectToTestDatabase();
         $this->dropAllTables();
         $this->migrator = new Migrator(
             $this->connection,

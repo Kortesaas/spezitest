@@ -277,6 +277,42 @@ not change the verified rating formulas above.
   currently eligible completed/tested results with valid positive prices.
 - The business unit and basis of `Preis` are not stated in the workbook.
 
+## Input scale — RE-VERIFIED (pre-deployment)
+
+Every one of the **972 historical grade values** (108 completed tests × 3
+testers × 3 categories) in the reviewed import plan was extracted and checked:
+
+- **All 972 values are integers. None is fractional.**
+- The full observed range is **0 to 10 inclusive**. `0` occurs 13 times and
+  `10` occurs 13 times, so both endpoints are real, used values — the scale is
+  0–10, not 1–10. (Distribution peaks at 4; Schorsch's Geschmack tops at 9 and
+  his Süffigkeit skips 9, but that is sample coverage, not a narrower rule.)
+- The source worksheet carries **no data-validation rule**, so nothing proves a
+  half-point or wider domain was ever intended.
+
+The admin rating UI therefore accepts **integers 0–10 inclusive, higher is
+better**, and nothing else (`TestEntryValidator`: `ctype_digit` + `0 ≤ n ≤ 10`;
+the grade stepper renders exactly `0…10`). The verified calculation engine is
+unchanged — it still parses decimal input exactly, it is simply never fed a
+non-integer from this UI. Historical/imported tests with `DECIMAL` storage
+(`10.0000`) round-trip through the form as `10`.
+
+## Public presentation — DECIDED (Packet 8)
+
+The product owner confirmed that the public website and the admin show the
+engine's own numbers directly:
+
+- each category (Optik, Süffigkeit, Geschmack) is displayed 0–10, higher is
+  better;
+- Gesamtwertung is the verified weighted sum (≈0–60), higher is better;
+- the ranking is descending by Gesamtwertung.
+
+No school-grade conversion, verdict band, star, point or percentage transform
+is applied. The design system's earlier "1,0–6,0 school grade" assumption was a
+design proposal made without the workbook and is not followed. Grades are
+formatted with the German decimal comma. This is a presentation decision only;
+the calculation layer is unchanged.
+
 ## Production gate
 
 Before this rating implementation goes to production, it must be verified

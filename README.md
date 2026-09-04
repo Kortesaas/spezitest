@@ -7,25 +7,54 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is at the **Packet 7 first-admin stage**. It contains a
-minimal Slim Framework 4 application, a lazy production-safe PDO connection
-layer, CLI-only forward migrations, the first real Spezitest domain schema, an
-independently testable rating engine, automated checks, the Packet 4 forensic
-workbook findings, a local two-stage legacy importer, and the first functional
-admin area. The HTML and CSS are intentionally minimal pending a dedicated
-frontend pass.
+This repository is at the **release-preparation stage** for the first
+production deployment. On top of the Packet 5 domain/rating foundation, the
+Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
 
-There is deliberately no public drink browser, rating/test entry, image
-gallery, automatic image optimization, or deployment automation yet. The
-admin and controlled import have been validated only against disposable
-MariaDB. No production database has been created or contacted.
+- **Test / rating entry** in the admin: a nine-grade form (Optik, Süffigkeit,
+  Geschmack for Manu, Fabi, Schorsch, each 0–10, higher is better), an optional
+  test price, draft saving, a live calculated Gesamtwertung, and a guarded
+  completion action that runs the **verified rating engine only** and moves the
+  drink to `tested` in one transaction.
+- **A real public website** styled with the Spezitest Design System:
+  `/` (home), `/spezis` (search / filter / sort browser), `/spezi/{id-or-slug}`
+  (detail with tester and category scores), `/ranking`, `/statistik` and
+  `/ueber`, plus a branded 404. Product images are served through a controlled
+  read-only route (`/spezi/{id}/bild`); missing images get a branded
+  placeholder.
+- **Statistics** derived only from real database rows (counts, average scores,
+  best category scores, tester averages, Gesamt distribution, region and
+  manufacturer breakdowns). Nothing is invented; an empty catalog shows honest
+  empty states.
+
+Release preparation added: the five fuzzy duplicate candidates resolved
+**DIFFERENT_PRODUCTS** (`tools/legacy-import/duplicate-decisions.resolved.json`);
+a re-verification of the rating input scale against all 972 historical grade
+values; `tools/build-release.sh` to produce a production artifact; a production
+`.htaccess`, `robots.txt` and `.env.production.example`; and the full Plesk
+procedure in **`docs/DEPLOYMENT.md`**.
+
+Image optimisation is still out of scope (validated originals only; no
+GD/Imagick dependency). Everything has been validated only against
+disposable/local MariaDB. **No production database has been created or
+contacted.**
+
+### Rating scale
+
+Each category (Optik, Süffigkeit, Geschmack) is graded as an **integer 0–10
+inclusive, higher is better** — re-verified against all 972 historical grade
+values (`docs/RATING_SYSTEM.md`). The published **Gesamtwertung** is the verified
+engine's weighted sum (Optik ×1 + Süffigkeit ×2 + Geschmack ×3), roughly 0–60,
+higher is better; ranking is descending. Grades are shown with the German
+decimal comma.
 
 ## Repository organization
 
 - `AGENTS.md`: mandatory guidance for future coding agents.
 - `docs/ARCHITECTURE.md`: architectural boundaries and runtime structure.
-- `docs/PRODUCTION.md`: hosting, deployment, and production security
-  constraints.
+- `docs/PRODUCTION.md`: hosting and production security constraints.
+- `docs/DEPLOYMENT.md`: the step-by-step Plesk deployment procedure, environment
+  checklist, database creation, legacy-data import, and verification.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
 - `docs/DATA_MODEL.md`: implemented tables/relationships and clearly separated
@@ -115,11 +144,17 @@ be lowered with `ADMIN_IMAGE_MAX_BYTES`.
 
 ## Admin area
 
-The minimally styled admin begins at `/admin/login`. It provides lifecycle
-counts plus drink listing, search, status filtering, quick creation, full
-metadata editing, explicit delete confirmation, status changes, and a single
-optional primary picture. All admin pages except login require session
-authentication. Every POST is CSRF-protected.
+The admin (styled with the Spezitest Design System admin shell, deliberately
+more compact than the public site) begins at `/admin/login`. It provides
+lifecycle counts, drink listing / search / status filtering, quick creation
+(name + status + optional picture), full metadata editing, explicit delete
+confirmation, status changes, a single optional primary picture, and
+**test / rating entry** (`/admin/drinks/{id}/test`). All admin pages except
+login require session authentication. Every POST is CSRF-protected.
+
+The quick-add workflow stays a single short form so a Spezi can be recorded
+quickly from a phone. `tested` is reachable only by completing a test; a
+status-only action can never fabricate it.
 
 Uploaded JPEG, PNG, and WebP files are checked by actual bytes, dimensions,
 and detected MIME type; client filenames and MIME headers are ignored. Files
@@ -201,6 +236,27 @@ ADMIN_IMAGE_MAX_BYTES=5242880
 In production the admin session cookie is automatically Secure, HttpOnly, and
 SameSite=Strict, and PHP strict cookie-only sessions are enabled.
 
+### `.env.testing` for the integration suite
+
+`composer test:integration` reads a git-ignored `.env.testing` file
+automatically (loaded by `tests/bootstrap.php`), so DB_* variables never have
+to be typed by hand. Copy the example and fill in the disposable-database
+values:
+
+```bash
+cp .env.testing.example .env.testing
+```
+
+The integration suite is destructive. It refuses to run unless `APP_ENV=testing`
+**and** `DB_NAME` ends with `_test`, so it can never touch the development
+(`spezitest`) or production database. Use three separate databases:
+
+| Purpose | Database | Configured in |
+| --- | --- | --- |
+| Development (`composer serve`) | `spezitest` | `.env` |
+| Integration tests | `spezitest_test` | `.env.testing` |
+| Production | separate Plesk database | deployment env |
+
 Run the integration suite in another terminal:
 
 ```bash
@@ -280,10 +336,15 @@ composer legacy-import:plan
 
 The command recovers and deduplicates embedded originals under ignored local
 output, verifies all 108 historical ratings/ranks through the PHP engine, and
-generates an external decision file for the five fuzzy duplicate pairs. The
-apply command refuses until every decision is explicit and the configured
-target has the migrated schema, canonical testers, and otherwise empty domain
-tables.
+uses the duplicate-decision file. The five fuzzy duplicate candidates are
+resolved **DIFFERENT_PRODUCTS**; the reviewed decisions are tracked at
+`tools/legacy-import/duplicate-decisions.resolved.json` (copy it into
+`var/legacy-import-output/current/duplicate-decisions.json` before re-running
+the planner). The apply command refuses unless `APP_ENV` is
+`local`/`development`/`testing` and the target has the migrated schema, canonical
+testers, and otherwise empty domain tables — so the historical catalogue is
+imported into a disposable local database and the resulting SQL + images are
+uploaded to production (`docs/DEPLOYMENT.md`).
 
 See `docs/LEGACY_IMPORT.md` before reviewing decisions or running the local
 apply command. The importer has no production-force shortcut and is not
@@ -304,7 +365,9 @@ See `docs/DATA_MODEL.md` for exact fields and relationships and
 
 ## Next phase
 
-No next packet may begin without explicit instruction. Do not treat test-only
-duplicate decisions as product-owner decisions, import into production, build
-public pages, redesign the admin, add rating/test entry, create/connect to
-Plesk, or deploy based only on Packet 7.
+The deployment procedure is documented (`docs/DEPLOYMENT.md`) and the release
+artifacts are reproducible (`tools/build-release.sh` + section 8 of that doc),
+but **no production database has been created and nothing has been deployed or
+connected to production.** The actual deployment is performed by the project
+owner following that document. Do not connect to or create the production/Plesk
+database, and do not deploy, without explicit instruction.

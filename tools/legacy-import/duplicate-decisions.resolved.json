@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "run_id": "462d267dc776c0a425f30f21bd10884ab2ac426436ce80407bbb5c8f6682f81f",
+  "allowed_decisions": [
+    "UNRESOLVED",
+    "SAME_PRODUCT",
+    "DIFFERENT_PRODUCTS"
+  ],
+  "candidates": [
+    {
+      "id": "fuzzy-p59-b17",
+      "left": {
+        "source": "primaerliste:59",
+        "name": "Cubanita Cola Mix",
+        "manufacturer": "Hohenthanner Schlossbrauerei",
+        "location": "84098 Hohenthann",
+        "image_sha256": "ea6d912ee9d63374707927a62482c1e2c5116da7a294077492f0f0dc019c6e97"
+      },
+      "right": {
+        "source": "beschaffungsliste:17",
+        "name": "Cubana Cola-Mix",
+        "manufacturer": "Siebers-Quelle",
+        "location": "88171 Weiler im Allgäu",
+        "image_sha256": "96973a9ea37122d709614897cd4fa311b30c1ba1f729e5293a40e9552ffd46c5"
+      },
+      "decision": "DIFFERENT_PRODUCTS",
+      "canonical_source": null,
+      "operator_note": "Resolved DIFFERENT_PRODUCTS: distinct name, manufacturer, location and image hash on both sides; no cross-workbook corroboration."
+    },
+    {
+      "id": "fuzzy-p76-b17",
+      "left": {
+        "source": "primaerliste:76",
+        "name": "UB Cubana Cola-Mix",
+        "manufacturer": "Schlossbrauerei Unterbaar",
+        "location": "86674 Baar (Schwaben)",
+        "image_sha256": "642e2f4e961fa2fa070495080bb76f03eb00994472cf21a49fb861288c6cb9a4"
+      },
+      "right": {
+        "source": "beschaffungsliste:17",
+        "name": "Cubana Cola-Mix",
+        "manufacturer": "Siebers-Quelle",
+        "location": "88171 Weiler im Allgäu",
+        "image_sha256": "96973a9ea37122d709614897cd4fa311b30c1ba1f729e5293a40e9552ffd46c5"
+      },
+      "decision": "DIFFERENT_PRODUCTS",
+      "canonical_source": null,
+      "operator_note": "Resolved DIFFERENT_PRODUCTS: distinct name, manufacturer, location and image hash on both sides; no cross-workbook corroboration."
+    },
+    {
+      "id": "fuzzy-p83-b12",
+      "left": {
+        "source": "primaerliste:83",
+        "name": "Vita Cola Mix",
+        "manufacturer": "Thüringer Waldquell Mineralbrunnen",
+        "location": "98574 Schmalkalden",
+        "image_sha256": "86bc95821df74e2bc9937020d7745d23984c1b13ad9d1857c99ab737e580363e"
+      },
+      "right": {
+        "source": "beschaffungsliste:12",
+        "name": "Viva Cola Mix",
+        "manufacturer": "Kaiserdom Spezialitäten Brauerei",
+        "location": "65183 Wiesbaden",
+        "image_sha256": "d2631e9268537c381de120c7b642d1db003b3fb99bf13236ad58427b0e94ae68"
+      },
+      "decision": "DIFFERENT_PRODUCTS",
+      "canonical_source": null,
+      "operator_note": "Resolved DIFFERENT_PRODUCTS: distinct name, manufacturer, location and image hash on both sides; no cross-workbook corroboration."
+    },
+    {
+      "id": "fuzzy-p84-b31",
+      "left": {
+        "source": "primaerliste:84",
+        "name": "Giesinger Kracherl Cola Mix",
+        "manufacturer": "Giesinger Biermanufaktur",
+        "location": "80935 München",
+        "image_sha256": "18eaf5897d09d4ddbc697ed59ab0a87919d5eb50d156be9ce37c603a5d638cb1"
+      },
+      "right": {
+        "source": "beschaffungsliste:31",
+        "name": "Golser Kracherl Cola Mix",
+        "manufacturer": "Privatbrauerei Gols",
+        "location": "A-7122 Gols",
+        "image_sha256": "7481ca21c3737e8a059f0a6786af7ccd1732edc7ae2a607429681ccf5aaf51f5"
+      },
+      "decision": "DIFFERENT_PRODUCTS",
+      "canonical_source": null,
+      "operator_note": "Resolved DIFFERENT_PRODUCTS: distinct name, manufacturer, location and image hash on both sides; no cross-workbook corroboration."
+    },
+    {
+      "id": "fuzzy-p102-b3",
+      "left": {
+        "source": "primaerliste:102",
+        "name": "SilberQuelle Cola-Mix",
+        "manufacturer": "SilberQuelle",
+        "location": "6230 Brixlegg",
+        "image_sha256": "354a2c2180e45ddb018781b3c53831445d811be9fa632183bf2601705611464a"
+      },
+      "right": {
+        "source": "beschaffungsliste:3",
+        "name": "Berg Quellen ColaMix",
+        "manufacturer": "Markengetränke Schwollen",
+        "location": "55767 Schwollen",
+        "image_sha256": "170f86d630ebb3a92831ff4b5afa0bb1ff9a1b54319b15059cf5dce861bdae80"
+      },
+      "decision": "DIFFERENT_PRODUCTS",
+      "canonical_source": null,
+      "operator_note": "Resolved DIFFERENT_PRODUCTS: distinct name, manufacturer, location and image hash on both sides; no cross-workbook corroboration."
+    }
+  ]
+}

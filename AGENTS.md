@@ -6,18 +6,38 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-Packet 7 adds the first functional, deliberately minimally styled admin area
-to the Packet 6 controlled-import and Packet 5 domain/rating foundation. The
-admin supports one environment-configured account, secure sessions, CSRF
-protection, dashboard lifecycle counts, drink CRUD/filtering, and one optional
-validated primary image. The runtime
-uses PHP 8.3, Composer, Slim Framework 4, a PSR-7 implementation, optional
-local `.env` loading, and a small lazy PDO connection layer. PHPUnit and
-PHPStan are the development quality tools. The
-application uses `public/` as its only intended web document root. Database
-changes use CLI-only, forward SQL migrations outside `public/`. The Python
-utilities in `tools/legacy-audit/` and `tools/legacy-import/` are local
-migration/audit tooling and are not production runtime code.
+Packet 8 turns the application into a locally usable Spezitest beta on top of
+the Packet 5 domain/rating foundation, the Packet 6 controlled importer and the
+Packet 7 admin. It adds admin test/rating entry, a real public website styled
+with the approved Spezitest Design System, controlled public image serving, and
+statistics derived only from real data. The runtime uses PHP 8.3, Composer,
+Slim Framework 4, a PSR-7 implementation, optional local `.env` loading, and a
+small lazy PDO connection layer. PHPUnit and PHPStan (level max) are the
+development quality tools. The application uses `public/` as its only intended
+web document root. Database changes use CLI-only, forward SQL migrations outside
+`public/`; Packet 8 added no migrations (test entry uses the existing
+`drink_tests` / `ratings` tables). The Python utilities in `tools/legacy-audit/`
+and `tools/legacy-import/` are local migration/audit tooling and are not
+production runtime code.
+
+The public site and admin share one vendored stylesheet at
+`public/assets/spezitest.css`, generated from the "Spezitest Design System"
+project. Frontend work must follow that design system and must not invent a new
+visual style. The rating input scale is **integers 0–10 inclusive, higher is
+better** (re-verified against all 972 historical grade values; see
+`docs/RATING_SYSTEM.md`); the Gesamtwertung is the verified weighted sum (≈0–60,
+higher is better), ranked descending. Test/rating entry uses the verified engine
+only; an incomplete rating set can never complete a test, and a completed test
+moves the drink to `tested` in one transaction.
+
+The project is at release-preparation stage. The five fuzzy duplicate
+candidates are resolved **DIFFERENT_PRODUCTS**
+(`tools/legacy-import/duplicate-decisions.resolved.json`). Deployment is
+documented in `docs/DEPLOYMENT.md`; the release artifact is built by
+`tools/build-release.sh`. **No production database exists and nothing has been
+deployed.** Do not connect to or create the production database, run the legacy
+importer against production (its `APP_ENV` guard forbids it anyway), or deploy,
+without explicit instruction.
 
 The implemented domain tables are `drinks`, `testers`, `drink_tests`,
 `ratings`, and `drink_images`; `schema_migrations` and `legacy_import_runs` are
@@ -31,10 +51,13 @@ Unless explicitly performing the reviewed Packet 6 workflow documented in
 `docs/ADMIN.md` before modifying authentication, sessions, admin persistence,
 or images. Unless the user explicitly starts a later phase, do not:
 
-- implement rating/test entry, self-registration, password reset, multiple
-  accounts, roles, a gallery, or automatic image processing;
-- build public catalog pages, redesign the admin, or introduce a frontend
-  build pipeline;
+- add self-registration, password reset, multiple accounts, roles, a gallery,
+  or automatic image processing;
+- introduce a frontend build pipeline or a Node.js runtime dependency;
+- change the rating methodology, scale, weighting, aggregation, or rounding;
+- auto-merge fuzzy legacy duplicates, or change a reviewed duplicate decision;
+- run the legacy importer against production, or import legacy data by any path
+  other than the reviewed SQL import in `docs/DEPLOYMENT.md`;
 - connect to or create the production database; or
 - deploy anything.
 
@@ -72,12 +95,13 @@ drink creation must never depend on optional metadata. A future phone workflow
 must support quickly recording a name, lifecycle status, and optionally one
 primary product picture.
 
-Packet 7 implements that quick-entry boundary. Do not add optional metadata to
-the create form; it belongs on the edit form after creation. Duplicate names
-remain valid and must not be rejected or silently merged.
-Because Packet 7 has no test-entry workflow, it must not create or transition a
-drink to `tested` without an existing completed test. Existing/imported tested
-records remain editable without inventing new test data.
+The quick-create form stays minimal: name, status, optional picture. Do not add
+optional metadata to the create form; it belongs on the edit form after
+creation. Duplicate names remain valid and must not be rejected or silently
+merged. A drink reaches `tested` only by completing a test through the
+test-entry workflow (all nine grades present, run through the verified engine);
+a status-only action must never fabricate it. Existing/imported tested records
+remain editable without inventing new test data.
 
 There are exactly three permanent testers, with these canonical names:
 

@@ -1,9 +1,28 @@
-Options -Indexes
+# Spezitest — Apache configuration for the public document root.
+# `public/` must be the site document root; nothing above it is web-served.
+
+Options -Indexes -MultiViews
 DirectoryIndex index.php
 
+# Front-controller routing: send anything that is not a real file or directory
+# to the Slim application. QSA keeps the query string; L stops rewriting.
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Never serve dotfiles (defence in depth; real secrets live outside public/).
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Long-lived caching for fingerprint-free static assets is intentionally modest:
+# the stylesheet name is stable, so allow a day and revalidate.
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    <FilesMatch "\.(css|js|svg|png|jpe?g|webp|woff2?)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
 </IfModule>

@@ -18,13 +18,14 @@ use Spezitest\Admin\Configuration\AdminConfiguration;
 use Spezitest\Application\AdminRuntime;
 use Spezitest\Application\AppFactory;
 use Spezitest\Configuration\AppConfiguration;
-use Spezitest\Database\ConnectionFactory;
-use Spezitest\Database\DatabaseConfiguration;
 use Spezitest\Database\Migration\Migrator;
+use Spezitest\Tests\Support\InteractsWithTestDatabase;
 use Spezitest\Tests\Support\InMemorySessionStore;
 
 final class AdminApplicationIntegrationTest extends TestCase
 {
+    use InteractsWithTestDatabase;
+
     private PDO $connection;
 
     private InMemorySessionStore $session;
@@ -36,7 +37,7 @@ final class AdminApplicationIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = (new ConnectionFactory(DatabaseConfiguration::fromEnvironment()))->create();
+        $this->connection = $this->connectToTestDatabase();
         $this->dropAllTables();
         (new Migrator($this->connection, dirname(__DIR__, 2) . '/database/migrations'))->migrate();
         $this->temporaryRoot = sys_get_temp_dir() . '/spezitest-admin-' . bin2hex(random_bytes(8));
@@ -112,8 +113,14 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertSame(2, $this->tableCount('drinks'));
 
         $dashboard = (string) $this->request('GET', '/admin')->getBody();
-        self::assertMatchesRegularExpression('/Identifiziert<\/dt><dd>1<\/dd>/', $dashboard);
-        self::assertMatchesRegularExpression('/Beschafft<\/dt><dd>1<\/dd>/', $dashboard);
+        self::assertMatchesRegularExpression(
+            '/state--identified">Identifiziert<\/span><\/div><span class="figure__num"[^>]*>1<\/span>/',
+            $dashboard,
+        );
+        self::assertMatchesRegularExpression(
+            '/state--acquired">Erworben<\/span><\/div><span class="figure__num"[^>]*>1<\/span>/',
+            $dashboard,
+        );
 
         $filteredRequest = (new ServerRequestFactory())
             ->createServerRequest('GET', '/admin/drinks?lifecycle_status=acquired&q=Doppelter')

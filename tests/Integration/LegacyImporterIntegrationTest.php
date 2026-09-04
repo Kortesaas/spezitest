@@ -8,22 +8,23 @@ use JsonException;
 use PDO;
 use PDOException;
 use PHPUnit\Framework\TestCase;
-use Spezitest\Database\ConnectionFactory;
-use Spezitest\Database\DatabaseConfiguration;
 use Spezitest\Database\Migration\Migrator;
 use Spezitest\LegacyImport\LegacyImporter;
 use Spezitest\LegacyImport\LegacyImportException;
 use Spezitest\LegacyImport\LegacyImportPlan;
+use Spezitest\Tests\Support\InteractsWithTestDatabase;
 
 final class LegacyImporterIntegrationTest extends TestCase
 {
+    use InteractsWithTestDatabase;
+
     private PDO $connection;
 
     private string $temporaryRoot;
 
     protected function setUp(): void
     {
-        $this->connection = (new ConnectionFactory(DatabaseConfiguration::fromEnvironment()))->create();
+        $this->connection = $this->connectToTestDatabase();
         $this->dropAllTables();
         (new Migrator($this->connection, dirname(__DIR__, 2) . '/database/migrations'))->migrate();
         $this->temporaryRoot = sys_get_temp_dir() . '/spezitest-legacy-import-test-' . bin2hex(random_bytes(8));

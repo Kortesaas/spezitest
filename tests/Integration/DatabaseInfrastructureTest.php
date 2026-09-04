@@ -6,20 +6,21 @@ namespace Spezitest\Tests\Integration;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use Spezitest\Database\ConnectionFactory;
-use Spezitest\Database\DatabaseConfiguration;
 use Spezitest\Database\Migration\MigrationException;
 use Spezitest\Database\Migration\Migrator;
+use Spezitest\Tests\Support\InteractsWithTestDatabase;
 
 final class DatabaseInfrastructureTest extends TestCase
 {
+    use InteractsWithTestDatabase;
+
     private PDO $connection;
 
     private string $migrationDirectory;
 
     protected function setUp(): void
     {
-        $this->connection = (new ConnectionFactory(DatabaseConfiguration::fromEnvironment()))->create();
+        $this->connection = $this->connectToTestDatabase();
         $this->dropTestTables();
 
         $this->migrationDirectory = sys_get_temp_dir()
