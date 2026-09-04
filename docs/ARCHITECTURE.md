@@ -102,10 +102,25 @@ raw tester inputs; category averages, Gesamt, rank, and normalized
 price/performance are derived.
 
 Ranking and price/performance services operate only on explicit comparison
-populations. A future application query/service boundary is responsible for
-selecting completed tests with valid official results; the mathematics does
-not hard-code workbook ranges. Formula details, historical quirks, and the
-remaining Excel boundary verification gate are in `RATING_SYSTEM.md`.
+populations. The application query/service boundary must select completed tests
+with valid official results. For Preis/Leistung the permanent population is all
+currently eligible completed/tested results with a valid positive price; the
+workbook's fixed range is not a domain rule. Formula details, historical
+quirks, and the remaining Excel boundary verification gate are in
+`RATING_SYSTEM.md`.
+
+## Legacy import boundary
+
+Packet 6 tooling lives under `tools/legacy-import/` with a CLI entry point at
+`bin/legacy-import.php`. It is outside `public/` and outside ordinary HTTP
+runtime behavior. The Python stage reads OOXML and produces a deterministic
+plan plus content-addressed original images. The PHP stage uses the application
+rating engine to verify that plan and may apply it only to configured,
+otherwise-empty domain tables.
+
+`legacy_import_runs` stores plan/source hashes and a run summary to prevent a
+silent second import. Generated reports and images are ignored local artifacts.
+Python and workbook parsing libraries are not production web dependencies.
 
 ## Future application boundaries
 

@@ -139,8 +139,9 @@ eventual migration; the workbook has no as-of date or status history.
 ## Duplicate and overlap review
 
 Comparison used case-folded, whitespace-normalized names for exact matches.
-Exact matching is only candidate generation; the future importer must use a
-reviewed identity decision.
+Exact matching is only candidate generation. Packet 6 merges only the four
+independently corroborated pairs below; other identity decisions remain
+reviewed inputs.
 
 ### Exact cross-workbook candidates: 4
 
@@ -203,6 +204,11 @@ The exact formulas and known edge cases are recorded in
 - **UNRESOLVED:** input validation/granularity, blank-or-zero price business
   behavior, exact half-boundary port behavior, a zero-width normalization
   population, and whether derived rankings are snapshots or dynamic.
+
+Packet 6 intentionally corrects one workbook artifact for current application
+behavior: Preis/Leistung uses the same mathematics over all currently eligible
+completed/tested results with valid positive prices, not a permanent fixed
+T2:T109 range. The fixed range above remains the verified historical evidence.
 
 Eight golden historical cases cover high/low results, repeating decimals,
 whole-number averages, a rank tie, price variation, both normalization
@@ -317,8 +323,9 @@ for the resulting schema and records which import questions remain deferred.
   duration, and stream.
 - Decide whether chart/Power Query history has archival value beyond the raw
   cells; it is not required to reproduce the verified score formulas.
-- Decide retest/history semantics and whether rank and price/performance are
-  dynamic or snapshot values.
+- Decide retest/history semantics and historical rank presentation. Packet 6
+  permanently selects dynamic Preis/Leistung over all currently eligible
+  completed/tested results with valid positive prices.
 - Establish Excel-compatible error and rounding behavior for cases absent
   from populated history before allowing the implemented rating engine into
   production.

@@ -196,9 +196,22 @@ intermediate = rounded Gesamt / price
 normalized = (intermediate - minimum) / (maximum - minimum)
 ```
 
-Historical compatibility can therefore pass the exact T2:T109 population;
-future behavior may pass a different set only after the product owner chooses
-it explicitly. Excel row references are not embedded in the service.
+Historical verification can therefore pass the exact T2:T109 population
+without embedding Excel row references in the service.
+
+### Permanent application comparison population — DECIDED
+
+For the application, the comparison population is **all currently eligible
+completed/tested Spezis with a valid positive price**. Gesamt is rounded first,
+then divided by the stored price, and those intermediate values are min-max
+normalized across that complete current set.
+
+This deliberately preserves the rating methodology while correcting the old
+fixed T2:T109 range as a spreadsheet implementation artifact. Newly eligible
+completed results participate automatically; blank untested spreadsheet rows
+never do. The population selection remains explicit at the application/query
+boundary so the mathematical service contains no persistence or row-range
+assumption.
 
 A missing or non-positive price, an empty population, or a zero-width
 population returns unavailable rather than inventing a value. Preis/Leistung
@@ -259,9 +272,9 @@ not change the verified rating formulas above.
   exact half-boundary case. `ExcelRounder` isolates a half-away-from-zero exact
   rational policy and has direct boundary tests, but Excel boundary fixtures
   remain a pre-production verification requirement.
-- Whether ranking and price/performance are historical snapshots or should be
-  dynamically recalculated after later tests is a product decision not proved
-  by the workbook.
+- Public/current-test selection and historical rank presentation remain product
+  decisions. Preis/Leistung itself is dynamically recalculated over all
+  currently eligible completed/tested results with valid positive prices.
 - The business unit and basis of `Preis` are not stated in the workbook.
 
 ## Production gate

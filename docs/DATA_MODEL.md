@@ -63,7 +63,7 @@ application service must update these consistently in one controlled action.
 Nullable fields preserve useful audited test facts without claiming more than
 the workbooks establish:
 
-- `price_amount DECIMAL(12,4)` stores the price associated with the test when
+- `price_amount DECIMAL(12,5)` stores the price associated with the test when
   its meaning is known;
 - `recorded_time TIME`, `duration_value INT UNSIGNED`, and
   `stream_reference SMALLINT UNSIGNED` retain the workbook-shaped values
@@ -71,10 +71,12 @@ the workbooks establish:
 - `completed_at` and `notes` are optional; and
 - creation and update timestamps are recorded.
 
-The four-decimal price scale preserves source values such as `0.6995` instead
-of scraping a two-decimal display. Price unit and basis remain unresolved.
+The five-decimal price scale preserves audited source values such as `0.6995`
+and `0.81583` instead of scraping a two-decimal display. Packet 6 added the
+forward precision migration; price unit and basis remain unresolved.
 Prices found on legacy untested records are not forced into fake test rows;
-their exact import destination must be decided during controlled import.
+Packet 6 reports all 58 as deferred enrichment because their permanent
+placement remains unresolved.
 
 ### `ratings`
 
@@ -130,6 +132,10 @@ The PHP domain layer calculates:
 - descending competition rank over a caller-supplied completed-result set; and
 - price/performance over a caller-supplied comparison set.
 
+The permanent current application comparison set for price/performance is all
+eligible completed/tested results with valid positive prices. This corrects
+the workbook's fixed T2:T109 range artifact without changing its mathematics.
+
 Not storing those outputs prevents stale values when raw ratings or the chosen
 comparison population changes. If profiling later proves caching necessary,
 it must be added as explicitly invalidated cache data, not as independently
@@ -142,8 +148,8 @@ editable truth.
 - The valid rating input range and granularity remain unverified beyond the
   observed historical values.
 - Price unit and basis are unknown. Missing, zero, or otherwise unavailable
-  prices do not produce Preis/Leistung; placement of untested legacy prices is
-  deferred to the import design.
+  prices do not produce Preis/Leistung; the 58 untested legacy prices remain
+  deferred enrichment facts rather than invented tests.
 - Historical acquisition/inventory events are not modeled. Lifecycle remains
   the current state on the drink.
 - Duplicate matching and merge rules remain part of the controlled import;
@@ -155,6 +161,17 @@ editable truth.
   and deletion behavior remain future work.
 - Image-processing technology remains unselected until production PHP
   capabilities are verified.
+
+## Legacy-import infrastructure
+
+### `legacy_import_runs`
+
+This isolated table records the deterministic one-time legacy run ID, plan and
+source hashes, a JSON summary, and application timestamp. It protects against
+silent duplicate imports without adding legacy-source columns to every domain
+table. It is migration infrastructure rather than product data.
+
+## Historical status rule
 
 During historical migration, red-marked drinks in the old Primärliste must be
 classified as `identified`, even though they appear in that list.

@@ -37,6 +37,7 @@ final class DomainSchemaMigrationTest extends TestCase
         self::assertSame([
             '20260904000000_create_domain_schema',
             '20260904000100_seed_canonical_testers',
+            '20260904000200_prepare_legacy_import',
         ], $this->migrator->migrate());
         self::assertSame([], $this->migrator->migrate());
 
@@ -44,6 +45,7 @@ final class DomainSchemaMigrationTest extends TestCase
             'drink_images',
             'drink_tests',
             'drinks',
+            'legacy_import_runs',
             'ratings',
             'schema_migrations',
             'testers',
@@ -121,7 +123,7 @@ final class DomainSchemaMigrationTest extends TestCase
             $this->numericColumn('ratings', 'optik'),
         );
         self::assertSame(
-            ['data_type' => 'decimal', 'numeric_precision' => 12, 'numeric_scale' => 4],
+            ['data_type' => 'decimal', 'numeric_precision' => 12, 'numeric_scale' => 5],
             $this->numericColumn('drink_tests', 'price_amount'),
         );
 
@@ -225,6 +227,7 @@ final class DomainSchemaMigrationTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    legacy_import_runs,
                     testers,
                     drinks,
                     migration_test_applied,

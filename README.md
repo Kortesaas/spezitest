@@ -7,16 +7,17 @@ eventual public site will be available at
 
 ## Project status
 
-This repository is at the **Packet 5 domain-foundation stage**. It contains a
+This repository is at the **Packet 6 controlled-import stage**. It contains a
 minimal Slim Framework 4 application, a lazy production-safe PDO connection
 layer, CLI-only forward migrations, the first real Spezitest domain schema, an
-independently testable rating engine, automated checks, and the Packet 4
-forensic workbook findings. The single placeholder page is not the real
-website design.
+independently testable rating engine, automated checks, the Packet 4 forensic
+workbook findings, and a local two-stage legacy importer. The single
+placeholder page is not the real website design.
 
 There is deliberately no authentication, admin panel, public drink browser,
-Excel import, image upload/processing, or deployment automation yet. No
-production database has been created or contacted.
+normal image upload/processing, or deployment automation yet. The controlled
+import has been validated only against disposable MariaDB. No production
+database has been created or contacted.
 
 ## Repository organization
 
@@ -32,6 +33,8 @@ production database has been created or contacted.
   quirks, unresolved edge semantics, and the production verification gate.
 - `docs/LEGACY_WORKBOOK_AUDIT.md`: workbook structure, lifecycle, overlap,
   image, metadata, anomaly, and migration-risk findings.
+- `docs/LEGACY_IMPORT.md`: dry-run, duplicate review, local apply, image
+  recovery, corrections, and import safety procedure.
 - `public/`: the only intended web document root and the minimal front
   controller.
 - `src/`: application/configuration code, database infrastructure, and isolated
@@ -40,7 +43,10 @@ production database has been created or contacted.
 - `tests/`: application tests and machine-readable historical golden fixtures.
 - `tools/legacy-audit/`: local read-only OOXML audit tooling; never production
   runtime code.
+- `tools/legacy-import/`: local plan construction, reports, review support, and
+  import-only PHP services; never an HTTP feature.
 - `bin/migrate.php`: CLI-only migration command; never an HTTP endpoint.
+- `bin/legacy-import.php`: CLI-only legacy plan verifier/apply command.
 - `database/migrations/`: reviewed, forward-only SQL migration files.
 - `composer.json` and `composer.lock`: PHP dependencies, autoloading, and
   quality commands.
@@ -68,6 +74,11 @@ boundary semantics are still a production gate; see `docs/RATING_SYSTEM.md`.
 Basic drink creation must remain quick: minimum required information first,
 optional enrichment later. A future image is optional and will normally be a
 file on webspace referenced by database metadata, not a MariaDB BLOB.
+
+Current Preis/Leistung preserves the historical calculation but dynamically
+normalizes over all eligible completed/tested results with valid positive
+prices. The fixed Excel T2:T109 range is documented as an intentionally
+corrected spreadsheet artifact.
 
 ## Production target
 
@@ -119,6 +130,13 @@ composer analyse
 `composer check` deliberately runs unit tests and static analysis only. It does
 not connect to or mutate a database.
 
+Legacy planning additionally requires Python 3 using only its standard
+library. The source-dependent importer tests are intentionally separate:
+
+```bash
+composer test:legacy-import
+```
+
 ## Local database and integration tests
 
 Database integration tests require a disposable MariaDB 10.11 database. Docker
@@ -152,10 +170,10 @@ Run the integration suite in another terminal:
 composer test:integration
 ```
 
-The integration suite creates, constrains, inspects, and removes the Packet 5
-domain schema and migration-infrastructure test objects in that disposable
-database. It is destructive within the configured database. Never point it at
-production or a database containing data you care about.
+The integration suite creates, constrains, inspects, and removes the domain
+schema and Packet 6 migration/import-infrastructure test objects in that
+disposable database. It is destructive within the configured database. Never
+point it at production or a database containing data you care about.
 
 ## Database migrations
 
@@ -214,10 +232,31 @@ does not connect to a database. See `docs/LEGACY_WORKBOOK_AUDIT.md` for the
 reviewed findings. The source workbooks and extracted image library must not be
 committed.
 
+## Controlled legacy import
+
+With both ignored source workbooks present, create a database-free import plan
+and verification reports with:
+
+```bash
+composer legacy-import:plan
+```
+
+The command recovers and deduplicates embedded originals under ignored local
+output, verifies all 108 historical ratings/ranks through the PHP engine, and
+generates an external decision file for the five fuzzy duplicate pairs. The
+apply command refuses until every decision is explicit and the configured
+target has the migrated schema, canonical testers, and otherwise empty domain
+tables.
+
+See `docs/LEGACY_IMPORT.md` before reviewing decisions or running the local
+apply command. The importer has no production-force shortcut and is not
+available over HTTP.
+
 ## Domain schema and rating engine
 
 The migrations create `drinks`, `testers`, `drink_tests`, `ratings`, and
-`drink_images`, plus the migrator-owned `schema_migrations` table. Derived
+`drink_images`, plus the migrator-owned `schema_migrations` and import-safety
+`legacy_import_runs` tables. Derived
 rating results are not authoritative columns. The calculation classes under
 `src/Domain/Rating/` implement three-tester category averages, weighted and
 Excel-compatible rounded Gesamt, competition ranking, and explicit-set
@@ -228,8 +267,7 @@ See `docs/DATA_MODEL.md` for exact fields and relationships and
 
 ## Next phase
 
-Packet 6 is the controlled legacy import/migration tooling, but it must not
-begin without explicit instruction. Do not import or merge workbook data,
-extract/import production images, add upload handling, build real pages, add
-authentication/admin functionality, create/connect to production, or deploy
-based only on Packet 5.
+No next packet may begin without explicit instruction. Do not treat test-only
+duplicate decisions as product-owner decisions, import into production, add
+normal upload handling, build real pages, add authentication/admin
+functionality, create/connect to Plesk, or deploy based only on Packet 6.

@@ -6,24 +6,27 @@ this repository. Read it before making changes. More detailed context lives in
 
 ## Current project phase
 
-Packet 5 established the first real domain schema and an independently
-testable rating engine. The runtime uses PHP 8.3, Composer, Slim Framework 4, a
-PSR-7 implementation, optional local `.env` loading, and a small lazy PDO
-connection layer. PHPUnit and PHPStan are the development quality tools. The
+Packet 6 adds a controlled, two-stage legacy import plan/apply tool to the
+Packet 5 domain schema and independently testable rating engine. The runtime
+uses PHP 8.3, Composer, Slim Framework 4, a PSR-7 implementation, optional
+local `.env` loading, and a small lazy PDO connection layer. PHPUnit and
+PHPStan are the development quality tools. The
 application uses `public/` as its only intended web document root. Database
 changes use CLI-only, forward SQL migrations outside `public/`. The Python
-utility in `tools/legacy-audit/` is local migration/audit tooling and is not
-production runtime code.
+utilities in `tools/legacy-audit/` and `tools/legacy-import/` are local
+migration/audit tooling and are not production runtime code.
 
 The implemented domain tables are `drinks`, `testers`, `drink_tests`,
-`ratings`, and `drink_images`; `schema_migrations` is infrastructure. The
-rating services live under `src/Domain/Rating/`. See `docs/DATA_MODEL.md` and
-`docs/RATING_SYSTEM.md` before changing either design. Never edit an applied
+`ratings`, and `drink_images`; `schema_migrations` and `legacy_import_runs` are
+infrastructure. The rating services live under `src/Domain/Rating/`. See
+`docs/DATA_MODEL.md` and `docs/RATING_SYSTEM.md` before changing either design.
+Never edit an applied
 migration; add a reviewed forward migration.
 
-Unless the user explicitly starts a later phase, do not:
+Unless explicitly performing the reviewed Packet 6 workflow documented in
+`docs/LEGACY_IMPORT.md`, do not import or merge workbook data. Unless the user
+explicitly starts a later phase, do not:
 
-- import or merge either Excel workbook or extracted image library;
 - implement image upload, processing, conversion, or deletion;
 - implement authentication, admin functionality, or sessions;
 - build the real frontend or introduce a frontend build pipeline;
@@ -95,6 +98,15 @@ results before production use.
   name spelling.
 - Preserve non-unique drink names. Never add `UNIQUE(name)` as a substitute for
   a reviewed duplicate-matching policy.
+- Preis/Leistung uses all currently eligible completed/tested Spezis with a
+  valid positive price. Preserve the formula but never reproduce fixed Excel
+  row ranges as permanent application behavior.
+- Never auto-merge fuzzy legacy candidates. Only the four independently
+  corroborated exact cross-workbook pairs are preapproved; every fuzzy decision
+  must come from the external review file.
+- Legacy import must remain CLI-only, verify source hashes, require an otherwise
+  empty target, record its run, and store generated image filenames outside
+  `public/`. It must not become a normal Python-dependent HTTP path.
 - Make database changes only through tracked, reviewable migrations.
 - Never expose migration execution over HTTP. Migrations are CLI/task or an
   explicitly reviewed manual deployment concern only.

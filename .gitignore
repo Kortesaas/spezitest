@@ -29,6 +29,8 @@ __pycache__/
 # Local legacy workbook sources and generated audit extracts
 /var/legacy-import/*.xlsx
 /var/legacy-audit/
+/var/legacy-import-output/
+/var/legacy-images/
 
 # IDE and operating-system files
 .DS_Store

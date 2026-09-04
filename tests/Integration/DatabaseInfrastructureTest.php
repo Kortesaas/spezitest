@@ -202,6 +202,7 @@ final class DatabaseInfrastructureTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    legacy_import_runs,
                     testers,
                     drinks,
                     migration_test_applied,

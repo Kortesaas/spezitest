@@ -44,9 +44,9 @@ Red-marked drinks in the old Primärliste are **not currently possessed** and
 must migrate as `identified`, even though they appear in the Primärliste.
 List membership alone must not override the red marking during migration.
 
-No Excel data has been migrated through Packet 5. When migration is later
-authorized, the mapping must be repeatable, auditable, and checked for
-duplicate logical drinks.
+Packet 6 implements and locally validates a controlled importer, but no legacy
+data has been imported into production. Any real migration must use its
+repeatable, auditable mapping and explicit duplicate review.
 
 ## Source-of-truth rule
 
