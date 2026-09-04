@@ -41,6 +41,13 @@
             "@test",
             "@analyse"
         ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv APP_ENV=local",
+            "@putenv APP_DEBUG=true",
+            "php -S 127.0.0.1:8080 -t public public/index.php"
+        ],
+        "dev:load-legacy": "sh tools/dev-load-legacy.sh",
         "legacy-import:apply": "php bin/legacy-import.php apply",
         "legacy-import:plan": [
             "python3 tools/legacy-import/plan.py",
@@ -54,5 +61,12 @@
         "test": "phpunit --testsuite unit",
         "test:legacy-import": "python3 -m unittest discover -s tools/legacy-import/tests -p 'test_*.py'",
         "test:integration": "phpunit --testsuite integration"
+    },
+    "scripts-descriptions": {
+        "dev": "Start the local development server at http://localhost:8080 (uses .env and the local database; never resets it).",
+        "dev:load-legacy": "Rebuild the local database from the reviewed legacy dataset (drops and reloads domain tables; asks first).",
+        "migrate": "Apply pending forward SQL migrations to the configured database.",
+        "check": "Run unit tests and PHPStan (no database).",
+        "test:integration": "Run the destructive integration suite against the spezitest_test database (see .env.testing)."
     }
 }

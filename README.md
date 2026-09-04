@@ -163,38 +163,48 @@ are served only through an authenticated route. See `docs/ADMIN.md`.
 
 ## Local development
 
-Prerequisites are PHP 8.3 with PDO MySQL, Fileinfo, and Composer 2. Ordinary
-unit tests and the public placeholder page need no running database, external
-service, production credential, Node.js installation, or frontend toolchain.
+Prerequisites are PHP 8.3 with PDO MySQL, Fileinfo, and Composer 2. No Node.js,
+Docker, or frontend toolchain is needed. Unit tests and static analysis need no
+database.
+
+### One-command dev server
 
 ```bash
 composer install
-cp .env.example .env
-composer check
-composer serve
+cp .env.example .env          # then set DB_* and, for /admin, ADMIN_*
+composer migrate              # create the local schema + canonical testers
+composer dev                  # → http://localhost:8080   (Ctrl+C to stop)
 ```
 
-The application is then available at `http://127.0.0.1:8080`. Admin routes
-also require a migrated local database and configured admin credentials.
-`composer serve` uses PHP's built-in server and is for local development only.
-It is not a production start command.
+`composer dev` runs PHP's built-in server against `public/`, pinned to
+`APP_ENV=local` / `APP_DEBUG=true`. It uses your `.env` and the local database
+and **never migrates or resets the database**. Edit any PHP/HTML/CSS file and
+the browser refresh shows it immediately.
 
-Individual quality commands are:
+When `APP_DEBUG=true` and the environment is not production, a **tiny live-reload
+helper** is injected: the page polls `GET /__dev/live` once a second and
+reloads itself when a watched source file changes. It is pure PHP + a few lines
+of vanilla JS, has no build step, and is completely absent in production
+(guarded by `APP_ENV != production && APP_DEBUG`). `composer serve` is the same
+server without the env pinning.
 
-```bash
-composer test
-composer analyse
-```
+### Everyday commands
+
+| Command | What it does |
+| --- | --- |
+| `composer dev` | Start the local site at `http://localhost:8080` |
+| *(Ctrl+C)* | Stop it |
+| `composer migrate` | Apply pending forward migrations to the local database |
+| `composer dev:load-legacy` | Drop and reload the local catalogue from the reviewed legacy dataset (asks first; needs the two workbooks in `var/legacy-import/`) |
+| `composer check` | Unit tests + PHPStan (no database) |
+| `composer test` / `composer analyse` | Unit tests / PHPStan individually |
+| `composer test:integration` | Destructive integration suite against `spezitest_test` (see below) |
+| `composer test:legacy-import` | Python importer tests (Python 3 stdlib only) |
 
 `composer check` deliberately runs unit tests and static analysis only. It does
-not connect to or mutate a database.
-
-Legacy planning additionally requires Python 3 using only its standard
-library. The source-dependent importer tests are intentionally separate:
-
-```bash
-composer test:legacy-import
-```
+not connect to or mutate a database. Local development always uses the local
+`spezitest` database from `.env`; it never touches production. Legacy planning
+and its importer tests additionally require Python 3 (standard library only).
 
 ## Local database and integration tests
 
@@ -253,7 +263,7 @@ The integration suite is destructive. It refuses to run unless `APP_ENV=testing`
 
 | Purpose | Database | Configured in |
 | --- | --- | --- |
-| Development (`composer serve`) | `spezitest` | `.env` |
+| Development (`composer dev`) | `spezitest` | `.env` |
 | Integration tests | `spezitest_test` | `.env.testing` |
 | Production | separate Plesk database | deployment env |
 

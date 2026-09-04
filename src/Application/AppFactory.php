@@ -23,6 +23,7 @@ use Spezitest\Admin\Image\ImageStorage;
 use Spezitest\Admin\Security\AdminAuthenticator;
 use Spezitest\Admin\Security\CsrfTokenManager;
 use Spezitest\Configuration\AppConfiguration;
+use Spezitest\Development\LiveReloadMiddleware;
 use Spezitest\Website\Http\WebsiteController;
 use Spezitest\Website\Http\WebsiteSecurityHeadersMiddleware;
 use Spezitest\Website\View\WebsiteRenderer;
@@ -91,6 +92,22 @@ final class AppFactory
                 );
             },
         );
+
+        // Local-development live reload. Never active in production: it requires
+        // a non-production environment AND APP_DEBUG=true. Added last so it is
+        // the outermost middleware and can patch every HTML response, 404s
+        // included.
+        if ($configuration->environment() !== 'production' && $configuration->debug()) {
+            $root = dirname(__DIR__, 2);
+            $app->add(new LiveReloadMiddleware([
+                $root . '/src',
+                $root . '/config',
+                $root . '/database/migrations',
+                $root . '/public/index.php',
+                $root . '/public/assets',
+                $root . '/public/.htaccess',
+            ]));
+        }
 
         return $app;
     }

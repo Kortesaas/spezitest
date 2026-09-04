@@ -31,6 +31,25 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('Diese Flasche ist leer', $body);
     }
 
+    public function testLiveReloadIsActiveInDebugAndAbsentInProduction(): void
+    {
+        $debug = AppFactory::create(new AppConfiguration('local', true), new NullLogger());
+        $debugResponse = $debug->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', '/__dev/live'),
+        );
+        self::assertSame(200, $debugResponse->getStatusCode());
+        self::assertMatchesRegularExpression('/\A[a-f0-9]{16}\z/', (string) $debugResponse->getBody());
+
+        $production = AppFactory::create(new AppConfiguration('production', true), new NullLogger());
+        $productionResponse = $production->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', '/__dev/live'),
+        );
+        self::assertSame(404, $productionResponse->getStatusCode());
+        self::assertStringNotContainsString('__dev', (string) $production->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', '/not-a-real-route'),
+        )->getBody());
+    }
+
     public function testNotFoundResponseCarriesWebsiteSecurityHeaders(): void
     {
         $response = $this->app()->handle(
