@@ -246,8 +246,8 @@ it will show empty-state pages until the data is imported, which is expected.
 
 1. **Schema:** create a one-off **Plesk → Scheduled Tasks** job using
    `/opt/plesk/php/8.3/bin/php <app-root>/bin/migrate.php` (adjust the PHP and
-   app paths to the subscription). Run it once and confirm exactly five
-   migrations are applied. Disable the task after successful verification.
+   app paths to the subscription). Run it once and confirm all seven currently
+   tracked migrations are applied. Disable the task after successful verification.
 2. **Rows:** phpMyAdmin → select the Spezitest database → **Import** → choose
    `spezitest-data.sql` from the initial-data archive → Go. The data-only seed
    requires the migrated tables to be empty, never drops tables, and loads 196
@@ -271,7 +271,7 @@ it will show empty-state pages until the data is imported, which is expected.
 > skip D. Run migrations instead as a one-off **Plesk → Scheduled Tasks** job:
 > command `/opt/plesk/php/8.3/bin/php /var/www/vhosts/<domain>/httpdocs/bin/migrate.php`
 > (adjust paths to your subscription). Run it once, confirm the output
-> "Applied 5 migration(s).", then delete or disable the task. Add drinks and
+> "Applied 7 migration(s).", then delete or disable the task. Add drinks and
 > tests through `/admin`.
 
 ---

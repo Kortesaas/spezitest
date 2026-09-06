@@ -116,7 +116,7 @@ Use the complete reviewed procedure in [DEPLOYMENT.md](DEPLOYMENT.md). In short:
 2. deploy the application archive with `public/` as document root;
 3. create the production `.env` from `.env.production.example`;
 4. take a database and filesystem backup;
-5. run the five migrations once via a Plesk Scheduled Task;
+5. run the seven currently tracked migrations once via a Plesk Scheduled Task;
 6. import `spezitest-data.sql` through phpMyAdmin;
 7. copy the data archive's `var/` contents into the application `var/`;
 8. verify HTTPS, admin authentication, generic errors, counts, ratings, and
