@@ -1539,3 +1539,28 @@ a.panel:hover{border-color:var(--navy);color:inherit}
   text-decoration:none;overflow-wrap:anywhere}
 .episode-fact__name:hover{color:var(--red);text-decoration:underline;text-decoration-thickness:2px}
 .episode-fact__value{font-size:var(--fs-sm);color:var(--text-muted);font-variant-numeric:tabular-nums}
+
+/* ---- Catalog pager, quieter ---------------------------------------------
+   The numbers lose their boxes; only the current page keeps a filled pill.
+   Zurück/Weiter use the same drawn chevrons as the Spezi pager instead of
+   arrow characters, and the whole row sits tighter. */
+.pagination{gap:var(--sp-2) var(--sp-4)}
+.pagination__pages{gap:2px}
+.pagination__pages a,.pagination__pages span{border:0;min-width:34px;min-height:34px;
+  padding-inline:var(--sp-2);border-radius:var(--radius-1)}
+.pagination__pages a:hover{background:var(--surface-tint);color:var(--red)}
+.pagination__pages [aria-current="page"]{background:var(--navy);color:var(--white)}
+.pagination__gap{min-width:auto;padding-inline:var(--sp-1);color:var(--gray-300)}
+
+/* `.pagination a` from the design system is more specific than a lone class,
+   so the element has to be named to drop its box. */
+.pagination a.pagination__step,
+.pagination span.pagination__step{border:0;background:none;min-height:34px;
+  padding-inline:0;gap:var(--sp-2);color:var(--navy)}
+.pagination a.pagination__step:hover{background:none;border:0;color:var(--red)}
+.pagination__step--prev::before,
+.pagination__step--next::after{content:"";display:inline-block;width:8px;height:8px;
+  border-top:var(--bw-strong) solid currentColor;border-right:var(--bw-strong) solid currentColor}
+.pagination__step--prev::before{transform:rotate(-135deg)}
+.pagination__step--next::after{transform:rotate(45deg)}
+.pagination span.pagination__step[aria-disabled="true"]{border:0;background:none;color:var(--gray-300)}

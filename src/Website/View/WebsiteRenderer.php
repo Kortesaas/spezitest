@@ -244,7 +244,7 @@ final class WebsiteRenderer
         if ($stats->pricedCount === 0) {
             return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack"><span class="eyebrow">Preis / Leistung</span>'
                 . '<h2 class="display-3">Noch keine Preise erfasst</h2>'
-                . '<p class="meta">Erscheint, sobald ein getesteter Spezi einen Preis hat.</p></div></section>';
+                . '<p class="meta">Erscheint, sobald eine getestete Spezi einen Preis hat.</p></div></section>';
         }
 
         $bestCaption = $stats->bestValue !== null
@@ -268,7 +268,7 @@ final class WebsiteRenderer
         return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
             . '<h2 class="display-3">Wer ist sein Geld wert?</h2>'
-            . '<p class="meta">Jeder Punkt ein getesteter Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
+            . '<p class="meta">Jeder Punkt eine getestete Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
             . 'antippen oder mit der Maus darüberfahren.</p></div>'
             . $figures . $bestCaption . $this->priceScatterChart($stats)
             . '</div></section>';
@@ -542,7 +542,7 @@ final class WebsiteRenderer
     private function episodeFacts(StreamEpisode $episode): string
     {
         $facts = [
-            ['Bester Spezi des Abends', $episode->best, static fn (RatedDrink $d): string
+            ['Beste Spezi des Abends', $episode->best, static fn (RatedDrink $d): string
                 => $d->result === null ? '' : Html::gradeOfMax($d->result->gesamt(), Html::GESAMT_MAX)],
             ['Schlusslicht des Abends', $episode->worst, static fn (RatedDrink $d): string
                 => $d->result === null ? '' : Html::gradeOfMax($d->result->gesamt(), Html::GESAMT_MAX)],
@@ -617,7 +617,7 @@ final class WebsiteRenderer
             . '<p class="meta">' . Html::e(implode(' · ', $meta)) . '</p>'
             . ($episode->best === null
                 ? ''
-                : '<p class="meta">Sieger des Abends: <a href="/spezi/' . Html::e($episode->best->slug()) . '">'
+                : '<p class="meta">Siegerin des Abends: <a href="/spezi/' . Html::e($episode->best->slug()) . '">'
                     . Html::e($episode->best->name) . '</a></p>')
             . '<div class="episode-card__actions">'
             . '<a class="btn btn--secondary btn--sm" href="/streams/' . $episode->number . '">Verkostungen ansehen</a>'
@@ -686,8 +686,8 @@ final class WebsiteRenderer
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Über das Projekt</span>'
             . '<h1 class="display-2">Wir trinken das, damit du es nicht musst.</h1>'
             . '<p class="lede">Ein Hobbyprojekt von drei Leuten mit einer selbstgestellten Aufgabe: möglichst '
-            . 'jeden Cola-Mix auftreiben, selbst kaufen und nach immer denselben Kriterien bewerten. Bisher '
-            . $counts['tested'] . ' ' . ($counts['tested'] === 1 ? 'getesteter Spezi' : 'getestete Spezis') . '.</p></div>'
+            . 'jede Spezi auftreiben, selbst kaufen und nach immer denselben Kriterien bewerten. Bisher '
+            . $counts['tested'] . ' ' . ($counts['tested'] === 1 ? 'getestete Spezi' : 'getestete Spezis') . '.</p></div>'
             . '<figure class="team-photo"><img src="/assets/spezitest-team.jpg" '
             . 'alt="Manu, Fabi und Schorsch hinter einem Tisch voller Cola-Mix-Flaschen" '
             . 'width="1600" height="921" loading="lazy"></figure></div></section>'
@@ -706,23 +706,23 @@ final class WebsiteRenderer
             . '<p class="meta">Alle Flaschen kaufen wir selbst. Es gibt keine bezahlten Tests, keine '
             . 'Kooperationen und keine nachträglichen Änderungen an der Methodik. Auch dann nicht, wenn '
             . 'uns ein Ergebnis nicht passt.</p></div>'
-            . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Lebenszyklus</span>'
+            . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Spezi-Lifecycle</span>'
             . '<div class="cluster cluster--tight" style="margin-top:var(--sp-3)">'
             . Html::stateBadge('identified') . Html::stateBadge('acquired') . Html::stateBadge('tested') . '</div>'
             . '<p class="meta" style="margin-top:var(--sp-3)">Jeder Eintrag hat genau einen dieser Zustände: '
             . 'gesehen, im Kasten, getestet.</p></div></aside></div></section>'
 
             . '<section class="wrap section" id="tester"><div class="stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Die Abteilung</span><h2 class="display-3">Drei Tester, eine Skala</h2></div>'
+            . '<div class="stack"><span class="eyebrow">Die Spezitester</span><h2 class="display-3">Was man über uns wissen muss:</h2></div>'
             . '<div class="grid grid--3">'
-            . $this->testerCard('Manu', 'Treibt die Flaschen auf und schleppt die Kästen.', 'manu')
-            . $this->testerCard('Fabi', 'Merkt als Erster, wenn etwas zu süß ist.', 'fabi')
-            . $this->testerCard('Schorsch', 'Pflegt den Katalog und schreibt mit, was am Tisch gesagt wird.', 'schorsch')
+            . $this->testerCard('Manu', 'Trinkt sehr gerne Spezi.', 'manu')
+            . $this->testerCard('Fabi', 'Trinkt auch sehr gerne Spezi.', 'fabi')
+            . $this->testerCard('Schorsch', 'Trinkt auch sehr gerne Spezi.', 'schorsch')
             . '</div></div></section>'
 
             . '<section class="wrap section" id="projekt"><div class="prose stack-lg">'
             . '<div class="stack"><span class="eyebrow">Zur Einordnung</span>'
-            . '<h2 class="display-3">Privatvergnügen, kein Geschäft</h2></div>'
+            . '<h2 class="display-3">Privatvergnügen, kein Geschäft!</h2></div>'
             . '<p>Spezitest ist ein Hobby. Wir verdienen hier nichts: keine Werbung, keine Affiliate-Links, '
             . 'keine gesponserten Beiträge, nichts zu kaufen. Die Getränke zahlen wir selbst, und kein '
             . 'Hersteller hat Einfluss darauf, was wir schreiben oder wie wir werten.</p>'
@@ -736,7 +736,7 @@ final class WebsiteRenderer
             . '</div></section>'
 
             . '<section class="section section--navy"><div class="wrap on-navy split" style="align-items:center">'
-            . '<h2 class="display-3" style="color:#fff">Fehlt uns ein Spezi?</h2>'
+            . '<h2 class="display-3" style="color:#fff">Fehlt uns eine Spezi?</h2>'
             . '<div class="stack"><p class="lede" style="color:rgba(255,255,255,.86)">Erst im Katalog nachsehen. '
             . 'Was dort fehlt, suchen wir.</p>'
             . '<div class="cluster"><a class="btn btn--on-navy" href="/spezis">Katalog prüfen</a></div></div></div></section>';
@@ -853,8 +853,6 @@ final class WebsiteRenderer
             . 'Social-Media-Skripte, keine Cookies, keine Schriften oder Bilder von fremden Servern. Sie können '
             . 'hier lesen, suchen und sortieren, ohne dass davon irgendetwas bei uns landet. Ausgenommen '
             . 'sind die Zugriffsprotokolle, die jeder Webserver technisch bedingt schreibt.</p>'
-            . '<p>Das ist keine Marketing-Aussage, sondern eine Eigenschaft der Seite: Es gibt schlicht keinen '
-            . 'Programmcode, der so etwas täte.</p></div>'
 
             . '<div><h2>Verantwortliche Stelle</h2>'
             . '<p>ABOUT US Media GmbH<br>Zeppelinstraße 16 1/2<br>86343 Königsbrunn</p>'

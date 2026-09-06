@@ -15,10 +15,12 @@ final readonly class CatalogQuery
     public const PER_PAGE = 24;
 
     /**
-     * The largest page "Mehr laden" can grow to. Without a ceiling a single
-     * request could be asked to render the whole catalog at once.
+     * The largest page "Mehr laden" can grow to. The bound exists only so a
+     * hand-written `per` parameter cannot ask the server to render an
+     * arbitrarily large page; it sits far above the catalog so that loading
+     * more never stops short of the last result in practice.
      */
-    public const MAX_PER_PAGE = self::PER_PAGE * 8;
+    public const MAX_PER_PAGE = self::PER_PAGE * 40;
 
     public const SORTS = ['best', 'name', 'recent', 'worst'];
 

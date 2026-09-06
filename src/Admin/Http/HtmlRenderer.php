@@ -116,7 +116,7 @@ final class HtmlRenderer
         $body = $this->head(
             'Übersicht',
             $total === 0
-                ? 'Noch kein Spezi erfasst. Der erste Eintrag startet den Katalog.'
+                ? 'Noch keine Spezi erfasst. Der erste Eintrag startet den Katalog.'
                 : '<strong>' . $counts['tested'] . '</strong> von ' . $total . ' Spezis getestet · '
                     . '<strong>' . $counts['acquired'] . '</strong> ' . ($counts['acquired'] === 1 ? 'wartet' : 'warten')
                     . ' auf den Testabend.',
@@ -403,7 +403,7 @@ final class HtmlRenderer
         )
             . $this->error($error)
             . ($drink['lifecycle_status'] === 'identified'
-                ? '<p class="notice notice--error"><span>Dieser Spezi ist noch nicht erworben. '
+                ? '<p class="notice notice--error"><span>Diese Spezi ist noch nicht erworben. '
                     . '<a href="/admin/drinks/' . $id . '/edit">Bitte zuerst auf „Erworben“ setzen.</a></span></p>'
                 : '')
             . '<form method="post" action="/admin/drinks/' . $id . '/test" class="stack-lg" data-test-form>'
@@ -1006,7 +1006,7 @@ final class HtmlRenderer
             . '<div class="field"><label class="label" for="' . $prefix . 'reg">Region / Land</label>'
             . '<input class="input" id="' . $prefix . 'reg" name="origin_region" maxlength="128" '
             . 'placeholder="z.B. Bayern" value="' . $this->escape($region) . '">'
-            . '<span class="hint">Gruppiert den Spezi auf der öffentlichen Karte.</span></div>'
+            . '<span class="hint">Gruppiert die Spezi auf der öffentlichen Karte.</span></div>'
             . '</div></section>';
     }
 
