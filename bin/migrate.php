@@ -21,6 +21,15 @@ try {
 
     $configuration = DatabaseConfiguration::fromEnvironment();
     $connection = (new ConnectionFactory($configuration))->create();
+    $identityStatement = $connection->query('SELECT DATABASE()');
+    if ($identityStatement === false) {
+        throw new RuntimeException('Could not identify the connected database.');
+    }
+    $databaseName = $identityStatement->fetchColumn();
+    if (!is_string($databaseName) || $databaseName === '') {
+        throw new RuntimeException('Could not identify the connected database.');
+    }
+    fwrite(STDOUT, 'Connected database: ' . $databaseName . "\n");
     $migrator = new Migrator($connection, $rootDirectory . '/database/migrations');
     $appliedMigrations = $migrator->migrate();
 
