@@ -794,22 +794,22 @@ final class WebsiteRenderer
             . 'uns ein Ergebnis nicht passt.</p></div>'
             . '<aside class="stack-lg"><div class="panel">'
             . '<span class="eyebrow">Spezi-Lifecycle</span>'
-            . '<p class="meta" style="margin-top:var(--sp-2)">Jeder Eintrag durchläuft dieselben drei Zustände '
-            . '– und hat immer genau einen davon.</p>'
+            . '<p class="meta" style="margin-top:var(--sp-2)">Jeder Spezi durchläuft dieselben drei Zustände.'
+            . '</p>'
             . '<div style="margin-top:var(--sp-5);display:flex;flex-direction:column">'
             . $this->lifecycleStep(
                 'identified',
-                'Wir wissen, dass es die Spezi gibt – gesehen, aber noch nicht im Kasten.',
+                'Wir wissen, dass es die Spezi gibt, haben sie aber noch nicht im Kasten.',
                 false,
             )
             . $this->lifecycleStep(
                 'acquired',
-                'Mindestens eine Flasche steht bei uns und wartet auf den Testabend.',
+                'Mindestens eine Flasche steht bei uns und wartet auf den Spezitest.',
                 false,
             )
             . $this->lifecycleStep(
                 'tested',
-                'Zu dritt verkostet und nach denselben Regeln bewertet.',
+                'Zu dritt verkostet und nach Optik, Süffigkeit und Geschmack bewertet.',
                 true,
             )
             . '</div></div></aside></div></section>'
@@ -822,7 +822,7 @@ final class WebsiteRenderer
             . $this->testerCard('Schorsch', 'Trinkt auch sehr gerne Spezi.', 'schorsch')
             . '</div></div></section>'
 
-            . '<section class="wrap section" id="projekt" style="padding-block:var(--sp-6)"><div class="prose stack-lg">'
+            . '<section class="wrap section" id="projekt" style="padding-top:var(--sp-6);padding-bottom:var(--sp-8)"><div class="prose stack-lg">'
             . '<div class="stack"><span class="eyebrow">Zur Einordnung</span>'
             . '<h2 class="display-3">Privatvergnügen, kein Geschäft!</h2></div>'
             . '<p>Spezitest ist ein Hobby. Wir verdienen hier nichts: keine Werbung, keine Affiliate-Links, '
@@ -834,7 +834,7 @@ final class WebsiteRenderer
             . 'dieses Getränk schreiben. Sie gehören ihren Inhabern. '
             . '<a href="/impressum#marken">Mehr dazu im Impressum.</a></p>'
             . '<p>Und was hier steht, sind Geschmacksurteile von drei Privatleuten, keine Laborwerte. '
-            . 'Wer anderer Meinung ist, hat vermutlich recht.</p>'
+            . 'Wer anderer Meinung ist, hat bestimmt auch recht.</p>'
             . '</div></section>'
 
             . '<section class="section section--navy"><div class="wrap on-navy split" style="align-items:center">'
@@ -1731,7 +1731,10 @@ final class WebsiteRenderer
 
     private function testerCard(string $name, string $description, string $image): string
     {
-        return '<div class="card"><figure class="pimg pimg--square pimg--bare"><img src="/assets/testers/'
+        // `card-link` without an href: the tester cards are not links, but they
+        // pick up the same lift/border/title treatment on hover as the Spezi
+        // cards, so the grid feels like the rest of the catalogue.
+        return '<div class="card card-link"><figure class="pimg pimg--square pimg--bare"><img src="/assets/testers/'
             . Html::e($image) . '.webp" alt="Porträt von ' . Html::e($name)
             . '" width="640" height="640" loading="lazy"></figure>'
             . '<div class="card__body"><span class="card__title">' . Html::e($name) . '</span>'
@@ -1739,21 +1742,33 @@ final class WebsiteRenderer
     }
 
     /**
-     * One stage of the drink lifecycle in the vertical diagram on /ueber: the
-     * status pill, a plain-language line, and a connector down to the next
-     * stage (omitted for the last).
+     * One stage of the drink lifecycle in the vertical diagram on /ueber: a
+     * node on the left rail, then the status pill and a plain-language line.
+     * The rail segment is drawn on every stage but the last, so the three
+     * nodes read as one continuous top-to-bottom flow.
      */
     private function lifecycleStep(string $status, string $meaning, bool $last): string
     {
-        $connector = $last
-            ? ''
-            : '<span aria-hidden="true" style="align-self:flex-start;width:var(--bw-strong);height:22px;'
-                . 'margin:var(--sp-2) 0 var(--sp-2) 17px;background:var(--line-strong)"></span>';
+        $dot = match ($status) {
+            'acquired' => 'var(--navy)',
+            'tested' => 'var(--red)',
+            default => 'var(--white)',
+        };
 
-        return '<div class="stack-sm">'
+        $rail = $last
+            ? ''
+            : '<span style="flex:1 0 auto;width:var(--bw-strong);background:var(--gray-300);'
+                . 'margin-top:var(--sp-1)"></span>';
+
+        return '<div style="display:flex;gap:var(--sp-4);align-items:stretch">'
+            . '<span aria-hidden="true" style="flex:none;display:flex;flex-direction:column;align-items:center">'
+            . '<span style="flex:none;width:14px;height:14px;margin-top:13px;border-radius:50%;'
+            . 'background:' . $dot . ';border:var(--bw-strong) solid var(--navy)"></span>'
+            . $rail
+            . '</span>'
+            . '<div style="padding-bottom:' . ($last ? '0' : 'var(--sp-5)') . '">'
             . Html::stateBadge($status, true)
-            . '<p class="meta" style="margin:0">' . Html::e($meaning) . '</p>'
-            . '</div>'
-            . $connector;
+            . '<p class="meta" style="margin:var(--sp-3) 0 0">' . Html::e($meaning) . '</p>'
+            . '</div></div>';
     }
 }
