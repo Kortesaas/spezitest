@@ -23,6 +23,12 @@ final readonly class TestFormData
         public string $notes,
         public string $status,
         public ?RatingResult $result,
+        /** The Testabend this test belongs to, if it has been filed under one. */
+        public ?int $streamReference = null,
+        /** Where the segment starts in that stream, as a `HH:MM:SS` string. */
+        public ?string $recordedTime = null,
+        /** How long the segment runs, in whole seconds. */
+        public ?int $durationValue = null,
     ) {
     }
 

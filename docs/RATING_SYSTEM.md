@@ -334,6 +334,12 @@ design proposal made without the workbook and is not followed. Grades are
 formatted with the German decimal comma. This is a presentation decision only;
 the calculation layer is unchanged.
 
+On the individual Spezi page, hovering or focusing one of the three category
+bars reveals each canonical tester's raw grade for that category (also carried
+in the bar's `aria-label`). The admin test-result page shows the same raw
+grades as a full per-tester matrix. Both are read-outs of the stored `ratings`
+rows — no new derived figure is introduced.
+
 ## Production gate
 
 Before this rating implementation goes to production, it must be verified

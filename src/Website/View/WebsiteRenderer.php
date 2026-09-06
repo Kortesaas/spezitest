@@ -11,6 +11,7 @@ use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrink;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Statistics;
+use Spezitest\Website\Catalog\StreamEpisode;
 
 /**
  * Renders the six public pages from real catalog data using the Spezitest
@@ -32,8 +33,9 @@ final class WebsiteRenderer
             . '<div class="stack-lg"><div class="stack">'
             . '<span class="eyebrow eyebrow--accent">Spezitest</span>'
             . '<h1 class="display-1">' . Html::e($this->headline($counts['tested'])) . '</h1>'
-            . '<p class="lede">Wir haben jedes Cola-Mix-Getränk aus Deutschland und den Nachbarländern gefunden, gekauft '
-            . 'und nach Optik, Süffigkeit und Geschmack bewertet.</p></div>'
+            . '<p class="lede">Wir suchen Cola-Mix aus Deutschland und den Nachbarländern zusammen, kaufen ihn '
+            . 'selbst und bewerten ihn zu dritt nach Optik, Süffigkeit und Geschmack. Immer nach denselben '
+            . 'Regeln, immer aus reinem Privatvergnügen.</p></div>'
             . '<div class="cluster"><a class="btn btn--primary btn--lg" href="/spezis">Zum Katalog</a>'
             . '<a class="btn btn--secondary btn--lg" href="/ranking">Zum Ranking</a></div></div>';
 
@@ -103,17 +105,11 @@ final class WebsiteRenderer
 
         $body .= '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="stack-lg">'
             . $this->catalogToolbar($page)
-            . '<p class="meta"><strong style="color:var(--navy)">' . $page->totalMatches . ' '
-            . ($page->totalMatches === 1 ? 'Ergebnis' : 'Ergebnisse') . '</strong>'
-            . ($page->pageCount > 1 ? ' · Seite ' . $page->page . ' von ' . $page->pageCount : '') . '</p>'
-            . ($page->items === []
-                ? '<div class="empty"><p class="empty__title">Keine Spezis gefunden</p>'
-                    . '<p>Andere Suchbegriffe oder Filter probieren.</p>'
-                    . ($query->isFiltered() ? '<p><a class="btn btn--secondary btn--sm" href="/spezis">Filter zurücksetzen</a></p>' : '')
-                    . '</div>'
-                : '<div class="grid grid--cards">' . implode('', array_map($this->catalogCard(...), $page->items)) . '</div>')
-            . $this->pagination($page)
-            . '</div></div>';
+            // Everything below the toolbar is swapped in one piece when "Mehr
+            // laden" is used with JavaScript, so it carries its own container.
+            . '<div id="ergebnisse" class="stack-lg" data-catalog-results>'
+            . $this->catalogResults($page)
+            . '</div></div></div>';
 
         return Layout::page('Spezis', $body, 'spezis', 'Alle katalogisierten Cola-Mix- und Spezi-Getränke mit Status und Gesamtwertung.');
     }
@@ -121,15 +117,23 @@ final class WebsiteRenderer
     public function detail(RatedDrink $drink, RatedDrinkCollection $collection): string
     {
         $result = $drink->result;
-        $origin = $drink->displayOrigin();
-        $subtitleParts = array_values(array_filter([$drink->manufacturer, $origin]));
+        // The subtitle carries everything the old "Details" section used to
+        // repeat: maker, both origin fields when they differ, and the test date.
+        $testedDate = Html::isoToGermanDate($drink->testedAt);
+        $subtitleParts = array_values(array_unique(array_filter([
+            $drink->manufacturer,
+            $drink->originLocation,
+            $drink->originRegion,
+            $testedDate === null ? null : 'Getestet am ' . $testedDate,
+        ])));
 
         $hero = '<div class="wrap" style="padding-top:var(--sp-4)"><nav aria-label="Brotkrumen"><ol class="breadcrumb">'
             . '<li><a href="/">Start</a></li><li><a href="/spezis">Spezis</a></li><li>' . Html::e($drink->name) . '</li></ol></nav></div>'
             . '<article><section class="wrap section" style="padding-top:var(--sp-5)"><div class="hero hero--detail">'
             . '<div>' . $this->productImage($drink, 'pimg--hero') . '</div>'
             . '<div class="stack-lg"><div class="stack">'
-            . '<div class="cluster cluster--tight">' . Html::stateBadge($drink->lifecycleStatus, true)
+            // A compact badge: the state is context for the name, not a headline.
+            . '<div class="cluster cluster--tight">' . Html::stateBadge($drink->lifecycleStatus)
             . '</div><h1 class="display-2">' . Html::e($drink->name) . '</h1>'
             . ($subtitleParts !== [] ? '<p class="lede">' . Html::e(implode(' · ', $subtitleParts)) . '</p>' : '')
             . '</div>';
@@ -140,17 +144,20 @@ final class WebsiteRenderer
                     ? '<div class="verdict-rank"><span class="verdict-rank__num">#' . $drink->rank . '</span>'
                         . '<span class="verdict-rank__label">von ' . count($collection->tested()) . ' getesteten</span></div>'
                     : '')
+                . '<div class="verdict-scores">'
                 . '<div class="score"><span class="score__num">' . Html::grade($result->gesamt()) . '</span>'
-                . '<span class="score__label">Gesamtwertung · 0–60</span></div></div>'
-                . $this->ratingBreakdown($result);
+                . '<span class="score__label">Gesamtwertung · 0–60</span></div>'
+                . $this->priceScores($drink)
+                . '</div></div>'
+                . $this->streamLink($drink)
+                . $this->ratingBreakdown($drink);
         } else {
-            $hero .= '<div class="notice"><span>Noch nicht getestet – Wertung und Einzelnoten folgen nach dem Testabend.</span></div>';
+            $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Testabend.</span></div>';
         }
 
         $hero .= '</div></div></section>';
 
-        $body = $hero . $this->detailSidebar($drink, $collection)
-            . $this->previousNextNav($drink, $collection) . '</article>';
+        $body = $hero . $this->previousNextNav($drink, $collection) . '</article>';
 
         return Layout::page(
             $drink->name,
@@ -207,8 +214,8 @@ final class WebsiteRenderer
         $intro .= '<div class="figure-row" style="margin-top:var(--sp-6)">'
             . $this->figure((string) $stats->testedCount, 'getestet')
             . $this->figure((string) $stats->total, 'im Katalog')
-            . $this->figure(Html::gradeOrDash($stats->averageGesamt), 'Ø Gesamt')
             . $this->figure((string) $stats->lifecycleCounts['identified'], 'noch gesucht')
+            . $this->figure(Html::gradeOrDash($stats->averageGesamt), 'Ø Gesamtwertung')
             . '</div></section>';
 
         $distribution = '<section class="section section--tint"><div class="wrap split">'
@@ -223,23 +230,12 @@ final class WebsiteRenderer
             . '<div class="barchart">' . $this->categoryAverageRows($stats) . '</div></div></div>'
             . '</div></section>';
 
-        $tables = '<section class="wrap section"><div class="split split--sidebar"><div class="stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Hersteller</span><h2 class="display-3">Mehrfach im Katalog</h2></div>'
-            . ($stats->manufacturers === []
-                ? '<p class="meta">Noch kein Hersteller mit mehreren Einträgen.</p>'
-                : '<div class="table-scroll"><table class="table"><caption class="visually-hidden">Hersteller mit mehreren Einträgen</caption>'
-                    . '<thead><tr><th>Hersteller</th><th>Einträge</th><th>Ø Wertung</th><th>Bester Eintrag</th></tr></thead><tbody>'
-                    . $this->manufacturerRows($stats) . '</tbody></table></div>')
-            . '</div><aside class="stack-lg">'
-            . $this->bestByCategoryPanel($stats)
-            . '</aside></div></section>';
-
         return Layout::page(
             'Statistik',
             $intro . $this->originMapSection($map) . $distribution
-                . $this->priceLeistungSection($stats) . $tables,
+                . $this->priceLeistungSection($stats),
             'statistik',
-            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester, Preis/Leistung und Hersteller.',
+            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester und Preis/Leistung.',
         );
     }
 
@@ -278,6 +274,58 @@ final class WebsiteRenderer
             . '</div></section>';
     }
 
+    /**
+     * The scale behind the scatter plot: horizontal rules every ten points of
+     * the Gesamtwertung and four price steps across, each with a small label.
+     * Purely a reading aid — no data of its own.
+     */
+    private function scatterGrid(
+        float $minPrice,
+        float $maxPrice,
+        float $padLeft,
+        float $padTop,
+        float $plotWidth,
+        float $plotHeight,
+    ): string {
+        $lines = '';
+        $labels = '';
+
+        for ($score = 0; $score <= Html::GESAMT_MAX; $score += 10) {
+            $y = round($padTop + (1 - $score / Html::GESAMT_MAX) * $plotHeight, 1);
+            $lines .= '<line x1="' . $padLeft . '" y1="' . $y . '" x2="' . round($padLeft + $plotWidth, 1)
+                . '" y2="' . $y . '"' . ($score === 0 ? ' class="is-axis"' : '') . '></line>';
+
+            if ($score % 20 === 0) {
+                $labels .= '<text class="scatter__tick" x="' . round($padLeft - 5, 1) . '" y="' . round($y + 2.4, 1)
+                    . '" text-anchor="end">' . $score . '</text>';
+            }
+        }
+
+        $steps = 4;
+        $span = $maxPrice - $minPrice;
+
+        for ($step = 0; $step <= $steps; ++$step) {
+            $x = round($padLeft + $plotWidth * $step / $steps, 1);
+            $lines .= '<line x1="' . $x . '" y1="' . $padTop . '" x2="' . $x . '" y2="'
+                . round($padTop + $plotHeight, 1) . '"></line>';
+
+            if ($step % 2 !== 0) {
+                continue;
+            }
+
+            $anchor = match ($step) {
+                0 => 'start',
+                $steps => 'end',
+                default => 'middle',
+            };
+            $labels .= '<text class="scatter__tick" x="' . $x . '" y="' . round($padTop + $plotHeight + 11, 1)
+                . '" text-anchor="' . $anchor . '">'
+                . Html::e(Html::price((string) ($minPrice + $span * $step / $steps))) . '</text>';
+        }
+
+        return '<g class="scatter__grid" aria-hidden="true">' . $lines . $labels . '</g>';
+    }
+
     private function priceScatterChart(Statistics $stats): string
     {
         $points = $stats->priceScatter;
@@ -290,15 +338,25 @@ final class WebsiteRenderer
         $minPrice = min($prices);
         $priceSpan = max($prices) - $minPrice;
 
-        $width = 320.0;
-        $height = 180.0;
-        $padLeft = 14.0;
+        // A wide, shallow box: 125 points need horizontal room, and the plot
+        // is height-capped in CSS so a wider ratio also fills more of the page.
+        $width = 480.0;
+        $height = 200.0;
+        $padLeft = 30.0;
         $padRight = 14.0;
-        $padTop = 14.0;
-        $padBottom = 14.0;
+        $padTop = 12.0;
+        $padBottom = 26.0;
         $plotWidth = $width - $padLeft - $padRight;
         $plotHeight = $height - $padTop - $padBottom;
 
+        $grid = $this->scatterGrid(
+            $minPrice,
+            $minPrice + $priceSpan,
+            $padLeft,
+            $padTop,
+            $plotWidth,
+            $plotHeight,
+        );
         $dots = '';
 
         foreach ($points as $point) {
@@ -321,21 +379,314 @@ final class WebsiteRenderer
         return '<figure class="scatter" data-scatter>'
             . '<svg class="scatter__plot" viewBox="0 0 ' . $width . ' ' . $height . '" role="img" '
             . 'aria-label="Streudiagramm: Preis je 0,5 Liter gegen Gesamtwertung, ein Punkt je getesteter Spezi" '
-            . 'preserveAspectRatio="xMidYMid meet">' . $dots . '</svg>'
+            . 'preserveAspectRatio="xMidYMid meet">' . $grid . $dots . '</svg>'
             . '<figcaption class="scatter__caption">'
             . '<span>← günstiger je 0,5 l</span><span>höhere Wertung ↑</span><span>teurer →</span></figcaption>'
             . '<div class="scatter__readout" data-scatter-readout hidden></div>'
             . '</figure>';
     }
 
+    /**
+     * The streams overview: one card per Testabend, newest first. The card
+     * opens that evening's own page; a second link opens the recording.
+     *
+     * @param array<int, ?string> $recordedOn recording dates keyed by episode number
+     */
+    public function streams(RatedDrinkCollection $collection, array $recordedOn = []): string
+    {
+        $episodes = $this->episodes($collection, $recordedOn);
+
+        $head = '<div class="wrap section" style="padding-bottom:var(--sp-6)">'
+            . '<nav aria-label="Brotkrumen"><ol class="breadcrumb"><li><a href="/">Start</a></li><li>Streams</li></ol></nav>'
+            . '<div class="stack" style="margin-top:var(--sp-3)"><h1 class="display-2">Streams</h1>'
+            . '<p class="lede">Jeder Testabend ist als Aufzeichnung online. Ein Klick auf einen Abend zeigt, '
+            . 'was dort verkostet wurde. Jede Zeile springt direkt an die passende Stelle im Video.</p></div></div>';
+
+        if ($episodes === []) {
+            return Layout::page(
+                'Streams',
+                $head . '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="empty">'
+                    . '<p class="empty__title">Noch keine Aufzeichnung</p>'
+                    . '<p>Hier erscheinen die Testabende, sobald sie gestreamt wurden.</p></div></div>',
+                'streams',
+            );
+        }
+
+        $tasted = 0;
+        $seconds = 0;
+
+        foreach ($episodes as $episode) {
+            $tasted += $episode->count();
+            $seconds += $episode->tastingSeconds ?? 0;
+        }
+
+        $figures = '<div class="figure-row" style="margin-bottom:var(--sp-7)">'
+            . $this->figure((string) count($episodes), count($episodes) === 1 ? 'Testabend' : 'Testabende')
+            . $this->figure((string) $tasted, 'Spezis verkostet')
+            . $this->figure($seconds === 0 ? '–' : (string) (int) round($seconds / 3600) . ' h', 'reine Verkostungszeit')
+            . $this->figure(
+                $tasted === 0 || $seconds === 0 ? '–' : StreamEpisode::minutes((int) round($seconds / $tasted)) ?? '–',
+                'Ø je Spezi',
+            )
+            . '</div>';
+
+        $cards = '';
+
+        foreach ($episodes as $episode) {
+            $cards .= $this->episodeCard($episode);
+        }
+
+        return Layout::page(
+            'Streams',
+            $head . '<div class="wrap" style="padding-bottom:var(--sp-9)">'
+                . $figures . '<div class="grid grid--2">' . $cards . '</div></div>',
+            'streams',
+            'Alle Spezitest-Testabende als Aufzeichnung, mit Sprungmarke zu jeder verkosteten Spezi.',
+        );
+    }
+
+    /**
+     * One Testabend in full: the evening in numbers, then what was tasted in
+     * the order it happened, each row jumping into the recording.
+     *
+     * @param array<int, ?string> $recordedOn
+     */
+    public function stream(int $number, RatedDrinkCollection $collection, array $recordedOn = []): ?string
+    {
+        $episodes = $this->episodes($collection, $recordedOn);
+        $episode = null;
+        $position = null;
+
+        foreach ($episodes as $index => $candidate) {
+            if ($candidate->number === $number) {
+                $episode = $candidate;
+                $position = $index;
+            }
+        }
+
+        if ($episode === null || $position === null) {
+            return null;
+        }
+
+        // The list runs newest first, so the earlier evening is the next entry.
+        $newer = $episodes[$position - 1] ?? null;
+        $older = $episodes[$position + 1] ?? null;
+
+        $rows = '';
+        $index = 0;
+
+        foreach ($episode->drinks as $drink) {
+            ++$index;
+            $rows .= $this->tastingRow($drink, $index);
+        }
+
+        $body = '<div class="wrap section" style="padding-bottom:var(--sp-5)">'
+            . '<nav aria-label="Brotkrumen"><ol class="breadcrumb"><li><a href="/">Start</a></li>'
+            . '<li><a href="/streams">Streams</a></li><li>Testabend ' . $episode->number . '</li></ol></nav>'
+            . '<div class="stack" style="margin-top:var(--sp-3)">'
+            . '<span class="eyebrow eyebrow--accent">Testabend ' . $episode->number . '</span>'
+            . '<h1 class="display-2">' . Html::e($episode->title) . '</h1>'
+            . '<p class="meta">' . $episode->count() . ' Spezis verkostet'
+            . ($episode->recordedOn === null
+                ? ''
+                : ' · aufgezeichnet am ' . Html::e(Html::isoToGermanDate($episode->recordedOn) ?? $episode->recordedOn))
+            . '</p></div>'
+            . ($episode->url === null
+                ? '<p class="notice" style="margin-top:var(--sp-5)"><span>Die Aufzeichnung dieses Abends ist noch nicht verlinkt.</span></p>'
+                : '<p style="margin-top:var(--sp-5)"><a class="btn btn--primary btn--lg" href="' . Html::e($episode->url) . '" '
+                    . 'target="_blank" rel="noopener noreferrer">Stream auf YouTube ansehen</a></p>')
+            . $this->episodeFigures($episode)
+            . '</div>'
+            . $this->episodeFacts($episode)
+            . '<section class="section section--tint"><div class="wrap stack-lg">'
+            . '<div class="cluster cluster--between"><h2 class="display-3">Verkostet an diesem Abend</h2>'
+            . ($episode->url === null ? '' : '<p class="meta">Jede Zeile springt ins Video.</p>') . '</div>'
+            . '<ol class="tasting">' . $rows . '</ol></div></section>'
+            . $this->episodePager($newer, $older);
+
+        return Layout::page(
+            'Testabend ' . $episode->number,
+            $body,
+            'streams',
+            $episode->title . ': ' . $episode->count() . ' Spezis im Test, mit Sprungmarken ins Video.',
+        );
+    }
+
+    /**
+     * @param array<int, ?string> $recordedOn
+     * @return list<StreamEpisode>
+     */
+    private function episodes(RatedDrinkCollection $collection, array $recordedOn): array
+    {
+        return array_map(
+            static fn (StreamEpisode $episode): StreamEpisode
+                => $episode->withRecordedOn($recordedOn[$episode->number] ?? null),
+            StreamEpisode::fromCollection($collection),
+        );
+    }
+
+    private function episodeFigures(StreamEpisode $episode): string
+    {
+        return '<div class="figure-row" style="margin-top:var(--sp-6)">'
+            . $this->figure((string) $episode->count(), 'Spezis verkostet')
+            . $this->figure(Html::gradeOrDash($episode->averageGesamt), 'Ø Gesamtwertung')
+            . $this->figure(StreamEpisode::minutes($episode->averageSeconds) ?? '–', 'Ø je Spezi')
+            . $this->figure(
+                $episode->tastingSeconds === null ? '–' : StreamEpisode::clock($episode->tastingSeconds) ?? '–',
+                'reine Verkostungszeit',
+            )
+            . '</div>';
+    }
+
+    /** The evening's superlatives, each linking to the Spezi it names. */
+    private function episodeFacts(StreamEpisode $episode): string
+    {
+        $facts = [
+            ['Bester Spezi des Abends', $episode->best, static fn (RatedDrink $d): string
+                => $d->result === null ? '' : Html::gradeOfMax($d->result->gesamt(), Html::GESAMT_MAX)],
+            ['Schlusslicht des Abends', $episode->worst, static fn (RatedDrink $d): string
+                => $d->result === null ? '' : Html::gradeOfMax($d->result->gesamt(), Html::GESAMT_MAX)],
+            ['Längste Verkostung', $episode->longest, static fn (RatedDrink $d): string
+                => StreamEpisode::minutes($d->stream->durationSeconds ?? null) ?? ''],
+            ['Kürzeste Verkostung', $episode->shortest, static fn (RatedDrink $d): string
+                => StreamEpisode::minutes($d->stream->durationSeconds ?? null) ?? ''],
+        ];
+
+        $cards = '';
+
+        foreach ($facts as [$label, $drink, $value]) {
+            if ($drink === null) {
+                continue;
+            }
+
+            $cards .= '<div class="episode-fact">'
+                . '<span class="episode-fact__label">' . Html::e($label) . '</span>'
+                . '<a class="episode-fact__name" href="/spezi/' . Html::e($drink->slug()) . '">'
+                . Html::e($drink->name) . '</a>'
+                . '<span class="episode-fact__value">' . Html::e($value($drink)) . '</span></div>';
+        }
+
+        if ($cards === '') {
+            return '';
+        }
+
+        return '<div class="wrap" style="padding-bottom:var(--sp-7)">'
+            . '<div class="episode-facts">' . $cards . '</div></div>';
+    }
+
+    private function episodeCard(StreamEpisode $episode): string
+    {
+        // Only bottles that actually have a photo go in the strip; a
+        // placeholder there would read as a gap, not as a missing image.
+        $withImage = array_values(array_filter(
+            $episode->drinks,
+            static fn (RatedDrink $drink): bool => $drink->hasImage,
+        ));
+        $strip = '';
+
+        foreach (array_slice($withImage, 0, 6) as $drink) {
+            $strip .= '<span class="episode-card__thumb">' . $this->productImage($drink, 'pimg--bare') . '</span>';
+        }
+
+        $rest = $episode->count() - min(6, count($withImage));
+
+        if ($rest > 0) {
+            $strip .= '<span class="episode-card__more">+' . $rest . '</span>';
+        }
+
+        $meta = [$episode->count() . ' ' . ($episode->count() === 1 ? 'Spezi' : 'Spezis')];
+
+        if ($episode->averageGesamt !== null) {
+            $meta[] = 'Ø ' . Html::grade($episode->averageGesamt);
+        }
+
+        if ($episode->averageSeconds !== null) {
+            $meta[] = (StreamEpisode::minutes($episode->averageSeconds) ?? '') . ' je Spezi';
+        }
+
+        return '<article class="card episode-card">'
+            . '<div class="episode-card__strip">' . $strip . '</div>'
+            . '<div class="card__body">'
+            . '<span class="eyebrow eyebrow--accent">Testabend ' . $episode->number
+            . ($episode->recordedOn === null
+                ? ''
+                : ' · ' . Html::e(Html::isoToGermanDate($episode->recordedOn) ?? $episode->recordedOn))
+            . '</span>'
+            . '<h2 class="card__title"><a class="episode-card__link" href="/streams/' . $episode->number . '">'
+            . Html::e($episode->title) . '</a></h2>'
+            . '<p class="meta">' . Html::e(implode(' · ', $meta)) . '</p>'
+            . ($episode->best === null
+                ? ''
+                : '<p class="meta">Sieger des Abends: <a href="/spezi/' . Html::e($episode->best->slug()) . '">'
+                    . Html::e($episode->best->name) . '</a></p>')
+            . '<div class="episode-card__actions">'
+            . '<a class="btn btn--secondary btn--sm" href="/streams/' . $episode->number . '">Verkostungen ansehen</a>'
+            . ($episode->url === null
+                ? '<span class="meta">Aufzeichnung folgt</span>'
+                : '<a class="btn btn--ghost btn--sm episode-card__watch" href="' . Html::e($episode->url) . '" '
+                    . 'target="_blank" rel="noopener noreferrer">Auf YouTube</a>')
+            . '</div></div></article>';
+    }
+
+    private function tastingRow(RatedDrink $drink, int $position): string
+    {
+        $segment = $drink->stream;
+        $result = $drink->result;
+        $watch = $segment?->watchUrl();
+        $offset = $segment?->formattedOffset();
+        $duration = StreamEpisode::minutes($segment->durationSeconds ?? null);
+
+        return '<li class="tasting__row">'
+            . '<span class="tasting__pos">' . $position . '</span>'
+            . $this->productImage($drink, 'pimg--thumb')
+            . '<span class="tasting__text">'
+            . '<a class="tasting__name" href="/spezi/' . Html::e($drink->slug()) . '">' . Html::e($drink->name) . '</a>'
+            . '<span class="tasting__sub">' . Html::e($drink->manufacturer ?? $drink->displayOrigin() ?? '—')
+            . ($duration === null ? '' : ' · ' . Html::e($duration)) . '</span>'
+            . '</span>'
+            . '<span class="tasting__score">'
+            . ($result === null ? '–' : Html::grade($result->gesamt()))
+            . '<small>' . ($drink->rank === null ? 'Wertung' : 'Platz ' . $drink->rank) . '</small></span>'
+            . ($watch === null || $offset === null
+                ? '<span class="tasting__jump tasting__jump--none">' . Html::e($offset ?? '–') . '</span>'
+                : '<a class="tasting__jump" href="' . Html::e($watch) . '" target="_blank" rel="noopener noreferrer">'
+                    . '<span>' . Html::e($offset) . '</span>'
+                    . '<span class="visually-hidden">' . Html::e($drink->name) . ' im Stream ansehen</span></a>')
+            . '</li>';
+    }
+
+    private function episodePager(?StreamEpisode $newer, ?StreamEpisode $older): string
+    {
+        if ($newer === null && $older === null) {
+            return '';
+        }
+
+        $link = static function (?StreamEpisode $episode, string $direction, string $label): string {
+            if ($episode === null) {
+                return '';
+            }
+
+            return '<a class="neighbour neighbour--' . $direction . '" href="/streams/' . $episode->number . '">'
+                . '<span class="neighbour__arrow" aria-hidden="true"></span>'
+                . '<span class="neighbour__text">'
+                . '<span class="neighbour__label">' . Html::e($label) . '</span>'
+                . '<span class="neighbour__name">' . Html::e($episode->title) . '</span></span></a>';
+        };
+
+        return '<section class="wrap section" style="padding-top:0">'
+            . '<nav class="pager-nav" aria-label="Weitere Testabende">'
+            . $link($older, 'prev', 'Früherer Testabend')
+            . $link($newer, 'next', 'Späterer Testabend')
+            . '</nav></section>';
+    }
     public function ueber(RatedDrinkCollection $collection): string
     {
         $counts = $collection->lifecycleCounts();
         $body = '<section class="wrap section"><div class="split" style="align-items:center">'
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Über das Projekt</span>'
             . '<h1 class="display-2">Wir trinken das, damit du es nicht musst.</h1>'
-            . '<p class="lede">Ein privates Projekt mit einer Aufgabe: jedes Cola-Mix-Getränk finden, kaufen und '
-            . 'nach denselben Kriterien bewerten. Bisher '
+            . '<p class="lede">Ein Hobbyprojekt von drei Leuten mit einer selbstgestellten Aufgabe: möglichst '
+            . 'jeden Cola-Mix auftreiben, selbst kaufen und nach immer denselben Kriterien bewerten. Bisher '
             . $counts['tested'] . ' ' . ($counts['tested'] === 1 ? 'getesteter Spezi' : 'getestete Spezis') . '.</p></div>'
             . '<figure class="team-photo"><img src="/assets/spezitest-team.jpg" '
             . 'alt="Manu, Fabi und Schorsch hinter einem Tisch voller Cola-Mix-Flaschen" '
@@ -345,14 +696,16 @@ final class WebsiteRenderer
             . '<div class="prose stack-lg"><div class="stack"><span class="eyebrow">Methode</span>'
             . '<h2 class="display-3">Wie getestet wird</h2></div>'
             . '<p>Gleiche Temperatur, gleiches Glas. Jeder der drei Tester vergibt für Optik, Süffigkeit und '
-            . 'Geschmack eine Note von 0 bis 10 – höher ist besser.</p>'
+            . 'Geschmack eine Note von 0 bis 10. Höher ist besser.</p>'
             . '<h3>Optik</h3><p>Farbe im Glas, Kohlensäure, Schaum, Flasche oder Dose.</p>'
             . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Abgang.</p>'
             . '<h3>Geschmack</h3><p>Verhältnis von Cola zu Orange, Aromatik, Eigenständigkeit.</p>'
             . '<h3>Gesamtwertung</h3><p>Gewichtet: Optik ×1, Süffigkeit ×2, Geschmack ×3. Ergebnis 0 bis 60.</p>'
             . '<h3>Preis / Leistung</h3><p>Nur, wenn ein Preis erfasst wurde. Verglichen wird auf Basis '
             . 'des Preises je 0,5 l.</p>'
-            . '<p class="meta">Keine bezahlten Tests. Keine nachträgliche Änderung der Methodik.</p></div>'
+            . '<p class="meta">Alle Flaschen kaufen wir selbst. Es gibt keine bezahlten Tests, keine '
+            . 'Kooperationen und keine nachträglichen Änderungen an der Methodik. Auch dann nicht, wenn '
+            . 'uns ein Ergebnis nicht passt.</p></div>'
             . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Lebenszyklus</span>'
             . '<div class="cluster cluster--tight" style="margin-top:var(--sp-3)">'
             . Html::stateBadge('identified') . Html::stateBadge('acquired') . Html::stateBadge('tested') . '</div>'
@@ -362,18 +715,38 @@ final class WebsiteRenderer
             . '<section class="wrap section" id="tester"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Die Abteilung</span><h2 class="display-3">Drei Tester, eine Skala</h2></div>'
             . '<div class="grid grid--3">'
-            . $this->testerCard('Manu', 'Zuständig für Beschaffung und Kastenlogistik.')
-            . $this->testerCard('Fabi', 'Achtet auf Süße und Abgang.')
-            . $this->testerCard('Schorsch', 'Führt den Katalog und schreibt die Testnotizen.')
+            . $this->testerCard('Manu', 'Treibt die Flaschen auf und schleppt die Kästen.')
+            . $this->testerCard('Fabi', 'Merkt als Erster, wenn etwas zu süß ist.')
+            . $this->testerCard('Schorsch', 'Pflegt den Katalog und schreibt mit, was am Tisch gesagt wird.')
             . '</div></div></section>'
+
+            . '<section class="wrap section" id="projekt"><div class="prose stack-lg">'
+            . '<div class="stack"><span class="eyebrow">Zur Einordnung</span>'
+            . '<h2 class="display-3">Privatvergnügen, kein Geschäft</h2></div>'
+            . '<p>Spezitest ist ein Hobby. Wir verdienen hier nichts: keine Werbung, keine Affiliate-Links, '
+            . 'keine gesponserten Beiträge, nichts zu kaufen. Die Getränke zahlen wir selbst, und kein '
+            . 'Hersteller hat Einfluss darauf, was wir schreiben oder wie wir werten.</p>'
+            . '<p>„Spezi“ ist eine eingetragene Marke, und wir gehören nicht dazu. Wir benutzen das Wort so, '
+            . 'wie es hierzulande am Tresen benutzt wird: als Sammelbegriff für Cola-Mix, egal von wem. '
+            . 'Genauso stehen alle anderen Marken- und Produktnamen hier nur deshalb, weil wir über genau '
+            . 'dieses Getränk schreiben. Sie gehören ihren Inhabern. '
+            . '<a href="/impressum#marken">Mehr dazu im Impressum.</a></p>'
+            . '<p>Und was hier steht, sind Geschmacksurteile von drei Privatleuten, keine Laborwerte. '
+            . 'Wer anderer Meinung ist, hat vermutlich recht.</p>'
+            . '</div></section>'
 
             . '<section class="section section--navy"><div class="wrap on-navy split" style="align-items:center">'
             . '<h2 class="display-3" style="color:#fff">Fehlt uns ein Spezi?</h2>'
-            . '<div class="stack"><p class="lede" style="color:rgba(255,255,255,.86)">Erst im Katalog nachsehen – '
-            . 'was dort fehlt, suchen wir.</p>'
+            . '<div class="stack"><p class="lede" style="color:rgba(255,255,255,.86)">Erst im Katalog nachsehen. '
+            . 'Was dort fehlt, suchen wir.</p>'
             . '<div class="cluster"><a class="btn btn--on-navy" href="/spezis">Katalog prüfen</a></div></div></div></section>';
 
-        return Layout::page('Über Spezitest', $body, 'ueber', 'Die Testmethode und die Tester hinter Spezitest.');
+        return Layout::page(
+            'Über Spezitest',
+            $body,
+            'ueber',
+            'Testmethode, Tester und Selbstverständnis hinter Spezitest. Ein privates, nicht kommerzielles Projekt.',
+        );
     }
 
     /**
@@ -385,6 +758,22 @@ final class WebsiteRenderer
         $body = '<section class="wrap section"><div class="prose stack-lg">'
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Rechtliches</span>'
             . '<h1 class="display-2">Impressum</h1></div>'
+
+            . '<div><h2>Was das hier ist</h2>'
+            . '<p>Spezitest ist ein privates Hobbyprojekt von drei Leuten, die zu viel Cola-Mix trinken. '
+            . 'Wir verkaufen nichts, wir schalten keine Werbung, wir nehmen kein Geld für Tests und wir '
+            . 'arbeiten mit keinem der hier genannten Hersteller zusammen. Die Seite kostet uns Geld statt '
+            . 'welches einzubringen. So soll es auch bleiben.</p></div>'
+
+            . '<div><h2>Warum hier eine Firma steht</h2>'
+            . '<p>Ein Impressum braucht eine ladungsfähige Anschrift und jemanden, den man erreichen kann. '
+            . 'Fabian, einer von uns dreien, ist Geschäftsführer der ABOUT US Media GmbH. Deshalb laufen '
+            . 'Post und Anfragen zu Spezitest über deren Anschrift, statt dass wir hier drei private '
+            . 'Wohnadressen ins Netz stellen. Die GmbH steht hier also als Kontakt- und Zustelladresse.</p>'
+            . '<p>Kommerziell wird das Projekt dadurch nicht: Spezitest ist kein Angebot der Firma, es gibt '
+            . 'keine Einnahmen, keine Werbung, keinen Auftrag und keine Kundenbeziehung zu irgendeinem '
+            . 'Getränkehersteller. Die Kästen zahlen wir privat.</p></div>'
+
             . '<div><h2>Anbieter</h2>'
             . '<p>ABOUT US Media GmbH<br>Zeppelinstraße 16 1/2<br>86343 Königsbrunn</p></div>'
             . '<div><h2>Kontakt</h2>'
@@ -400,98 +789,129 @@ final class WebsiteRenderer
             . 'Telefon: <a href="tel:+4917681646809">+49 176 81646809</a></p></div>'
             . '<div><h2>Inhaltlich Verantwortlicher gem. § 18 Abs. 2 MStV</h2>'
             . '<p>Fabian Heißerer (Anschrift und Kontakt s.&nbsp;o.)</p></div>'
+
+            . '<div id="marken"><h2>Marken und Produktnamen</h2>'
+            . '<p>„Spezi“ ist eine eingetragene Marke. Wir gehören nicht dazu und geben auch nicht vor, dazu '
+            . 'zu gehören. Im deutschen Sprachgebrauch ist „Spezi“ längst das Wort, mit dem man ein '
+            . 'Cola-Mix-Getränk bestellt, egal von welchem Hersteller. Genau so benutzen wir es hier: '
+            . 'beschreibend, als Gattungsbegriff für die Getränkeart, um die es auf dieser Seite geht.</p>'
+            . '<p>Dasselbe gilt für alle anderen Marken-, Produkt- und Herstellernamen auf dieser Seite. Sie '
+            . 'gehören ihren jeweiligen Inhabern. Wir nennen sie, weil wir über genau dieses Getränk '
+            . 'schreiben. Das ist weder eine Empfehlung des Herstellers an uns noch eine Zusammenarbeit in '
+            . 'irgendeine Richtung.</p>'
+            . '<p>Die Produktfotos zeigen die Flaschen und Dosen, die wir selbst gekauft und getestet '
+            . 'haben. Wir fotografieren sie zu Hause und bearbeiten die Bilder nach. Teilweise nutzen wir '
+            . 'dafür auch KI-Werkzeuge, etwa um Hintergrund, Ausschnitt oder Ausleuchtung zu '
+            . 'vereinheitlichen. Es sind also keine offiziellen Herstellerfotos. Sie sind auch nicht '
+            . 'als originalgetreue Abbildung der Verpackung gedacht, sondern sollen im Katalog nur '
+            . 'zeigen, um welches Getränk es geht. Im Zweifel gilt immer das, was tatsächlich im '
+            . 'Regal steht.</p>'
+            . '<p>Unsere Bewertungen sind persönliche Geschmacksurteile von drei Privatpersonen an einem '
+            . 'Küchentisch. Sie sind keine Warentests im Sinne eines Prüfinstituts und erheben keinen '
+            . 'Anspruch auf Objektivität.</p>'
+            . '<p>Wenn ein Rechteinhaber mit etwas auf dieser Seite ein Problem hat: kurze Mail an die oben '
+            . 'genannte Adresse genügt. Wir nehmen das ernst und ändern oder entfernen die Stelle.</p></div>'
+
             . '<div><h2>Haftung für Inhalte</h2>'
-            . '<p>Wir sind gemäß § 7 Abs. 1 TMG als Diensteanbieter für eigene Inhalte auf diesen Seiten nach den '
-            . 'allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir jedoch nicht verpflichtet, '
-            . 'übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, '
-            . 'die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der '
-            . 'Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt. Eine Haftung ist '
-            . 'jedoch erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei '
-            . 'Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.</p></div>'
+            . '<p>Für eigene Inhalte auf diesen Seiten sind wir nach § 7 Abs. 1 TMG und den allgemeinen '
+            . 'Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir allerdings nicht verpflichtet, fremde '
+            . 'Informationen zu überwachen oder nach Hinweisen auf rechtswidrige Tätigkeiten zu suchen. '
+            . 'Pflichten zur Entfernung oder Sperrung nach den allgemeinen Gesetzen bleiben davon unberührt; '
+            . 'sie greifen aber erst, sobald wir von einer konkreten Rechtsverletzung wissen. Sagen Sie uns '
+            . 'Bescheid, dann ist der Inhalt schnell weg.</p></div>'
+
             . '<div><h2>Haftung für Links</h2>'
-            . '<p>Unser Blog kann Links zu externen Websites Dritter enthalten, auf deren Inhalte wir keinen '
-            . 'Einfluss haben. Daher können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die '
-            . 'Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. '
-            . 'Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente '
-            . 'inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung '
-            . 'nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend '
-            . 'entfernen.</p></div>'
+            . '<p>Wir verlinken an einigen Stellen auf fremde Seiten, vor allem auf unsere Aufzeichnungen bei '
+            . 'YouTube. Auf deren Inhalte haben wir keinen Einfluss, verantwortlich ist immer der jeweilige '
+            . 'Anbieter. Als wir die Links gesetzt haben, war dort nichts Rechtswidriges zu erkennen. Eine '
+            . 'dauerhafte Kontrolle aller verlinkten Seiten leisten wir ohne konkreten Anlass nicht. Wird '
+            . 'uns einer bekannt, fliegt der Link raus.</p></div>'
+
             . '<div><h2>Urheberrecht</h2>'
-            . '<p>Die durch uns erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen '
-            . 'Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet. Die Vervielfältigung, Bearbeitung, '
-            . 'Verbreitung sowie jede Art der Verwertung außerhalb der Grenzen des Urheberrechts bedürfen der '
-            . 'schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers. Downloads und Kopien dieser Seite '
-            . 'sind nur für den privaten, nicht kommerziellen Gebrauch gestattet.</p></div>'
+            . '<p>Texte, Fotos und Auswertungen auf dieser Seite haben wir selbst gemacht; sie unterliegen dem '
+            . 'deutschen Urheberrecht. Beiträge Dritter sind gekennzeichnet. Wer etwas davon außerhalb der '
+            . 'Schranken des Urheberrechts verwenden möchte, fragt uns bitte vorher. Für den privaten Gebrauch '
+            . 'ist das Kopieren selbstverständlich in Ordnung.</p></div>'
+
             . '</div></section>';
 
-        return Layout::page('Impressum', $body, 'impressum', 'Impressum und Anbieterkennzeichnung von Spezitest.');
+        return Layout::page(
+            'Impressum',
+            $body,
+            'impressum',
+            'Impressum von Spezitest. Ein privates, nicht kommerzielles Projekt rund um Cola-Mix.',
+        );
     }
-
-    /**
-     * Privacy policy, carried over from the previous spezitest.de site. The
-     * address of the responsible party was corrected to Zeppelinstraße 16 1/2;
-     * the wording is otherwise unchanged.
-     */
     public function datenschutz(): string
     {
         $body = '<section class="wrap section"><div class="prose stack-lg">'
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Rechtliches</span>'
             . '<h1 class="display-2">Datenschutz</h1></div>'
 
-            . '<div><h2>1. Datenschutz auf einen Blick</h2>'
-            . '<h3>Allgemeine Hinweise</h3>'
-            . '<p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen '
-            . 'Daten passiert, wenn Sie unsere Website besuchen. Personenbezogene Daten sind alle Daten, mit denen '
-            . 'Sie persönlich identifiziert werden können. Ausführliche Informationen zum Thema Datenschutz '
-            . 'entnehmen Sie unserer unter diesem Text aufgeführten Datenschutzerklärung.</p>'
-            . '<h3>Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>'
-            . '<p>Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten '
-            . 'können Sie dem <a href="/impressum">Impressum</a> dieser Website entnehmen.</p>'
-            . '<h3>Wie erfassen wir Ihre Daten?</h3>'
-            . '<p>Ihre Daten werden zum einen dadurch erhoben, dass Sie uns diese mitteilen. Hierbei kann es sich '
-            . 'z.&nbsp;B. um Daten handeln, die Sie in ein Kontaktformular eingeben. Andere Daten werden automatisch '
-            . 'beim Besuch der Website durch unsere IT-Systeme erfasst. Das sind vor allem technische Daten '
-            . '(z.&nbsp;B. Internetbrowser, Betriebssystem oder Uhrzeit des Seitenaufrufs). Die Erfassung dieser '
-            . 'Daten erfolgt automatisch, sobald Sie unsere Website betreten.</p>'
-            . '<h3>Wofür nutzen wir Ihre Daten?</h3>'
-            . '<p>Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten. '
-            . 'Andere Daten können zur Analyse Ihres Nutzerverhaltens verwendet werden.</p>'
-            . '<h3>Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>'
-            . '<p>Sie haben jederzeit das Recht unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer '
-            . 'gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung, '
-            . 'Sperrung oder Löschung dieser Daten zu verlangen. Hierzu sowie zu weiteren Fragen zum Thema '
-            . 'Datenschutz können Sie sich jederzeit unter der im Impressum angegebenen Adresse an uns wenden. Des '
-            . 'Weiteren steht Ihnen ein Beschwerderecht bei der zuständigen Aufsichtsbehörde zu.</p>'
-            . '<h3>Analyse-Tools und Tools von Drittanbietern</h3>'
-            . '<p>Beim Besuch unserer Website kann Ihr Surf-Verhalten statistisch ausgewertet werden. Das geschieht '
-            . 'vor allem mit Cookies und mit sogenannten Analyseprogrammen. Die Analyse Ihres Surf-Verhaltens '
-            . 'erfolgt in der Regel anonym; das Surf-Verhalten kann nicht zu Ihnen zurückverfolgt werden. Sie '
-            . 'können dieser Analyse widersprechen oder sie durch die Nichtbenutzung bestimmter Tools verhindern. '
-            . 'Detaillierte Informationen dazu finden Sie in der folgenden Datenschutzerklärung. Sie können dieser '
-            . 'Analyse widersprechen. Über die Widerspruchsmöglichkeiten werden wir Sie in dieser '
-            . 'Datenschutzerklärung informieren.</p></div>'
+            . '<div><h2>Kurzfassung</h2>'
+            . '<p>Diese Seite sammelt nichts über Sie. Kein Tracking, keine Analyse-Tools, keine Werbe- oder '
+            . 'Social-Media-Skripte, keine Cookies, keine Schriften oder Bilder von fremden Servern. Sie können '
+            . 'hier lesen, suchen und sortieren, ohne dass davon irgendetwas bei uns landet. Ausgenommen '
+            . 'sind die Zugriffsprotokolle, die jeder Webserver technisch bedingt schreibt.</p>'
+            . '<p>Das ist keine Marketing-Aussage, sondern eine Eigenschaft der Seite: Es gibt schlicht keinen '
+            . 'Programmcode, der so etwas täte.</p></div>'
 
-            . '<div><h2>2. Allgemeine Hinweise und Pflichtinformationen</h2>'
-            . '<h3>Hinweis zur verantwortlichen Stelle</h3>'
-            . '<p>Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:</p>'
+            . '<div><h2>Verantwortliche Stelle</h2>'
             . '<p>ABOUT US Media GmbH<br>Zeppelinstraße 16 1/2<br>86343 Königsbrunn</p>'
-            . '<p>Telefon: <a href="tel:+4915902608764">+49 (0) 1590 2608764</a><br>'
-            . 'E-Mail: <a href="mailto:hallo@aboutusmedia.de">hallo@aboutusmedia.de</a></p>'
-            . '<p>Verantwortliche Stelle ist die natürliche oder juristische Person, die allein oder gemeinsam mit '
-            . 'anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten (z.&nbsp;B. Namen, '
-            . 'E-Mail-Adressen o.&nbsp;Ä.) entscheidet.</p>'
-            . '<h3>SSL- bzw. TLS-Verschlüsselung</h3>'
-            . '<p>Diese Seite nutzt aus Sicherheitsgründen und zum Schutz der Übertragung vertraulicher Inhalte, '
-            . 'wie zum Beispiel Bestellungen oder Anfragen, die Sie an uns als Seitenbetreiber senden, eine SSL- '
-            . 'bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennen Sie daran, dass die Adresszeile '
-            . 'des Browsers von „http://“ auf „https://“ wechselt und an dem Schloss-Symbol in Ihrer Browserzeile. '
-            . 'Wenn die SSL- bzw. TLS-Verschlüsselung aktiviert ist, können die Daten, die Sie an uns übermitteln, '
-            . 'nicht von Dritten mitgelesen werden.</p></div>'
+            . '<p>E-Mail: <a href="mailto:hallo@aboutusmedia.de">hallo@aboutusmedia.de</a><br>'
+            . 'Telefon: <a href="tel:+4915902608764">+49 1590 2608764</a></p>'
+            . '<p>Verantwortliche Stelle ist, wer über Zwecke und Mittel der Verarbeitung personenbezogener '
+            . 'Daten entscheidet. Bei Fragen zum Datenschutz schreiben Sie einfach an die Adresse oben.</p></div>'
+
+            . '<div><h2>Server-Logfiles</h2>'
+            . '<p>Wenn Sie eine Seite aufrufen, hält unser Hoster den Zugriff in einer Protokolldatei fest. '
+            . 'Darin stehen die aufgerufene Adresse, Datum und Uhrzeit, die übertragene Datenmenge, die '
+            . 'Meldung ob der Abruf geklappt hat, Browser und Betriebssystem sowie Ihre IP-Adresse. Diese Daten '
+            . 'brauchen wir, damit die Seite ausgeliefert werden kann und damit wir Störungen und Angriffe '
+            . 'erkennen. Wir führen sie nicht mit anderen Daten zusammen und werten sie nicht personenbezogen '
+            . 'aus.</p>'
+            . '<p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO: Wir haben ein berechtigtes Interesse daran, '
+            . 'dass die Seite technisch fehlerfrei und sicher läuft. Die Protokolle werden beim Hoster nach '
+            . 'kurzer Zeit automatisch gelöscht.</p></div>'
+
+            . '<div><h2>Cookies</h2>'
+            . '<p>Auf den öffentlichen Seiten setzen wir keine Cookies. Auch keine „technisch notwendigen“. '
+            . 'Deshalb finden Sie hier auch kein Cookie-Banner. Ein Sitzungs-Cookie gibt es nur im internen '
+            . 'Verwaltungsbereich, in dem wir die Testergebnisse pflegen; dort kommen Sie ohne Zugangsdaten '
+            . 'nicht hin.</p></div>'
+
+            . '<div><h2>Suche</h2>'
+            . '<p>Die Vorschläge, die beim Tippen im Katalog erscheinen, beantwortet unser eigener Server. '
+            . 'Ihre Suchbegriffe gehen an niemanden sonst und werden nicht dauerhaft gespeichert.</p></div>'
+
+            . '<div><h2>Links zu YouTube</h2>'
+            . '<p>Wir verlinken unsere Aufzeichnungen bei YouTube, betten aber keine Videos ein. Solange Sie '
+            . 'nicht auf so einen Link klicken, erfährt YouTube nichts von Ihrem Besuch bei uns. Klicken Sie, '
+            . 'gilt die Datenschutzerklärung von YouTube bzw. Google.</p></div>'
+
+            . '<div><h2>Verschlüsselung</h2>'
+            . '<p>Die Seite wird über HTTPS ausgeliefert. Sie erkennen das am Schloss-Symbol in der Adresszeile '
+            . 'Ihres Browsers. Was zwischen Ihrem Gerät und unserem Server läuft, kann unterwegs niemand '
+            . 'mitlesen.</p></div>'
+
+            . '<div><h2>Ihre Rechte</h2>'
+            . '<p>Sie haben jederzeit das Recht auf Auskunft über die zu Ihrer Person gespeicherten Daten, auf '
+            . 'Berichtigung, Löschung und Einschränkung der Verarbeitung, auf Datenübertragbarkeit sowie das '
+            . 'Recht, einer Verarbeitung zu widersprechen. Melden Sie sich dafür bei der oben genannten '
+            . 'Adresse. Außerdem können Sie sich bei einer Datenschutz-Aufsichtsbehörde beschweren. Für uns '
+            . 'zuständig ist das Bayerische Landesamt für Datenschutzaufsicht.</p>'
+            . '<p>Viel zu holen gibt es dabei allerdings nicht: Außer den Logfiles beim Hoster liegen hier '
+            . 'keine Daten über Besucherinnen und Besucher.</p></div>'
+
             . '</div></section>';
 
-        return Layout::page('Datenschutz', $body, 'datenschutz', 'Datenschutzerklärung von Spezitest.');
+        return Layout::page(
+            'Datenschutz',
+            $body,
+            'datenschutz',
+            'Datenschutz bei Spezitest: keine Cookies, kein Tracking, keine Dienste Dritter.',
+        );
     }
-
     public function notFound(): string
     {
         $body = '<section class="wrap section section--lg" style="min-height:55vh;display:flex;align-items:center">'
@@ -587,148 +1007,6 @@ final class WebsiteRenderer
         return $items;
     }
 
-    private function ratingBreakdown(\Spezitest\Domain\Rating\RatingResult $result): string
-    {
-        $rows = [
-            ['Optik', $result->optikAverage(), Html::CATEGORY_MAX, false],
-            ['Süffigkeit', $result->sueffigkeitAverage(), Html::CATEGORY_MAX, false],
-            ['Geschmack', $result->geschmackAverage(), Html::CATEGORY_MAX, false],
-            ['Gesamtwertung', $result->gesamt(), Html::GESAMT_MAX, true],
-        ];
-
-        $html = '<div class="stack"><span class="eyebrow">Einzelkriterien</span><div class="ratings">';
-
-        foreach ($rows as [$label, $value, $max, $isTotal]) {
-            $html .= '<div class="rating' . ($isTotal ? ' rating--total' : '') . '">'
-                . '<span class="rating__label">' . Html::e($label) . '</span>'
-                . '<span class="rating__val">' . Html::grade($value) . '</span>'
-                . '<span class="rating__bar"><i style="width:' . Html::barWidth($value, $max) . '%"></i></span></div>';
-        }
-
-        $html .= '<div class="rating__scale"><span>0 · niedrig</span><span>höher ist besser</span></div></div></div>';
-
-        return $html;
-    }
-
-    private function detailSidebar(RatedDrink $drink, RatedDrinkCollection $collection): string
-    {
-        // The hero subtitle already carries the manufacturer and the display
-        // origin; the panel only adds what is not visible there.
-        $shown = array_filter([$drink->manufacturer, $drink->displayOrigin()]);
-        $facts = [];
-
-        foreach ([['Ort', $drink->originLocation], ['Region', $drink->originRegion]] as [$term, $value]) {
-            if ($value !== null && !in_array($value, $shown, true)) {
-                $facts[] = [$term, $value];
-            }
-        }
-
-        $testedDate = Html::isoToGermanDate($drink->testedAt);
-
-        if ($testedDate !== null) {
-            $facts[] = ['Getestet am', $testedDate];
-        }
-
-        $factsHtml = '';
-
-        foreach ($facts as [$term, $value]) {
-            $factsHtml .= '<dt>' . Html::e($term) . '</dt><dd>' . Html::e($value) . '</dd>';
-        }
-
-        $priceHtml = '';
-
-        if ($drink->priceAmount !== null && $drink->priceVolumeMl !== null) {
-            $pp = $drink->pricePerformance;
-            $normalizedNote = $drink->priceVolumeMl === 500
-                ? ''
-                : '<p class="meta">→ ' . Html::e(Html::price(
-                    (string) (new PriceNormalizer())->perReferenceVolume($drink->priceAmount, $drink->priceVolumeMl),
-                )) . ' je 0,5 l — die für Preis/Leistung verwendete Basis.</p>';
-            $priceHtml = '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
-                . '<div class="cluster" style="gap:var(--sp-6)">'
-                . '<div class="score"><span class="score__num">' . Html::e(Html::price($drink->priceAmount)) . '</span>'
-                . '<span class="score__label">/ ' . $drink->priceVolumeMl . ' ml</span></div>'
-                . ($pp !== null
-                    ? '<div class="score"><span class="score__num">' . Html::grade((float) $pp->normalized() * 100, 0) . '</span>'
-                        . '<span class="score__label">von 100 · Preis / Leistung</span></div>'
-                    : '')
-                . '</div>'
-                . $normalizedNote
-                . ($pp !== null ? '<p class="meta">100 = bestes Verhältnis aus Gesamtwertung und Preis je 0,5 l unter '
-                    . 'allen getesteten Spezis mit erfasstem Preis.</p>' : '')
-                . '</div>';
-        }
-
-        if ($priceHtml === '' && $factsHtml === '') {
-            return '';
-        }
-
-        return '<section class="section section--tint"><div class="wrap split split--sidebar"><div class="stack-lg">'
-            . $priceHtml
-            . ($priceHtml === '' ? '<p class="meta">Keine weiteren Angaben erfasst.</p>' : '')
-            . '</div><aside class="stack-lg">'
-            . ($factsHtml !== ''
-                ? '<div class="panel"><span class="eyebrow">Details</span><dl class="meta--dl meta--dl-stack" style="margin-top:var(--sp-3)">' . $factsHtml . '</dl></div>'
-                : '')
-            . '</aside></div></section>';
-    }
-
-    /**
-     * A simple previous/next pager by Gesamtwertung rank, spanning the full
-     * page width rather than living inside the sidebar.
-     */
-    private function previousNextNav(RatedDrink $drink, RatedDrinkCollection $collection): string
-    {
-        if (!$drink->isTested()) {
-            return '';
-        }
-
-        $ranked = $collection->ranked();
-        $position = null;
-
-        foreach ($ranked as $index => $candidate) {
-            if ($candidate->id === $drink->id) {
-                $position = $index;
-
-                break;
-            }
-        }
-
-        if ($position === null) {
-            return '';
-        }
-
-        $previous = $ranked[$position - 1] ?? null;
-        $next = $ranked[$position + 1] ?? null;
-
-        if ($previous === null && $next === null) {
-            return '';
-        }
-
-        return '<section class="wrap section" style="padding-top:0">'
-            . '<nav class="grid grid--2" style="gap:var(--sp-3) var(--sp-4)" aria-label="Weitere Spezis nach Wertung">'
-            . ($previous !== null ? $this->neighbourRow($previous, 'Vorheriger') : '<div></div>')
-            . ($next !== null ? $this->neighbourRow($next, 'Nächster') : '<div></div>')
-            . '</nav></section>';
-    }
-
-    private function neighbourRow(RatedDrink $drink, string $label): string
-    {
-        $result = $drink->result;
-        $subParts = array_filter([
-            $drink->manufacturer,
-            $result !== null ? Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) : null,
-        ]);
-
-        return '<a class="neighbour" href="/spezi/' . Html::e($drink->slug()) . '">'
-            . $this->productImage($drink, 'pimg--thumb')
-            . '<span class="neighbour__text">'
-            . '<span class="neighbour__label">' . Html::e($label) . ' · #' . ($drink->rank ?? '') . '</span>'
-            . '<span class="neighbour__name">' . Html::e($drink->name) . '</span>'
-            . '<span class="neighbour__sub">' . Html::e(implode(' · ', $subParts)) . '</span></span>'
-            . '</a>';
-    }
-
     private function catalogCard(RatedDrink $drink): string
     {
         $result = $drink->isTested() ? $drink->result : null;
@@ -819,28 +1097,6 @@ final class WebsiteRenderer
         }
 
         return $html;
-    }
-
-    private function pagination(CatalogPage $page): string
-    {
-        if ($page->pageCount <= 1) {
-            return '';
-        }
-
-        $links = '';
-
-        for ($number = 1; $number <= $page->pageCount; ++$number) {
-            if ($number === $page->page) {
-                $links .= '<span aria-current="page">' . $number . '</span>';
-
-                continue;
-            }
-
-            $qs = $page->query->toQueryString($number);
-            $links .= '<a href="/spezis' . ($qs !== '' ? '?' . Html::e($qs) : '') . '">' . $number . '</a>';
-        }
-
-        return '<nav class="pagination" aria-label="Seiten">' . $links . '</nav>';
     }
 
     private function figuresSection(RatedDrinkCollection $collection): string
@@ -939,69 +1195,6 @@ final class WebsiteRenderer
     }
 
     /**
-     * Manufacturers that have a comparable average come first; the rest are
-     * still listed, but they no longer push the useful rows off the screen.
-     */
-    private function manufacturerRows(Statistics $stats): string
-    {
-        $entries = $stats->manufacturers;
-        usort($entries, static function (array $a, array $b): int {
-            $left = $a['averageGesamt'];
-            $right = $b['averageGesamt'];
-
-            if ($left === null && $right === null) {
-                return $b['count'] <=> $a['count'];
-            }
-
-            if ($left === null) {
-                return 1;
-            }
-
-            if ($right === null) {
-                return -1;
-            }
-
-            return $right <=> $left;
-        });
-
-        $rows = '';
-
-        foreach ($entries as $manufacturer) {
-            $best = $manufacturer['best'];
-            $rows .= '<tr><td><strong>' . Html::e($manufacturer['name']) . '</strong></td>'
-                . '<td class="table__num">' . $manufacturer['count'] . '</td>'
-                . '<td class="table__num">'
-                . ($manufacturer['averageGesamt'] === null ? '–' : Html::grade($manufacturer['averageGesamt'])) . '</td>'
-                . '<td>' . ($best !== null ? Html::e($best['name']) . ' (' . Html::grade($best['gesamt']) . ')' : '–') . '</td></tr>';
-        }
-
-        return $rows;
-    }
-
-    private function bestByCategoryPanel(Statistics $stats): string
-    {
-        $labels = ['optik' => 'Optik', 'sueffigkeit' => 'Süffigkeit', 'geschmack' => 'Geschmack'];
-        $items = '';
-
-        foreach ($labels as $key => $label) {
-            $best = $stats->bestByCategory[$key];
-
-            if ($best === null) {
-                continue;
-            }
-
-            $items .= '<dt>' . Html::e($label) . '</dt><dd>' . Html::e($best['name']) . ' · ' . Html::grade($best['value'], 1) . '</dd>';
-        }
-
-        if ($items === '') {
-            return '';
-        }
-
-        return '<div class="panel"><span class="eyebrow">Beste Einzelkriterien</span>'
-            . '<dl class="meta--dl meta--dl-stack" style="margin-top:var(--sp-3)">' . $items . '</dl></div>';
-    }
-
-    /**
      * The origin map: an abstracted Germany in the Spezitest palette with one
      * dot per postal region. Without JavaScript every dot is an anchor to its
      * own entry in the list beside it; with JavaScript the list turns into a
@@ -1067,6 +1260,352 @@ final class WebsiteRenderer
                     . '<ul class="map__rest">' . $elsewhere . '</ul></section>'
                 : '')
             . '</div></div></div></div></section>';
+    }
+
+    /**
+     * The three category bars plus the weighted total. Each category bar can be
+     * hovered or focused to reveal what the individual testers gave it.
+     */
+    private function ratingBreakdown(RatedDrink $drink): string
+    {
+        $result = $drink->result;
+
+        if ($result === null) {
+            return '';
+        }
+
+        /** @var list<array{string, string, float}> $categories */
+        $categories = [
+            ['Optik', 'optik', $result->optikAverage()],
+            ['Süffigkeit', 'sueffigkeit', $result->sueffigkeitAverage()],
+            ['Geschmack', 'geschmack', $result->geschmackAverage()],
+        ];
+
+        $html = '<div class="stack"><span class="eyebrow">Einzelkriterien</span><div class="ratings">';
+
+        foreach ($categories as [$label, $key, $value]) {
+            $peek = $this->testerPeek($drink, $key);
+            $bar = '<span class="rating__bar"><i style="width:' . Html::barWidth($value, Html::CATEGORY_MAX) . '%"></i></span>';
+            $attributes = $peek === ''
+                ? ''
+                : ' tabindex="0" role="img" aria-label="' . $this->testerPeekLabel($drink, $label, $key, $value) . '"';
+            $html .= '<div class="rating' . ($peek === '' ? '' : ' rating--peek') . '"' . $attributes . '>'
+                . '<span class="rating__label">' . Html::e($label) . '</span>'
+                . '<span class="rating__val">' . Html::grade($value) . '</span>'
+                . ($peek === '' ? $bar : '<span class="rating__track">' . $bar . $peek . '</span>')
+                . '</div>';
+        }
+
+        $html .= '<div class="rating rating--total">'
+            . '<span class="rating__label">Gesamtwertung</span>'
+            . '<span class="rating__val">' . Html::grade($result->gesamt()) . '</span>'
+            . '<span class="rating__bar"><i style="width:' . Html::barWidth($result->gesamt(), Html::GESAMT_MAX) . '%"></i></span></div>'
+            . '<div class="rating__scale"><span>0 · niedrig</span><span>höher ist besser</span></div></div></div>';
+
+        return $html;
+    }
+
+    /**
+     * A simple previous/next pager by Gesamtwertung rank, spanning the full
+     * page width rather than living inside the sidebar.
+     */
+    private function previousNextNav(RatedDrink $drink, RatedDrinkCollection $collection): string
+    {
+        if (!$drink->isTested()) {
+            return '';
+        }
+
+        $ranked = $collection->ranked();
+        $position = null;
+
+        foreach ($ranked as $index => $candidate) {
+            if ($candidate->id === $drink->id) {
+                $position = $index;
+
+                break;
+            }
+        }
+
+        if ($position === null) {
+            return '';
+        }
+
+        $previous = $ranked[$position - 1] ?? null;
+        $next = $ranked[$position + 1] ?? null;
+
+        if ($previous === null && $next === null) {
+            return '';
+        }
+
+        // Back on the left, forward on the right, each with an arrow, so the
+        // direction is readable before the labels are.
+        return '<section class="wrap section" style="padding-top:0">'
+            . '<nav class="pager-nav" aria-label="Weitere Spezis nach Wertung">'
+            . ($previous !== null ? $this->neighbourRow($previous, 'Vorheriger', 'prev') : '')
+            . ($next !== null ? $this->neighbourRow($next, 'Nächster', 'next') : '')
+            . '</nav></section>';
+    }
+
+    /** @param 'prev'|'next' $direction */
+    private function neighbourRow(RatedDrink $drink, string $label, string $direction): string
+    {
+        $result = $drink->result;
+        $subParts = array_filter([
+            $drink->manufacturer,
+            $result !== null ? Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) : null,
+        ]);
+
+        return '<a class="neighbour neighbour--' . $direction . '" '
+            . 'rel="' . ($direction === 'prev' ? 'prev' : 'next') . '" '
+            . 'href="/spezi/' . Html::e($drink->slug()) . '">'
+            . '<span class="neighbour__arrow" aria-hidden="true"></span>'
+            . $this->productImage($drink, 'pimg--thumb')
+            . '<span class="neighbour__text">'
+            . '<span class="neighbour__label">' . Html::e($label) . ' · #' . ($drink->rank ?? '') . '</span>'
+            . '<span class="neighbour__name">' . Html::e($drink->name) . '</span>'
+            . '<span class="neighbour__sub">' . Html::e(implode(' · ', $subParts)) . '</span></span>'
+            . '</a>';
+    }
+
+    /**
+     * Previous / next either side of the page numbers. Long lists collapse to
+     * first · … · a window around the current page · … · last, so the pager
+     * never wraps into a wall of numbers.
+     */
+    private function pagination(CatalogPage $page): string
+    {
+        if ($page->pageCount <= 1) {
+            return '';
+        }
+
+        $links = '';
+
+        foreach ($this->pageNumbers($page->page, $page->pageCount) as $number) {
+            if ($number === null) {
+                $links .= '<span class="pagination__gap" aria-hidden="true">…</span>';
+
+                continue;
+            }
+
+            $links .= $number === $page->page
+                ? '<span aria-current="page">' . $number . '</span>'
+                : '<a href="' . Html::e($page->query->url($number)) . '">' . $number . '</a>';
+        }
+
+        return '<nav class="pagination" aria-label="Seiten">'
+            . $this->pageStep($page, $page->page - 1, 'Zurück', 'prev')
+            . '<span class="pagination__pages">' . $links . '</span>'
+            . $this->pageStep($page, $page->page + 1, 'Weiter', 'next')
+            . '</nav>';
+    }
+
+    private function pageStep(CatalogPage $page, int $target, string $label, string $direction): string
+    {
+        $class = 'pagination__step pagination__step--' . $direction;
+
+        if ($target < 1 || $target > $page->pageCount) {
+            return '<span class="' . $class . '" aria-disabled="true">' . Html::e($label) . '</span>';
+        }
+
+        return '<a class="' . $class . '" rel="' . ($direction === 'prev' ? 'prev' : 'next') . '" href="'
+            . Html::e($page->query->url($target)) . '">' . Html::e($label) . '</a>';
+    }
+
+    /**
+     * The page numbers to render: always the first and last page, plus a window
+     * around the current one. `null` marks an elided run.
+     *
+     * @return list<int|null>
+     */
+    private function pageNumbers(int $current, int $count): array
+    {
+        if ($count <= 7) {
+            return range(1, $count);
+        }
+
+        $window = [1, $count];
+
+        for ($number = $current - 1; $number <= $current + 1; ++$number) {
+            if ($number >= 1 && $number <= $count) {
+                $window[] = $number;
+            }
+        }
+
+        $window = array_values(array_unique($window));
+        sort($window);
+
+        $numbers = [];
+        $previous = 0;
+
+        foreach ($window as $number) {
+            if ($number - $previous > 1) {
+                $numbers[] = null;
+            }
+
+            $numbers[] = $number;
+            $previous = $number;
+        }
+
+        return $numbers;
+    }
+
+    /**
+     * The result count, the card grid, "Mehr laden" and the pager. Rendered as
+     * one block so the client-side "Mehr laden" can swap it in place; the same
+     * markup is what a plain page load produces.
+     */
+    private function catalogResults(CatalogPage $page): string
+    {
+        $query = $page->query;
+
+        if ($page->items === []) {
+            return '<p class="meta"><strong style="color:var(--navy)">0 Ergebnisse</strong></p>'
+                . '<div class="empty"><p class="empty__title">Keine Spezis gefunden</p>'
+                . '<p>Andere Suchbegriffe oder Filter probieren.</p>'
+                . ($query->isFiltered() ? '<p><a class="btn btn--secondary btn--sm" href="/spezis">Filter zurücksetzen</a></p>' : '')
+                . '</div>';
+        }
+
+        $count = '<p class="meta"><strong style="color:var(--navy)">' . $page->totalMatches . ' '
+            . ($page->totalMatches === 1 ? 'Ergebnis' : 'Ergebnisse') . '</strong>'
+            . ' · ' . $page->firstItemNumber() . '–' . $page->lastItemNumber() . ' angezeigt'
+            . ($page->pageCount > 1 ? ' · Seite ' . $page->page . ' von ' . $page->pageCount : '') . '</p>';
+
+        return $count
+            . '<div class="grid grid--cards">' . implode('', array_map($this->catalogCard(...), $page->items)) . '</div>'
+            . $this->loadMore($page)
+            . $this->pagination($page);
+    }
+
+    /**
+     * Grows the page by one more block of Spezis. It is a real link to a real
+     * URL, so it works without JavaScript; `spezitest.js` upgrades it to an
+     * in-place append that keeps the scroll position.
+     */
+    private function loadMore(CatalogPage $page): string
+    {
+        if (!$page->hasMoreItems()) {
+            return '';
+        }
+
+        $remaining = $page->totalMatches - $page->lastItemNumber();
+
+        if (!$page->query->canLoadMore()) {
+            // The page cannot grow any further; the pager below takes over.
+            return '<p class="load-more__note meta">Noch ' . $remaining . ' weitere. Weiter geht es über '
+                . 'die Seiten unten.</p>';
+        }
+
+        $step = min($remaining, CatalogQuery::PER_PAGE);
+        $target = $page->query->withMoreItems();
+
+        return '<div class="load-more">'
+            . '<a class="btn btn--secondary load-more__btn" href="' . Html::e($target->url()) . '#ergebnisse" '
+            . 'data-load-more>' . $step . ' weitere laden</a>'
+            . '<p class="load-more__note meta">' . $page->lastItemNumber() . ' von ' . $page->totalMatches . ' angezeigt</p>'
+            . '</div>';
+    }
+
+    /**
+     * The recorded price and the Preis/Leistung figure derived from it, shown
+     * in the verdict row beside the Gesamtwertung. Absent when no price is
+     * recorded — the row then simply has fewer figures, not empty placeholders.
+     * A container other than 0,5 l carries its normalised basis as a tooltip,
+     * because that is the number the 0–100 figure is actually built from.
+     */
+    private function priceScores(RatedDrink $drink): string
+    {
+        if ($drink->priceAmount === null || $drink->priceVolumeMl === null) {
+            return '';
+        }
+
+        $title = $drink->priceVolumeMl === 500
+            ? ''
+            : ' title="' . Html::e(Html::price(
+                (string) (new PriceNormalizer())->perReferenceVolume($drink->priceAmount, $drink->priceVolumeMl),
+            )) . ' je 0,5 l"';
+
+        $html = '<div class="score score--price"' . $title . '>'
+            . '<span class="score__num">' . Html::e(Html::price($drink->priceAmount)) . '</span>'
+            . '<span class="score__label">Preis / ' . $drink->priceVolumeMl . ' ml</span></div>';
+
+        $pricePerformance = $drink->pricePerformance;
+
+        if ($pricePerformance !== null) {
+            $html .= '<div class="score score--pp">'
+                . '<span class="score__num">' . Html::grade((float) $pricePerformance->normalized() * 100, 0) . '</span>'
+                . '<span class="score__label">Preis / Leistung · von 100</span></div>';
+        }
+
+        return $html;
+    }
+
+    private function streamLink(RatedDrink $drink): string
+    {
+        $segment = $drink->stream;
+
+        if ($segment === null) {
+            return '';
+        }
+
+        // Two quiet routes to the same tasting: the evening's own page, which
+        // always exists, and the recording, which only appears once an address
+        // is on file. Both stay understated — the verdict above is the headline.
+        $links = '<a class="btn btn--quiet" href="/streams/' . $segment->runNumber . '">'
+            . 'Zum Testabend ' . $segment->runNumber . '</a>';
+
+        $url = $segment->watchUrl();
+        $offset = $segment->formattedOffset();
+
+        if ($url !== null) {
+            $links .= '<a class="btn btn--quiet stream-link__watch" href="' . Html::e($url) . '" '
+                . 'target="_blank" rel="noopener noreferrer">'
+                . ($offset === null ? 'Auf YouTube ansehen' : 'Auf YouTube ab ' . Html::e($offset))
+                . '</a>';
+        }
+
+        return '<div class="stream-link">' . $links
+            . '<span class="meta stream-link__note">' . Html::e($segment->title()) . '</span></div>';
+    }
+
+    /**
+     * The hover/focus panel that reveals each tester's grade for one category.
+     * Empty (feature simply absent) unless all three canonical testers have a
+     * grade for that category.
+     */
+    private function testerPeek(RatedDrink $drink, string $category): string
+    {
+        $parts = '';
+
+        foreach (self::TESTERS as $code => $name) {
+            $grade = $drink->testerGrades[$code][$category] ?? null;
+
+            if (!is_string($grade) || $grade === '') {
+                return '';
+            }
+
+            $parts .= '<span>' . Html::e($name) . '<b>' . Html::e($this->gradeInteger($grade)) . '</b></span>';
+        }
+
+        return '<span class="rating__peek" aria-hidden="true">' . $parts . '</span>';
+    }
+
+    private function testerPeekLabel(RatedDrink $drink, string $label, string $category, float $value): string
+    {
+        $parts = [];
+
+        foreach (self::TESTERS as $code => $name) {
+            $parts[] = $name . ' ' . $this->gradeInteger((string) ($drink->testerGrades[$code][$category] ?? ''));
+        }
+
+        return Html::e(
+            $label . ' ' . Html::grade($value) . ' von 10. Einzelnoten: ' . implode(', ', $parts) . '.',
+        );
+    }
+
+    private function gradeInteger(string $grade): string
+    {
+        return (string) (int) round((float) $grade);
     }
 
     private function testerCard(string $name, string $description): string

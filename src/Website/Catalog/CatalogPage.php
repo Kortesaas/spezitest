@@ -21,6 +21,24 @@ final readonly class CatalogPage
     ) {
     }
 
+    /** The 1-based position of the first item in this window. */
+    public function firstItemNumber(): int
+    {
+        return $this->items === [] ? 0 : ($this->page - 1) * $this->query->perPage + 1;
+    }
+
+    /** The 1-based position of the last item in this window. */
+    public function lastItemNumber(): int
+    {
+        return ($this->page - 1) * $this->query->perPage + count($this->items);
+    }
+
+    /** Whether more matches follow this window, so "Mehr laden" has something to add. */
+    public function hasMoreItems(): bool
+    {
+        return $this->lastItemNumber() < $this->totalMatches;
+    }
+
     public static function build(RatedDrinkCollection $collection, CatalogQuery $query): self
     {
         $matches = array_values(array_filter(
@@ -49,9 +67,10 @@ final readonly class CatalogPage
         usort($matches, self::comparator($query->sort));
 
         $total = count($matches);
-        $pageCount = max(1, (int) ceil($total / CatalogQuery::PER_PAGE));
+        $perPage = $query->perPage;
+        $pageCount = max(1, (int) ceil($total / $perPage));
         $page = min($query->page, $pageCount);
-        $items = array_slice($matches, ($page - 1) * CatalogQuery::PER_PAGE, CatalogQuery::PER_PAGE);
+        $items = array_slice($matches, ($page - 1) * $perPage, $perPage);
 
         return new self($items, $total, $page, $pageCount, $query);
     }

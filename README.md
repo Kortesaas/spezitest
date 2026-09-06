@@ -17,11 +17,17 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   completion action that runs the **verified rating engine only** and moves the
   drink to `tested` in one transaction.
 - **A real public website** styled with the Spezitest Design System:
-  `/` (home), `/spezis` (search / filter / sort browser), `/spezi/{id-or-slug}`
-  (detail with tester and category scores), `/ranking`, `/statistik` and
-  `/ueber`, plus a branded 404. Product images are served through a controlled
+  `/` (home), `/spezis` (search / filter / sort browser with an incremental
+  `Mehr laden` and a first/window/last pager), `/spezi/{id-or-slug}`
+  (detail with tester and category scores), `/ranking`, `/statistik`,
+  `/streams` (every Testabend with a jump mark per Spezi) and `/ueber`, plus
+  a branded 404. Product images are served through a controlled
   read-only route (`/spezi/{id}/bild`); missing images get a branded
   placeholder.
+- **Testabende**: each livestream episode is a record with its own number,
+  date and video address; every test knows which evening it was tasted in and
+  at which point in the recording, so the public detail page can link straight
+  into the video at that timestamp. Closing an evening produces its report.
 - **Statistics** derived only from real database rows (counts, average scores,
   best category scores, tester averages, Gesamt distribution, region and
   manufacturer breakdowns). Nothing is invented; an empty catalog shows honest

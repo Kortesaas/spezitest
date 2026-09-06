@@ -100,6 +100,68 @@ final class WebsiteController
         );
     }
 
+    public function streams(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->html($response, $this->renderer->streams(
+            $this->catalogRepository()->ratedDrinks(),
+            $this->recordingDates(),
+        ));
+    }
+
+    /** @param array<string, string> $arguments */
+    public function stream(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $arguments['number'] ?? '';
+        $page = ctype_digit($number)
+            ? $this->renderer->stream(
+                (int) $number,
+                $this->catalogRepository()->ratedDrinks(),
+                $this->recordingDates(),
+            )
+            : null;
+
+        if ($page === null) {
+            return $this->html($response, $this->renderer->notFound(), 404);
+        }
+
+        return $this->html($response, $page);
+    }
+
+    /**
+     * The recording date of each Testabend, keyed by episode number. Kept out
+     * of the catalog query because it belongs to the episode, not the test.
+     *
+     * @return array<int, ?string>
+     */
+    private function recordingDates(): array
+    {
+        $statement = $this->connection()->query('SELECT number, recorded_on FROM test_runs');
+
+        if ($statement === false) {
+            return [];
+        }
+
+        $dates = [];
+
+        foreach ($statement as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $number = $row['number'] ?? null;
+            $date = $row['recorded_on'] ?? null;
+
+            if (is_int($number) || is_string($number)) {
+                $dates[(int) $number] = is_string($date) ? $date : null;
+            }
+        }
+
+        return $dates;
+    }
+
     public function ueber(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
     {
         return $this->html($response, $this->renderer->ueber($this->catalogRepository()->ratedDrinks()));

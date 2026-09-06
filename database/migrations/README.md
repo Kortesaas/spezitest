@@ -31,6 +31,25 @@ The September 2026 photo-follow-up migration adds the boolean
 `drinks.needs_new_photo` marker. It deliberately stores no image path and does
 not change lifecycle semantics.
 
+`20260906120000_backfill_primaerliste_prices.sql` fills
+`drinks.price_amount` / `drinks.price_volume_ml` for the 166 reviewed
+Primärliste products (seed ids 31–196) from the workbook `Preis` column, which
+the product owner confirmed is a per-0.5 L figure, so every row is stored with
+`price_volume_ml = 500`. The workbook SHA-256 matches the one already recorded
+in `resources/initial-data/refresh-plan.json`; the id→product mapping is that
+plan's fixed record order, cross-checked against the identical values already
+present in `drink_tests.price_amount` for all 125 tested rows. It is a single
+idempotent `UPDATE` and leaves the 30 procurement-only drinks (ids 1–30) NULL.
+
+`20260906140000_create_test_runs.sql` adds `test_runs`, one row per
+Testabend (livestream episode): number, title, recording date, stream
+address and an `open`/`completed` status. It is pure DDL and inserts
+nothing. The table is keyed by the same number `drink_tests.stream_reference`
+already stores, and deliberately carries **no foreign key** on that column:
+migrations run before the reviewed data-only seed during a fresh install, so
+a constraint would reject the seed's `drink_tests` rows. Episode details are
+therefore optional per stream number.
+
 MariaDB DDL can commit implicitly. A failed multi-statement migration may
 therefore leave partial schema changes even though its version is not recorded.
 Production migrations require review, a verified backup, a recovery plan, and

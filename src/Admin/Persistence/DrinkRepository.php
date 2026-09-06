@@ -45,12 +45,70 @@ final readonly class DrinkRepository
     }
 
     /**
-     * @return list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool, needs_new_photo: bool}>
+     * Counts for the data-quality shortcuts on the dashboard: how many drinks
+     * still miss a picture, miss a price, or are flagged for a new photo.
+     *
+     * @return array{no_image: int, no_price: int, needs_photo: int}
      */
-    public function search(string $search, ?string $status): array
+    public function qualityCounts(): array
+    {
+        $statement = $this->connection->prepare(
+            <<<'SQL'
+                SELECT
+                    SUM(CASE WHEN di.id IS NULL THEN 1 ELSE 0 END) AS no_image,
+                    SUM(CASE WHEN d.price_amount IS NULL OR d.price_volume_ml IS NULL THEN 1 ELSE 0 END) AS no_price,
+                    SUM(CASE WHEN d.needs_new_photo = 1 THEN 1 ELSE 0 END) AS needs_photo
+                FROM drinks d
+                LEFT JOIN drink_images di
+                    ON di.drink_id = d.id
+                   AND di.display_order = 0
+                SQL,
+        );
+        $statement->execute();
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!is_array($row)) {
+            return ['no_image' => 0, 'no_price' => 0, 'needs_photo' => 0];
+        }
+
+        return [
+            'no_image' => $this->countValue($row, 'no_image'),
+            'no_price' => $this->countValue($row, 'no_price'),
+            'needs_photo' => $this->countValue($row, 'needs_photo'),
+        ];
+    }
+
+    /**
+     * A SUM() from an aggregate row. MariaDB returns it as a string (or as NULL
+     * for an empty table), so it is validated before it becomes an int.
+     *
+     * @param array<array-key, mixed> $row
+     */
+    private function countValue(array $row, string $key): int
+    {
+        $value = $row[$key] ?? null;
+
+        if ($value === null) {
+            return 0;
+        }
+
+        if (!is_int($value) && !is_string($value)) {
+            throw new RuntimeException('The drink quality count query returned invalid data.');
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * The WHERE fragments shared by both listings. `$flag` is one of the
+     * validated data-quality filters and never reaches SQL as raw input.
+     *
+     * @param array<string, string> $parameters
+     * @return list<string>
+     */
+    private function conditions(string $search, ?string $status, string $flag, array &$parameters): array
     {
         $where = [];
-        $parameters = [];
 
         if ($search !== '') {
             $where[] = '(d.name LIKE :search_name OR d.manufacturer LIKE :search_manufacturer)';
@@ -62,6 +120,55 @@ final readonly class DrinkRepository
             $where[] = 'd.lifecycle_status = :status';
             $parameters['status'] = $status;
         }
+
+        $condition = match ($flag) {
+            'no_image' => 'di.id IS NULL',
+            'has_image' => 'di.id IS NOT NULL',
+            'no_price' => '(d.price_amount IS NULL OR d.price_volume_ml IS NULL)',
+            'needs_photo' => 'd.needs_new_photo = 1',
+            default => null,
+        };
+
+        if ($condition !== null) {
+            $where[] = $condition;
+        }
+
+        return $where;
+    }
+
+    /** Whitelisted ORDER BY clauses; the key is validated before it gets here. */
+    private function orderBy(string $sort): string
+    {
+        // Rows without a value sort last in both directions, so neither end of
+        // a column sort is a wall of dashes.
+        $perHalfLitre = '(d.price_amount * 500 / d.price_volume_ml)';
+        $noPrice = '(d.price_amount IS NULL OR d.price_volume_ml IS NULL)';
+        // The Herkunft column leads with the Ort, so the sort has to as well;
+        // with the PLZ in front that also orders the list roughly geographically.
+        $origin = "COALESCE(NULLIF(d.origin_location, ''), NULLIF(d.origin_region, ''))";
+        $noOrigin = '(' . $origin . ' IS NULL)';
+        $lifecycle = "FIELD(d.lifecycle_status, 'identified', 'acquired', 'tested')";
+
+        return match ($sort) {
+            'name_desc' => ' ORDER BY d.name DESC, d.id DESC',
+            'region' => ' ORDER BY ' . $noOrigin . ', ' . $origin . ' ASC, d.name',
+            'region_desc' => ' ORDER BY ' . $noOrigin . ', ' . $origin . ' DESC, d.name',
+            'price_asc' => ' ORDER BY ' . $noPrice . ', ' . $perHalfLitre . ' ASC, d.name',
+            'price_desc' => ' ORDER BY ' . $noPrice . ', ' . $perHalfLitre . ' DESC, d.name',
+            'status' => ' ORDER BY ' . $lifecycle . ' ASC, d.name',
+            'status_desc' => ' ORDER BY ' . $lifecycle . ' DESC, d.name',
+            'recent' => ' ORDER BY d.updated_at DESC, d.id DESC',
+            default => ' ORDER BY d.name, d.id',
+        };
+    }
+
+    /**
+     * @return list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool, needs_new_photo: bool}>
+     */
+    public function search(string $search, ?string $status, string $flag = '', string $sort = 'name'): array
+    {
+        $parameters = [];
+        $where = $this->conditions($search, $status, $flag, $parameters);
 
         $sql = <<<'SQL'
             SELECT
@@ -81,7 +188,7 @@ final readonly class DrinkRepository
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $sql .= ' ORDER BY d.name, d.id LIMIT 500';
+        $sql .= $this->orderBy($sort) . ' LIMIT 500';
         $statement = $this->connection->prepare($sql);
         $statement->execute($parameters);
         $rows = [];
@@ -114,6 +221,84 @@ final readonly class DrinkRepository
                 'name' => $name,
                 'lifecycle_status' => $lifecycleStatus,
                 'manufacturer' => $manufacturer,
+                'has_primary_image' => (int) $hasPrimaryImage === 1,
+                'needs_new_photo' => (int) $needsNewPhoto === 1,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Full-detail listing for the admin Spezi overview: every stored drink
+     * parameter, including the raw price pair, in one row.
+     *
+     * @return list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int, has_primary_image: bool, needs_new_photo: bool}>
+     */
+    public function searchDetailed(string $search, ?string $status, string $flag = '', string $sort = 'name'): array
+    {
+        $parameters = [];
+        $where = $this->conditions($search, $status, $flag, $parameters);
+
+        $sql = <<<'SQL'
+            SELECT
+                d.id,
+                d.name,
+                d.lifecycle_status,
+                d.manufacturer,
+                d.origin_location,
+                d.origin_region,
+                d.notes,
+                d.price_amount,
+                d.price_volume_ml,
+                d.needs_new_photo,
+                CASE WHEN di.id IS NULL THEN 0 ELSE 1 END AS has_primary_image
+            FROM drinks d
+            LEFT JOIN drink_images di
+                ON di.drink_id = d.id
+               AND di.display_order = 0
+            SQL;
+
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= $this->orderBy($sort) . ' LIMIT 500';
+        $statement = $this->connection->prepare($sql);
+        $statement->execute($parameters);
+        $rows = [];
+
+        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            if (!is_array($row)) {
+                throw new RuntimeException('The drink search returned invalid data.');
+            }
+
+            $id = $row['id'] ?? null;
+            $name = $row['name'] ?? null;
+            $lifecycleStatus = $row['lifecycle_status'] ?? null;
+            $hasPrimaryImage = $row['has_primary_image'] ?? null;
+            $needsNewPhoto = $row['needs_new_photo'] ?? null;
+
+            if (
+                (!is_int($id) && !is_string($id))
+                || !is_string($name)
+                || !is_string($lifecycleStatus)
+                || (!is_int($hasPrimaryImage) && !is_string($hasPrimaryImage))
+                || (!is_int($needsNewPhoto) && !is_string($needsNewPhoto))
+            ) {
+                throw new RuntimeException('The drink search returned invalid data.');
+            }
+
+            $rows[] = [
+                'id' => (int) $id,
+                'name' => $name,
+                'lifecycle_status' => $lifecycleStatus,
+                'manufacturer' => $this->nullableString($row, 'manufacturer'),
+                'origin_location' => $this->nullableString($row, 'origin_location'),
+                'origin_region' => $this->nullableString($row, 'origin_region'),
+                'notes' => $this->nullableString($row, 'notes'),
+                'price_amount' => $this->nullableString($row, 'price_amount'),
+                'price_volume_ml' => $this->nullableInt($row, 'price_volume_ml'),
                 'has_primary_image' => (int) $hasPrimaryImage === 1,
                 'needs_new_photo' => (int) $needsNewPhoto === 1,
             ];

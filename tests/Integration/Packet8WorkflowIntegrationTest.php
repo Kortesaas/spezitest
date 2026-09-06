@@ -97,6 +97,27 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('55,33', $detail);
         self::assertNull($this->storedGesamtColumn());
 
+        // Each category bar exposes the three testers' grades (hover/focus peek).
+        self::assertStringContainsString('rating--peek', $detail);
+        self::assertStringContainsString(
+            'Einzelnoten: Manu 9, Fabi 9, Schorsch 8.',
+            $detail,
+        );
+
+        // The admin result view shows the per-tester matrix and links to editing.
+        $result = (string) $this->request('GET', "/admin/drinks/$first/test/result")->getBody();
+        self::assertStringContainsString('Einzelnoten', $result);
+        self::assertStringContainsString('result-matrix', $result);
+        self::assertStringContainsString('Schorsch', $result);
+        self::assertStringContainsString('Ergebnis bearbeiten', $result);
+        self::assertStringContainsString("/admin/drinks/$first/test\"", $result);
+
+        // The Spezi overview links a tested drink straight to its result.
+        self::assertStringContainsString(
+            "/admin/drinks/$first/test/result\">Ergebnis</a>",
+            (string) $this->request('GET', '/admin/drinks')->getBody(),
+        );
+
         // A weaker completed test for the second drink establishes ranking order.
         $this->request('POST', "/admin/drinks/$second/test/complete", $this->body([
             'manu' => [4, 4, 4], 'fabi' => [4, 4, 4], 'schorsch' => [4, 4, 4],
@@ -113,26 +134,193 @@ final class Packet8WorkflowIntegrationTest extends TestCase
     public function testDrinkPriceFeedsPublicPreisLeistung(): void
     {
         $this->login();
-        $id = $this->createDrink('Bepreister Spezi', 'acquired');
+
+        // Preis/Leistung is a normalised comparison across every priced,
+        // tested Spezi, so a figure only exists once there are at least two of
+        // them: with a single one the population's minimum equals its maximum.
+        $best = $this->createPricedTestedDrink('Bepreister Spezi', '0,89', [
+            'manu' => [9, 10, 10],
+            'fabi' => [9, 10, 10],
+            'schorsch' => [8, 8, 8],
+        ]);
+        $this->createPricedTestedDrink('Teurer Spezi', '2,49', [
+            'manu' => [4, 4, 4],
+            'fabi' => [4, 4, 4],
+            'schorsch' => [4, 4, 4],
+        ]);
+        $this->logout();
+
+        $canonical = $this->request('GET', "/spezi/$best")->getHeaderLine('Location');
+        $detail = (string) $this->request('GET', $canonical)->getBody();
+
+        // The recorded price stands next to the Gesamtwertung it is judged with.
+        self::assertStringContainsString('0,89 €', $detail);
+        self::assertStringContainsString('Preis / 500 ml', $detail);
+
+        // The cheaper Spezi with the better grades is the reference: 100 of 100.
+        self::assertStringContainsString('Preis / Leistung · von 100', $detail);
+        self::assertStringContainsString(
+            '<span class="score__num">100</span><span class="score__label">Preis / Leistung',
+            $detail,
+        );
+    }
+
+    /**
+     * A drink that is priced, fully graded and therefore part of the
+     * Preis/Leistung comparison population.
+     *
+     * @param array<string, array{int, int, int}> $grades
+     */
+    private function createPricedTestedDrink(string $name, string $price, array $grades): int
+    {
+        $id = $this->createDrink($name, 'acquired');
 
         $update = $this->request('POST', "/admin/drinks/$id", [
             '_csrf' => $this->csrfToken(),
-            'name' => 'Bepreister Spezi',
+            'name' => $name,
             'lifecycle_status' => 'acquired',
-            'price' => '0,89',
+            'price' => $price,
             'price_volume_ml' => '500',
         ]);
         self::assertSame(303, $update->getStatusCode());
 
-        $this->request('POST', "/admin/drinks/$id/test/complete", $this->goldenBody());
-        $this->logout();
+        $complete = $this->request('POST', "/admin/drinks/$id/test/complete", $this->body($grades));
+        self::assertSame(303, $complete->getStatusCode());
 
+        return $id;
+    }
+
+    public function testTestabendCollectsItsTestsAndDeepLinksIntoTheStream(): void
+    {
+        $this->login();
+
+        // A brand-new evening takes the next free number.
+        $start = $this->request('POST', '/admin/testabende', [
+            '_csrf' => $this->csrfToken(),
+            'number' => '1',
+        ]);
+        self::assertSame(303, $start->getStatusCode());
+        self::assertSame('/admin/testabende/1', $start->getHeaderLine('Location'));
+
+        // Anything completed while it runs is filed under it, without the
+        // person entering the test having to say so.
+        $id = $this->createDrink('Im Stream getestet', 'acquired');
+        $this->request('POST', "/admin/drinks/$id/test/complete", $this->goldenBody());
+        self::assertSame(1, $this->streamReference($id));
+
+        // The episode's details, including the address the deep link needs.
+        $details = $this->request('POST', '/admin/testabende/1', [
+            '_csrf' => $this->csrfToken(),
+            'title' => 'Spezi mit den Spezis #1',
+            'recorded_on' => '2025-02-16',
+            'stream_url' => 'https://www.example.org/watch?v=abc',
+            'notes' => '',
+        ]);
+        self::assertSame(303, $details->getStatusCode());
+
+        // A segment timestamp entered on the test form drives the jump target.
+        // A completed test saves through the engine again, never as a draft.
+        $position = $this->request('POST', "/admin/drinks/$id/test/complete", $this->body([
+            'manu' => [9, 10, 10],
+            'fabi' => [9, 10, 10],
+            'schorsch' => [8, 8, 8],
+        ]) + [
+            'stream_reference' => '1',
+            'recorded_time' => '1:07:24',
+            'duration_value' => '319',
+        ]);
+        self::assertSame(303, $position->getStatusCode());
+
+        $report = (string) $this->request('GET', '/admin/testabende/1')->getBody();
+        self::assertStringContainsString('Spezi mit den Spezis #1', $report);
+        self::assertStringContainsString('1:07:24', $report);
+        self::assertStringContainsString(
+            'https://www.example.org/watch?v=abc&amp;t=4044s',
+            $report,
+        );
+
+        // Closing the evening stops it collecting further tests.
+        $complete = $this->request('POST', '/admin/testabende/1/complete', ['_csrf' => $this->csrfToken()]);
+        self::assertSame(303, $complete->getStatusCode());
+
+        $second = $this->createDrink('Nach dem Testabend', 'acquired');
+        $this->request('POST', "/admin/drinks/$second/test/complete", $this->goldenBody());
+        self::assertNull($this->streamReference($second));
+
+        // And the public detail page offers the same jump.
+        $this->logout();
         $canonical = $this->request('GET', "/spezi/$id")->getHeaderLine('Location');
         $detail = (string) $this->request('GET', $canonical)->getBody();
+        // Two quiet routes: the evening's own page and the recording itself.
+        self::assertStringContainsString('href="/streams/1"', $detail);
+        self::assertStringContainsString('Auf YouTube ab 1:07:24', $detail);
+        self::assertStringContainsString('https://www.example.org/watch?v=abc&amp;t=4044s', $detail);
+    }
 
-        self::assertStringContainsString('0,89 €', $detail);
-        self::assertStringContainsString('/ 500 ml', $detail);
-        self::assertStringContainsString('Preis / Leistung', $detail);
+    public function testStreamsPageListsEpisodesAndLinksIntoTheRecording(): void
+    {
+        $this->login();
+        $this->request('POST', '/admin/testabende', ['_csrf' => $this->csrfToken(), 'number' => '1']);
+
+        $id = $this->createPricedTestedDrink('Im Stream verkostet', '0,89', [
+            'manu' => [9, 10, 10],
+            'fabi' => [9, 10, 10],
+            'schorsch' => [8, 8, 8],
+        ]);
+
+        $this->request('POST', '/admin/testabende/1', [
+            '_csrf' => $this->csrfToken(),
+            'title' => 'Spezi mit den Spezis',
+            'stream_url' => 'https://www.example.org/watch?v=abc',
+        ]);
+        $this->request('POST', "/admin/drinks/$id/test/complete", $this->body([
+            'manu' => [9, 10, 10],
+            'fabi' => [9, 10, 10],
+            'schorsch' => [8, 8, 8],
+        ]) + ['stream_reference' => '1', 'recorded_time' => '7:24', 'duration_value' => '319']);
+        $this->logout();
+
+        // The overview names the episode and links to its own page.
+        $overview = (string) $this->request('GET', '/streams')->getBody();
+        self::assertStringContainsString('Spezi mit den Spezis', $overview);
+        self::assertStringContainsString('href="/streams/1"', $overview);
+        self::assertStringContainsString('https://www.example.org/watch?v=abc', $overview);
+
+        // The episode page carries the evening's figures and a jump per Spezi.
+        $episode = (string) $this->request('GET', '/streams/1')->getBody();
+        self::assertStringContainsString('Im Stream verkostet', $episode);
+        self::assertStringContainsString('5:19 min', $episode);
+        self::assertStringContainsString('Ø Gesamtwertung', $episode);
+        self::assertStringContainsString('https://www.example.org/watch?v=abc&amp;t=444s', $episode);
+
+        // An episode that does not exist is a 404, not a crash.
+        self::assertSame(404, $this->request('GET', '/streams/99')->getStatusCode());
+    }
+
+    public function testStreamUrlMustBeAnAbsoluteHttpAddress(): void
+    {
+        $this->login();
+        $this->request('POST', '/admin/testabende', ['_csrf' => $this->csrfToken(), 'number' => '1']);
+
+        $response = $this->request('POST', '/admin/testabende/1', [
+            '_csrf' => $this->csrfToken(),
+            'stream_url' => 'javascript:alert(1)',
+        ]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('http:// oder https://', (string) $response->getBody());
+        self::assertStringNotContainsString('javascript:alert(1)"', (string) $response->getBody());
+    }
+
+    private function streamReference(int $drinkId): ?int
+    {
+        $statement = $this->connection->prepare(
+            'SELECT stream_reference FROM drink_tests WHERE drink_id = :drink_id ORDER BY id DESC LIMIT 1',
+        );
+        $statement->execute(['drink_id' => $drinkId]);
+        $value = $statement->fetchColumn();
+
+        return $value === false || $value === null ? null : (int) $value;
     }
 
     public function testIncompleteRatingCannotCompleteATest(): void
@@ -473,7 +661,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $this->connection->exec(
             <<<'SQL'
                 DROP TABLE IF EXISTS
-                    ratings, drink_images, drink_tests, legacy_import_runs,
+                    ratings, drink_images, drink_tests, test_runs, legacy_import_runs,
                     testers, drinks, schema_migrations
                 SQL,
         );

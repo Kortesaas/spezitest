@@ -52,6 +52,95 @@
     }
   });
 
+  // One-tap presets beside a numeric field (e.g. 330 / 500 / 1000 ml). The
+  // field stays a normal input, so it works without this.
+  document.addEventListener('click', function (event) {
+    var preset = event.target.closest('[data-fill]');
+    if (!preset) {
+      return;
+    }
+    var target = document.getElementById(preset.getAttribute('data-fill'));
+    if (!target) {
+      return;
+    }
+    target.value = preset.getAttribute('data-fill-value') || '';
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.focus();
+  });
+
+  // Catalog "Mehr laden": fetch the wider page and swap the results block in
+  // place, so the grid grows without losing the scroll position. The button is
+  // a real link to a real URL, so without this it simply navigates there.
+  (function () {
+    var container = document.querySelector('[data-catalog-results]');
+    if (!container || !window.fetch || !window.history) {
+      return;
+    }
+
+    var busy = false;
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target.closest('[data-load-more]');
+      if (!trigger || !container.contains(trigger)) {
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      if (busy) {
+        return;
+      }
+      busy = true;
+
+      var wrapper = trigger.closest('.load-more');
+      if (wrapper) {
+        wrapper.classList.add('is-busy');
+      }
+      trigger.setAttribute('aria-busy', 'true');
+
+      var url = trigger.href;
+      var firstNewCard = container.querySelectorAll('.grid--cards > *').length;
+
+      fetch(url, { headers: { Accept: 'text/html' } })
+        .then(function (response) {
+          return response.ok ? response.text() : null;
+        })
+        .then(function (html) {
+          if (html === null) {
+            window.location.href = url;
+            return;
+          }
+
+          var parsed = new DOMParser().parseFromString(html, 'text/html');
+          var fresh = parsed.querySelector('[data-catalog-results]');
+          if (!fresh) {
+            window.location.href = url;
+            return;
+          }
+
+          container.innerHTML = fresh.innerHTML;
+          // Drop the #ergebnisse fragment: the page has not jumped anywhere.
+          window.history.replaceState({}, '', url.split('#')[0]);
+
+          // Move focus to the first Spezi that was not there before, so the
+          // keyboard lands on the new items instead of the page top.
+          var cards = container.querySelectorAll('.grid--cards > a');
+          var target = cards[firstNewCard];
+          if (target) {
+            target.setAttribute('tabindex', '-1');
+            target.focus({ preventScroll: true });
+          }
+        })
+        .catch(function () {
+          window.location.href = url;
+        })
+        .then(function () {
+          busy = false;
+        });
+    });
+  })();
   // Type-ahead for the catalog search. The form submits normally without it.
   (function () {
     var form = document.querySelector('[data-suggest]');
@@ -345,9 +434,24 @@
   if (form && output) {
     var CATEGORIES = { optik: 1, sueffigkeit: 2, geschmack: 3 };
     var TESTERS = ['manu', 'fabi', 'schorsch'];
+    var steps = form.querySelectorAll('[data-progress-steps] i');
+    var counter = form.querySelector('[data-progress-count]');
+
+    var setAverage = function (category, value) {
+      var field = form.querySelector('[data-category-avg="' + category + '"]');
+      if (field) {
+        field.textContent =
+          value === null
+            ? 'Ø –'
+            : 'Ø ' + (Math.round(value * 100) / 100).toFixed(2).replace('.', ',');
+      }
+    };
 
     var recompute = function () {
       var weightedSum = 0;
+      var complete = true;
+      var filled = 0;
+
       for (var category in CATEGORIES) {
         if (!Object.prototype.hasOwnProperty.call(CATEGORIES, category)) {
           continue;
@@ -357,20 +461,39 @@
         for (var i = 0; i < TESTERS.length; i++) {
           var field = form.elements[TESTERS[i] + '_' + category];
           var raw = field && field.value !== '' ? Number(field.value) : NaN;
+          var row = field && field.length ? field[0].closest('.graderow') : null;
+          var label = row ? row.querySelector('.graderow__value') : null;
           if (!isNaN(raw)) {
             total += raw;
             count += 1;
+            filled += 1;
+            if (label) {
+              label.textContent = raw + ' / 10';
+            }
+          } else if (label) {
+            label.textContent = 'keine Note';
           }
         }
         if (count !== TESTERS.length) {
-          output.textContent = '–';
-          return;
+          complete = false;
+          setAverage(category, null);
+        } else {
+          setAverage(category, total / TESTERS.length);
+          weightedSum += (total / TESTERS.length) * CATEGORIES[category];
         }
-        weightedSum += (total / TESTERS.length) * CATEGORIES[category];
       }
-      output.textContent = (Math.round(weightedSum * 100) / 100)
-        .toFixed(2)
-        .replace('.', ',');
+
+      output.textContent = complete
+        ? (Math.round(weightedSum * 100) / 100).toFixed(2).replace('.', ',')
+        : '–';
+
+      // The progress strip mirrors how many of the nine notes are set.
+      for (var step = 0; step < steps.length; step++) {
+        steps[step].classList.toggle('is-set', step < filled);
+      }
+      if (counter) {
+        counter.textContent = String(filled);
+      }
     };
 
     form.addEventListener('input', recompute);
@@ -521,4 +644,24 @@
       });
     });
   })();
+
+  // Spezi detail: the per-tester pill above a category bar is centred on the
+  // pointer (clamped so it stays over the bar), so it reads as coming out of
+  // the spot being hovered. Cosmetic — the pill is CSS hover/focus and works
+  // without this, falling back to centred.
+  Array.prototype.forEach.call(document.querySelectorAll('.rating--peek'), function (row) {
+    var pill = row.querySelector('.rating__peek');
+    row.addEventListener('pointermove', function (event) {
+      var rect = row.getBoundingClientRect();
+      if (rect.width === 0) {
+        return;
+      }
+      var half = pill ? pill.offsetWidth / 2 : 0;
+      var x = Math.max(half, Math.min(rect.width - half, event.clientX - rect.left));
+      row.style.setProperty('--peek-x', x + 'px');
+    });
+    row.addEventListener('pointerleave', function () {
+      row.style.removeProperty('--peek-x');
+    });
+  });
 })();

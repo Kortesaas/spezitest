@@ -41,6 +41,8 @@ final class DomainSchemaMigrationTest extends TestCase
             '20260904000200_prepare_legacy_import',
             '20260905000000_add_drink_price_and_volume',
             '20260906000000_add_needs_new_photo_flag',
+            '20260906120000_backfill_primaerliste_prices',
+            '20260906140000_create_test_runs',
         ], $this->migrator->migrate());
         self::assertSame([], $this->migrator->migrate());
 
@@ -51,6 +53,7 @@ final class DomainSchemaMigrationTest extends TestCase
             'legacy_import_runs',
             'ratings',
             'schema_migrations',
+            'test_runs',
             'testers',
         ], $this->tableNames());
 
@@ -247,6 +250,7 @@ final class DomainSchemaMigrationTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    test_runs,
                     legacy_import_runs,
                     testers,
                     drinks,

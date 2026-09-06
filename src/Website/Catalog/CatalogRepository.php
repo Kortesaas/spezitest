@@ -47,7 +47,7 @@ final readonly class CatalogRepository
 
         /** @var array<int, RatingResult> $resultsByDrink */
         $resultsByDrink = [];
-        /** @var array<int, array{notes: ?string, tested_at: ?string, grades: array<string, array{optik: string, sueffigkeit: string, geschmack: string}>}> $testMetaByDrink */
+        /** @var array<int, array{notes: ?string, tested_at: ?string, grades: array<string, array{optik: string, sueffigkeit: string, geschmack: string}>, stream: ?StreamSegment}> $testMetaByDrink */
         $testMetaByDrink = [];
 
         foreach ($completedTests as $test) {
@@ -58,6 +58,15 @@ final readonly class CatalogRepository
                 'notes' => $test['notes'],
                 'tested_at' => $test['completed_at'],
                 'grades' => $grades,
+                'stream' => $test['stream_reference'] === null
+                    ? null
+                    : new StreamSegment(
+                        $test['stream_reference'],
+                        $test['stream_title'],
+                        $test['stream_url'],
+                        $this->offsetSeconds($test['recorded_time']),
+                        $test['duration_value'],
+                    ),
             ];
 
             if ($result !== null) {
@@ -105,6 +114,7 @@ final readonly class CatalogRepository
                 $meta['tested_at'] ?? null,
                 $pricePerformance,
                 $meta['grades'] ?? [],
+                $meta['stream'] ?? null,
             );
         }
 
@@ -234,17 +244,57 @@ final readonly class CatalogRepository
         return $rows;
     }
 
+    /** A stored `HH:MM:SS` offset as whole seconds, for a `?t=…s` deep link. */
+    private function offsetSeconds(?string $recordedTime): ?int
+    {
+        if ($recordedTime === null || $recordedTime === '') {
+            return null;
+        }
+
+        $parts = explode(':', $recordedTime);
+
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        return (int) $parts[0] * 3600 + (int) $parts[1] * 60 + (int) $parts[2];
+    }
+
     /**
-     * @return list<array{id: int, drink_id: int, notes: ?string, completed_at: ?string}>
+     * A whole-second column. MariaDB hands an INT back as an int through this
+     * driver, so it must not go through the text reader.
+     *
+     * @param array<array-key, mixed> $row
+     */
+    private function nullableSeconds(array $row, string $key): ?int
+    {
+        $value = $row[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_int($value) && !is_string($value)) {
+            throw new RuntimeException('A catalog query returned invalid numeric data.');
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * @return list<array{id: int, drink_id: int, notes: ?string, completed_at: ?string, stream_reference: ?int, recorded_time: ?string, duration_value: ?int, stream_title: ?string, stream_url: ?string}>
      */
     private function completedTestRows(): array
     {
         $statement = $this->connection->query(
             <<<'SQL'
-                SELECT id, drink_id, notes, completed_at
-                FROM drink_tests
-                WHERE status = 'completed'
-                ORDER BY drink_id, id DESC
+                SELECT t.id, t.drink_id, t.notes, t.completed_at,
+                       t.stream_reference, t.recorded_time, t.duration_value,
+                       r.title AS stream_title, r.stream_url
+                FROM drink_tests t
+                LEFT JOIN test_runs r ON r.number = t.stream_reference
+                WHERE t.status = 'completed'
+                ORDER BY t.drink_id, t.id DESC
                 SQL,
         );
 
@@ -274,11 +324,19 @@ final readonly class CatalogRepository
             }
 
             $seenDrink[$drinkId] = true;
+            $streamReference = $row['stream_reference'] ?? null;
             $rows[] = [
                 'id' => (int) $id,
                 'drink_id' => $drinkId,
                 'notes' => $this->nullableString($row, 'notes'),
                 'completed_at' => $this->nullableString($row, 'completed_at'),
+                'stream_reference' => is_int($streamReference) || is_string($streamReference)
+                    ? (int) $streamReference
+                    : null,
+                'recorded_time' => $this->nullableString($row, 'recorded_time'),
+                'duration_value' => $this->nullableSeconds($row, 'duration_value'),
+                'stream_title' => $this->nullableString($row, 'stream_title'),
+                'stream_url' => $this->nullableString($row, 'stream_url'),
             ];
         }
 

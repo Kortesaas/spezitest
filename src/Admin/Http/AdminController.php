@@ -14,11 +14,14 @@ use Spezitest\Admin\Image\ImageValidationException;
 use Spezitest\Admin\Image\UploadedImageValidator;
 use Spezitest\Admin\Persistence\DrinkRepository;
 use Spezitest\Admin\Persistence\TestRepository;
+use Spezitest\Admin\Persistence\TestRunRepository;
 use Spezitest\Admin\Security\AdminAuthenticator;
 use Spezitest\Admin\Security\CsrfTokenManager;
 use Spezitest\Admin\TestService;
 use Spezitest\Admin\Testing\TestEntryValidator;
 use Spezitest\Admin\Testing\TestFormData;
+use Spezitest\Admin\Testing\TestRunValidator;
+use Spezitest\Admin\Testing\TestStreamPosition;
 use Spezitest\Admin\Validation\DrinkInputValidator;
 use Spezitest\Admin\Validation\ValidationException;
 use Spezitest\Application\AdminRuntime;
@@ -26,15 +29,21 @@ use Spezitest\Domain\Rating\RatingCalculator;
 use Spezitest\Domain\Rating\TesterRatingFactory;
 use Spezitest\Media\ImageResponder;
 use Spezitest\Website\Catalog\CatalogRepository;
+use Spezitest\Website\Catalog\StreamEpisode;
 use Spezitest\Website\Catalog\RatedDrink;
 
 final class AdminController
 {
     private ?PDO $connection = null;
 
+    /** @var array{identified: int, acquired: int, tested: int}|null */
+    private ?array $lifecycleCounts = null;
+
     private readonly DrinkInputValidator $validator;
 
     private readonly TestEntryValidator $testValidator;
+
+    private readonly TestRunValidator $runValidator;
 
     private readonly ImageStorage $imageStorage;
 
@@ -46,6 +55,7 @@ final class AdminController
     ) {
         $this->validator = new DrinkInputValidator();
         $this->testValidator = new TestEntryValidator();
+        $this->runValidator = new TestRunValidator();
         $configuration = $this->runtime->configuration();
         $this->imageStorage = new ImageStorage(
             $configuration->imageStorageRoot(),
@@ -107,7 +117,8 @@ final class AdminController
         return $this->html(
             $response,
             $this->renderer->dashboard(
-                $this->repository()->lifecycleCounts(),
+                $this->counts(),
+                $this->repository()->qualityCounts(),
                 $this->repository()->search('', 'acquired'),
                 $this->csrfTokens->token(),
             ),
@@ -118,18 +129,18 @@ final class AdminController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $query = $request->getQueryParams();
-
         try {
-            $search = $this->validator->validateSearch($query['q'] ?? null);
-            $statusValue = $query['lifecycle_status'] ?? null;
-            $status = $statusValue === null || $statusValue === ''
-                ? null
-                : $this->validator->validateStatus($statusValue);
+            $filters = $this->listFilters($request->getQueryParams(), '/admin/drinks');
         } catch (ValidationException $exception) {
             return $this->html(
                 $response,
-                $this->renderer->drinks([], '', null, $this->csrfTokens->token(), $exception->getMessage()),
+                $this->renderer->drinks(
+                    [],
+                    new DrinkListFilters(),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    $exception->getMessage(),
+                ),
                 422,
             );
         }
@@ -137,9 +148,9 @@ final class AdminController
         return $this->html(
             $response,
             $this->renderer->drinks(
-                $this->repository()->search($search, $status),
-                $search,
-                $status,
+                $this->repository()->searchDetailed($filters->search, $filters->status, $filters->flag, $filters->sort),
+                $filters,
+                $this->counts(),
                 $this->csrfTokens->token(),
             ),
         );
@@ -150,20 +161,29 @@ final class AdminController
         ResponseInterface $response,
     ): ResponseInterface {
         try {
-            $search = $this->validator->validateSearch($request->getQueryParams()['q'] ?? null);
+            $filters = $this->listFilters($request->getQueryParams(), '/admin/test');
         } catch (ValidationException $exception) {
             return $this->html(
                 $response,
-                $this->renderer->testQueue([], '', $this->csrfTokens->token(), $exception->getMessage()),
+                $this->renderer->testQueue(
+                    [],
+                    new DrinkListFilters(path: '/admin/test'),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    $exception->getMessage(),
+                ),
                 422,
             );
         }
 
+        // The queue is always the acquired drinks, so the status chips stay off
+        // this page and the filter object never carries a status of its own.
         return $this->html(
             $response,
             $this->renderer->testQueue(
-                $this->repository()->search($search, 'acquired'),
-                $search,
+                $this->repository()->searchDetailed($filters->search, 'acquired', $filters->flag, $filters->sort),
+                $filters,
+                $this->counts(),
                 $this->csrfTokens->token(),
             ),
         );
@@ -175,7 +195,7 @@ final class AdminController
     ): ResponseInterface {
         return $this->html(
             $response,
-            $this->renderer->createForm($this->csrfTokens->token()),
+            $this->renderer->createForm($this->counts(), $this->csrfTokens->token()),
         );
     }
 
@@ -191,7 +211,7 @@ final class AdminController
         } catch (ValidationException|ImageValidationException $exception) {
             return $this->html(
                 $response,
-                $this->renderer->createForm($this->csrfTokens->token(), $body, $exception->getMessage()),
+                $this->renderer->createForm($this->counts(), $this->csrfTokens->token(), $body, $exception->getMessage()),
                 422,
             );
         }
@@ -209,7 +229,7 @@ final class AdminController
         $drink = $this->repository()->find($drinkId);
 
         if ($drink === null) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->html(
@@ -217,6 +237,7 @@ final class AdminController
             $this->renderer->editForm(
                 $drink,
                 $this->repository()->primaryImage($drinkId) !== null,
+                $this->counts(),
                 $this->csrfTokens->token(),
             ),
         );
@@ -243,7 +264,7 @@ final class AdminController
             $drink = $this->repository()->find($drinkId);
 
             if ($drink === null) {
-                return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+                return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
             }
 
             return $this->html(
@@ -251,6 +272,7 @@ final class AdminController
                 $this->renderer->editForm(
                     $drink,
                     $this->repository()->primaryImage($drinkId) !== null,
+                    $this->counts(),
                     $this->csrfTokens->token(),
                     $exception->getMessage(),
                 ),
@@ -259,7 +281,7 @@ final class AdminController
         }
 
         if (!$updated) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->redirect($response, '/admin/drinks/' . $drinkId . '/edit');
@@ -278,7 +300,13 @@ final class AdminController
         } catch (ValidationException $exception) {
             return $this->html(
                 $response,
-                $this->renderer->drinks([], '', null, $this->csrfTokens->token(), $exception->getMessage()),
+                $this->renderer->drinks(
+                    [],
+                    new DrinkListFilters(),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    $exception->getMessage(),
+                ),
                 422,
             );
         }
@@ -289,9 +317,9 @@ final class AdminController
             return $this->html(
                 $response,
                 $this->renderer->drinks(
-                    $this->repository()->search('', null),
-                    '',
-                    null,
+                    $this->repository()->searchDetailed('', null),
+                    new DrinkListFilters(),
+                    $this->counts(),
                     $this->csrfTokens->token(),
                     $exception->getMessage(),
                 ),
@@ -300,7 +328,7 @@ final class AdminController
         }
 
         if (!$updated) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->redirect($response, '/admin/drinks');
@@ -315,12 +343,12 @@ final class AdminController
         $drink = $this->repository()->find($this->drinkId($arguments));
 
         if ($drink === null) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->html(
             $response,
-            $this->renderer->deleteConfirmation($drink, $this->csrfTokens->token()),
+            $this->renderer->deleteConfirmation($drink, $this->counts(), $this->csrfTokens->token()),
         );
     }
 
@@ -338,18 +366,18 @@ final class AdminController
             $drink = $this->repository()->find($drinkId);
 
             if ($drink === null) {
-                return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+                return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
             }
 
             return $this->html(
                 $response,
-                $this->renderer->deleteConfirmation($drink, $this->csrfTokens->token(), $exception->getMessage()),
+                $this->renderer->deleteConfirmation($drink, $this->counts(), $this->csrfTokens->token(), $exception->getMessage()),
                 409,
             );
         }
 
         if (!$deleted) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->redirect($response, '/admin/drinks');
@@ -384,7 +412,7 @@ final class AdminController
         $drink = $this->repository()->find($drinkId);
 
         if ($drink === null) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         return $this->html(
@@ -392,6 +420,8 @@ final class AdminController
             $this->renderer->testForm(
                 $drink,
                 $this->loadTestFormData($drinkId),
+                $this->runRepository()->all(),
+                $this->counts(),
                 $this->csrfTokens->token(),
                 $this->repository()->primaryImage($drinkId) !== null,
             ),
@@ -428,17 +458,18 @@ final class AdminController
 
         try {
             $input = $this->testValidator->validate($body, $complete);
+            $position = $this->streamPosition($body);
 
             if ($complete) {
-                $this->testService()->complete($drinkId, $input);
+                $this->testService()->complete($drinkId, $input, $position);
             } else {
-                $this->testService()->saveDraft($drinkId, $input);
+                $this->testService()->saveDraft($drinkId, $input, $position);
             }
         } catch (ValidationException $exception) {
             $drink = $this->repository()->find($drinkId);
 
             if ($drink === null) {
-                return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+                return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
             }
 
             return $this->html(
@@ -446,6 +477,8 @@ final class AdminController
                 $this->renderer->testForm(
                     $drink,
                     $this->testFormDataFromBody($body, $drink['lifecycle_status']),
+                    $this->runRepository()->all(),
+                    $this->counts(),
                     $this->csrfTokens->token(),
                     $this->repository()->primaryImage($drinkId) !== null,
                     $exception->getMessage(),
@@ -470,7 +503,7 @@ final class AdminController
         $drink = $collection->find($drinkId);
 
         if ($drink === null || !$drink->isTested()) {
-            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
         }
 
         $ranked = $collection->ranked();
@@ -504,6 +537,7 @@ final class AdminController
                 $priceTotal,
                 $priceAbove,
                 $priceBelow,
+                $this->counts(),
                 $this->csrfTokens->token(),
             ),
         );
@@ -556,6 +590,9 @@ final class AdminController
             $test['notes'] ?? '',
             $test['status'],
             $result,
+            $test['stream_reference'],
+            $test['recorded_time'],
+            $test['duration_value'],
         );
     }
 
@@ -564,6 +601,10 @@ final class AdminController
      */
     private function testFormDataFromBody(array $body, string $status): TestFormData
     {
+        $run = $body['stream_reference'] ?? null;
+        $offset = $body['recorded_time'] ?? null;
+        $duration = $body['duration_value'] ?? null;
+
         $grades = [];
 
         foreach (['manu', 'fabi', 'schorsch'] as $code) {
@@ -585,6 +626,9 @@ final class AdminController
             is_string($notes) ? $notes : '',
             $status === 'tested' ? 'completed' : 'draft',
             null,
+            is_string($run) && ctype_digit($run) ? (int) $run : null,
+            is_string($offset) && $offset !== '' ? $offset : null,
+            is_string($duration) && ctype_digit($duration) ? (int) $duration : null,
         );
     }
 
@@ -604,6 +648,225 @@ final class AdminController
         return ctype_digit($raw) ? $raw : '';
     }
 
+    public function testRuns(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $repository = $this->runRepository();
+
+        return $this->html(
+            $response,
+            $this->renderer->testRuns(
+                $repository->all(),
+                $repository->nextNumber(),
+                $this->counts(),
+                $this->csrfTokens->token(),
+            ),
+        );
+    }
+
+    /** @param array<string, string> $arguments */
+    public function testRun(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $repository = $this->runRepository();
+        $run = $repository->find($this->runNumber($arguments));
+
+        if ($run === null) {
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
+        }
+
+        return $this->html(
+            $response,
+            $this->renderer->testRun(
+                $run,
+                $repository->tests($run->number),
+                $this->episode($run->number),
+                $this->counts(),
+                $this->csrfTokens->token(),
+            ),
+        );
+    }
+
+    /** Start the next Testabend, so tonight's completed tests are filed under it. */
+    public function startTestRun(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $repository = $this->runRepository();
+
+        try {
+            $number = $this->runValidator->validateNumber($this->body($request)['number'] ?? null);
+        } catch (ValidationException $exception) {
+            return $this->html(
+                $response,
+                $this->renderer->testRuns(
+                    $repository->all(),
+                    $repository->nextNumber(),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    $exception->getMessage(),
+                ),
+                422,
+            );
+        }
+
+        $open = $repository->openRun();
+
+        if ($open !== null && $open->number !== $number) {
+            return $this->html(
+                $response,
+                $this->renderer->testRuns(
+                    $repository->all(),
+                    $repository->nextNumber(),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    'Testabend #' . $open->number . ' läuft noch. Bitte zuerst abschließen.',
+                ),
+                422,
+            );
+        }
+
+        $repository->open($number);
+
+        return $this->redirect($response, '/admin/testabende/' . $number);
+    }
+
+    /** @param array<string, string> $arguments */
+    public function updateTestRun(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+        $repository = $this->runRepository();
+        $body = $this->body($request);
+
+        try {
+            $repository->save(
+                $number,
+                $this->runValidator->validateTitle($body['title'] ?? null),
+                $this->runValidator->validateDate($body['recorded_on'] ?? null),
+                $this->runValidator->validateStreamUrl($body['stream_url'] ?? null),
+                $this->runValidator->validateNotes($body['notes'] ?? null),
+            );
+        } catch (ValidationException $exception) {
+            $run = $repository->find($number);
+
+            if ($run === null) {
+                return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
+            }
+
+            return $this->html(
+                $response,
+                $this->renderer->testRun(
+                    $run,
+                    $repository->tests($number),
+                    $this->episode($number),
+                    $this->counts(),
+                    $this->csrfTokens->token(),
+                    $exception->getMessage(),
+                ),
+                422,
+            );
+        }
+
+        return $this->redirect($response, '/admin/testabende/' . $number);
+    }
+
+    /** @param array<string, string> $arguments */
+    public function completeTestRun(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+        $this->runRepository()->complete($number);
+
+        return $this->redirect($response, '/admin/testabende/' . $number);
+    }
+
+    /**
+     * The stream fields of the test form. Absent fields mean "leave as is":
+     * the form always submits all three, so an empty set only happens on a
+     * request that does not carry them at all.
+     *
+     * @param array<array-key, mixed> $body
+     */
+    private function streamPosition(array $body): ?TestStreamPosition
+    {
+        if (!array_key_exists('stream_reference', $body)) {
+            return null;
+        }
+
+        $run = $body['stream_reference'] ?? null;
+
+        return new TestStreamPosition(
+            $run === null || $run === '' ? null : $this->runValidator->validateNumber($run),
+            $this->runValidator->validateOffset($body['recorded_time'] ?? null),
+            $this->runValidator->validateDuration($body['duration_value'] ?? null),
+        );
+    }
+
+    /**
+     * The evening's figures, derived exactly as the public site derives them
+     * — same engine, same rules — so the admin report and the page agree.
+     * Null while nothing in the run is completed yet.
+     */
+    private function episode(int $number): ?StreamEpisode
+    {
+        $episodes = StreamEpisode::fromCollection(
+            (new CatalogRepository($this->connection()))->ratedDrinks(),
+        );
+
+        foreach ($episodes as $episode) {
+            if ($episode->number === $number) {
+                return $episode;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<string, string> $arguments */
+    private function runNumber(array $arguments): int
+    {
+        return $this->runValidator->validateNumber($arguments['number'] ?? '');
+    }
+
+    /**
+     * The lifecycle counts every authenticated page needs for the sidebar and     * the filter chips: one cheap GROUP BY per request, memoised.
+     *
+     * @return array{identified: int, acquired: int, tested: int}
+     */
+    private function counts(): array
+    {
+        return $this->lifecycleCounts ??= $this->repository()->lifecycleCounts();
+    }
+
+    /**
+     * Parses the shared list controls. Every value is validated against a
+     * whitelist before it can reach the repository.
+     *
+     * @param array<array-key, mixed> $query
+     */
+    private function listFilters(array $query, string $path): DrinkListFilters
+    {
+        $statusValue = $query['lifecycle_status'] ?? null;
+
+        return new DrinkListFilters(
+            $this->validator->validateSearch($query['q'] ?? null),
+            $statusValue === null || $statusValue === ''
+                ? null
+                : $this->validator->validateStatus($statusValue),
+            $this->validator->validateListFilter($query['filter'] ?? null),
+            $this->validator->validateSort($query['sort'] ?? null),
+            $path,
+        );
+    }
+
     private function repository(): DrinkRepository
     {
         return new DrinkRepository($this->connection());
@@ -614,12 +877,18 @@ final class AdminController
         return new TestRepository($this->connection());
     }
 
+    private function runRepository(): TestRunRepository
+    {
+        return new TestRunRepository($this->connection());
+    }
+
     private function testService(): TestService
     {
         return new TestService(
             $this->connection(),
             $this->repository(),
             $this->testRepository(),
+            $this->runRepository(),
         );
     }
 

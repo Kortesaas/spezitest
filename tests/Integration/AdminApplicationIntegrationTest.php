@@ -143,12 +143,24 @@ final class AdminApplicationIntegrationTest extends TestCase
             'origin_location' => 'München',
             'origin_region' => 'Bayern',
             'notes' => '<script>alert(1)</script>',
+            'price' => '0,8345',
+            'price_volume_ml' => '500',
         ]);
         self::assertSame(303, $edit->getStatusCode());
         $editForm = (string) $this->request('GET', '/admin/drinks/' . $firstId . '/edit')->getBody();
         self::assertStringContainsString('Hersteller &amp; Co.', $editForm);
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $editForm);
         self::assertStringNotContainsString('<script>alert(1)</script>', $editForm);
+
+        // The Spezi overview lists every stored parameter, price included.
+        $overview = (string) $this->request('GET', '/admin/drinks')->getBody();
+        self::assertStringContainsString('Bearbeitete Spezi', $overview);
+        self::assertStringContainsString('Hersteller &amp; Co.', $overview);
+        self::assertStringContainsString('Bayern', $overview);
+        self::assertStringContainsString('data-label="Preis"', $overview);
+        // The "Preis / 0,5 l" column is always shown to the cent (x,xx).
+        self::assertStringContainsString('>0,83 €</span>', $overview);
+        self::assertStringNotContainsString('0,8345', $overview);
 
         $status = $this->request('POST', '/admin/drinks/' . $secondId . '/status', [
             '_csrf' => $this->csrfToken(),
@@ -427,6 +439,7 @@ final class AdminApplicationIntegrationTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    test_runs,
                     legacy_import_runs,
                     testers,
                     drinks,

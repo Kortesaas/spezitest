@@ -38,6 +38,8 @@ final readonly class RatedDrink
         public ?string $testedAt,
         public ?PricePerformanceResult $pricePerformance,
         public array $testerGrades = [],
+        /** Where this Spezi can be watched being tasted, when it was tested. */
+        public ?StreamSegment $stream = null,
     ) {
     }
 

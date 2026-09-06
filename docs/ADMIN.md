@@ -60,7 +60,31 @@ is still CSRF-protected.
 | GET | `/admin/drinks/{id}/test` | Nine-grade test-entry form (draft or completed) |
 | POST | `/admin/drinks/{id}/test` | Save a draft test (partial grades allowed) |
 | POST | `/admin/drinks/{id}/test/complete` | Validate all nine grades, run the engine, set `tested` |
-| GET | `/admin/drinks/{id}/test/result` | Ranking result, place blurred until revealed |
+| GET | `/admin/drinks/{id}/test/result` | Full test result: per-tester grade matrix and averages, plus the blurred ranking places |
+| GET | `/admin/testabende` | Testabende (livestream episodes) with their Spezi and timestamp counts |
+| POST | `/admin/testabende` | Start the next Testabend; refuses while another one is open |
+| GET | `/admin/testabende/{number}` | One Testabend: its details form and the report of that evening |
+| POST | `/admin/testabende/{number}` | Save title, recording date, stream address and note |
+| POST | `/admin/testabende/{number}/complete` | Mark the Testabend finished |
+
+### List controls
+
+`GET /admin/drinks` and `GET /admin/test` share one set of optional query
+parameters. Every value is validated against a whitelist before it reaches
+the repository; an unknown value is rejected with 422 rather than ignored.
+
+| Parameter | Values | Notes |
+| --- | --- | --- |
+| `q` | free text, max 255 chars | Matches name or Hersteller |
+| `lifecycle_status` | `identified`, `acquired`, `tested` | `/admin/test` ignores it and always lists `acquired` |
+| `filter` | `no_image`, `has_image`, `no_price`, `needs_photo` | Data-quality shortcuts, also linked from the dashboard |
+| `sort` | `name`, `name_desc`, `region`, `region_desc`, `price_asc`, `price_desc`, `status`, `status_desc`, `recent` | `name` is the default and is omitted from generated links |
+
+Each sort key maps to exactly one hard-coded `ORDER BY` clause in
+`DrinkRepository::orderBy()`; no part of a sort or filter value is ever
+interpolated into SQL. The overview table renders the sortable columns as
+links that cycle ascending -> descending -> default order, so sorting works
+without JavaScript. Both lists are still capped at 500 rows.
 
 All state changes use POST and require a session-bound random CSRF token.
 Unauthenticated protected requests redirect to `/admin/login`. Production
@@ -168,6 +192,51 @@ first — see `public/assets/spezitest.css`'s `[data-reveal-scope]`/`.spoiler`
 rule and the matching click handler in `spezitest.js`). A drink with no price
 set shows "Kein Preis erfasst" for that half, never blurred. The page's
 primary action returns to `/admin/test` for the next Spezi.
+
+Between the summary and the blurred places, an **"Einzelnoten"** panel shows the
+concrete recorded result — never blurred, since it is data rather than a
+placement: a compact matrix of every tester's three raw grades with the
+verified category averages in its footer, the tasting note, and an "Ergebnis
+bearbeiten" link back to `/admin/drinks/{id}/test`. The Spezi overview lists an
+"Ergebnis" action on every `tested` row that opens the same page. Editing an
+existing result still goes through the same grade form and the verified engine;
+category averages and Gesamt are re-derived, never stored.
+
+## Testabende and stream positions
+
+A Testabend is one livestream episode. `drink_tests` already carried the three
+columns the Primärliste import fills — `stream_reference` (which stream),
+`recorded_time` (where the segment starts) and `duration_value` (how long it
+ran) — so the episode itself was the only missing piece. `test_runs` adds it:
+number, title, recording date, **stream address** and an `open` / `completed`
+status.
+
+- The table is keyed by the same number `drink_tests.stream_reference` stores.
+  There is deliberately **no foreign key** on that column: migrations run before
+  the reviewed data-only seed during a fresh install, so a constraint would
+  reject the seed's `drink_tests` rows. Episode details are therefore optional
+  per number, and a run known only from `drink_tests` lists as "no details yet".
+- At most one Testabend is `open`. While one is, completing a test files it
+  under that evening automatically; the test form can still assign a different
+  one explicitly. A test that already carries a number keeps it, so re-saving an
+  old test never moves it into tonight's evening.
+- "Testabend abschließen" closes the evening. Later tests are then unassigned
+  until the next one is started.
+- The stream address is validated to an absolute `http(s)` URL before it is
+  stored, because it is rendered as a link on the public detail page. A segment
+  timestamp turns it into a deep link (`…&t=444s`); without a timestamp the link
+  opens the episode. No link is rendered when no address is on file.
+- The Testabend report derives its figures (Ø Gesamtwertung, Ø time per Spezi,
+  longest/shortest tasting, best/worst of the evening) through the same
+  `StreamEpisode` the public streams page uses, so both always agree and the
+  rating figures still come from the verified engine only.
+- The reviewed chapter lists live in `resources/stream-index/streams.txt` and
+  are matched to the catalog by `tools/stream-index/` (see its README). That
+  import is CLI-only, refuses production, and is what filled the existing 125
+  segment offsets; the admin form is for corrections and for new evenings.
+- A completed test is saved through the rating engine again, never as a draft —
+  the test form therefore offers "Änderungen speichern" instead of
+  "Zwischenspeichern" once a test is complete.
 
 ## Drink price (Preis/Leistung basis)
 

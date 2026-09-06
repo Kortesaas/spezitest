@@ -16,6 +16,7 @@ final class Layout
         'spezis' => ['/spezis', 'Spezis'],
         'ranking' => ['/ranking', 'Ranking'],
         'statistik' => ['/statistik', 'Statistik'],
+        'streams' => ['/streams', 'Streams'],
         'ueber' => ['/ueber', 'Über'],
     ];
 
@@ -30,14 +31,14 @@ final class Layout
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . Html::e($title) . ' · Spezitest</title>'
             . $descriptionMeta
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p21">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p26">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body>'
             . '<a class="skip-link" href="#main">Zum Inhalt springen</a>'
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p21" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p26" defer></script>'
             . '</body></html>';
     }
 
@@ -67,10 +68,12 @@ final class Layout
             . '<div class="split" style="gap:var(--sp-6)">'
             . '<div class="stack"><img src="/assets/spezitest-logo-white.svg" alt="Spezitest" width="120" height="28">'
             . '<p style="font-size:var(--fs-sm);color:rgba(255,255,255,.8);max-width:34ch">'
-            . 'Cola-Mix aus Deutschland und den Nachbarländern im Test.</p></div>'
+            . 'Cola-Mix aus Deutschland und den Nachbarländern im Test. Ein privates Hobbyprojekt '
+            . 'ohne kommerzielles Interesse.</p></div>'
             . '<div class="grid grid--3" style="gap:var(--sp-5)">'
             . '<div><h3>Katalog</h3><ul class="stack-sm">'
-            . '<li><a href="/spezis">Alle Spezis</a></li><li><a href="/ranking">Ranking</a></li><li><a href="/statistik">Statistik</a></li></ul></div>'
+            . '<li><a href="/spezis">Alle Spezis</a></li><li><a href="/ranking">Ranking</a></li>'
+            . '<li><a href="/statistik">Statistik</a></li><li><a href="/streams">Streams</a></li></ul></div>'
             . '<div><h3>Projekt</h3><ul class="stack-sm">'
             . '<li><a href="/ueber">Über Spezitest</a></li><li><a href="/ueber#methode">Testmethode</a></li><li><a href="/ueber#tester">Tester</a></li></ul></div>'
             . '<div><h3>Rechtliches</h3><ul class="stack-sm">'
@@ -78,7 +81,10 @@ final class Layout
             . '<li><a href="/admin">Verwaltung</a></li></ul></div>'
             . '</div></div>'
             . '<hr class="rule" style="margin-block:var(--sp-6)">'
-            . '<p style="font-size:var(--fs-xs);color:rgba(255,255,255,.7)">spezitest.de · Beta</p>'
+            . '<p style="font-size:var(--fs-xs);color:rgba(255,255,255,.7);max-width:80ch">spezitest.de · Beta · '
+            . 'Nicht kommerzielles Fan-Projekt. „Spezi“ und alle genannten Marken- und Produktnamen gehören '
+            . 'ihren jeweiligen Inhabern; wir stehen mit keinem der Hersteller in Verbindung. '
+            . '<a href="/impressum#marken">Hinweise zu Marken</a></p>'
             . '</div></footer>';
     }
 }

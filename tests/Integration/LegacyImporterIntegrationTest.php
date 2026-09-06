@@ -130,6 +130,7 @@ final class LegacyImporterIntegrationTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    test_runs,
                     legacy_import_runs,
                     testers,
                     drinks,

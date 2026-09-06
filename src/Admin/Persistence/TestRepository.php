@@ -21,12 +21,13 @@ final readonly class TestRepository
     }
 
     /**
-     * @return array{id: int, drink_id: int, status: string, price_amount: ?string, notes: ?string, completed_at: ?string}|null
+     * @return array{id: int, drink_id: int, status: string, price_amount: ?string, notes: ?string, completed_at: ?string, stream_reference: ?int, recorded_time: ?string, duration_value: ?int}|null
      */
     public function currentTest(int $drinkId, bool $forUpdate = false): ?array
     {
         $sql = <<<'SQL'
-            SELECT id, drink_id, status, price_amount, notes, completed_at
+            SELECT id, drink_id, status, price_amount, notes, completed_at,
+                   stream_reference, recorded_time, duration_value
             FROM drink_tests
             WHERE drink_id = :drink_id
             ORDER BY (status = 'completed') DESC, id DESC
@@ -64,6 +65,9 @@ final readonly class TestRepository
             'price_amount' => $this->nullableString($row, 'price_amount'),
             'notes' => $this->nullableString($row, 'notes'),
             'completed_at' => $this->nullableString($row, 'completed_at'),
+            'stream_reference' => $this->nullableInt($row, 'stream_reference'),
+            'recorded_time' => $this->nullableString($row, 'recorded_time'),
+            'duration_value' => $this->nullableInt($row, 'duration_value'),
         ];
     }
 
@@ -177,6 +181,34 @@ final readonly class TestRepository
         ]);
     }
 
+    /**
+     * Where this test sits in its Testabend's recording: which stream, the
+     * segment's start offset and how long it ran. All three are optional —
+     * a test evening can be recorded long before the video is cut.
+     */
+    public function updateStreamPosition(
+        int $testId,
+        ?int $runNumber,
+        ?string $offset,
+        ?int $duration,
+    ): void {
+        $statement = $this->connection->prepare(
+            <<<'SQL'
+                UPDATE drink_tests
+                SET stream_reference = :stream_reference,
+                    recorded_time = :recorded_time,
+                    duration_value = :duration_value
+                WHERE id = :id
+                SQL,
+        );
+        $statement->execute([
+            'stream_reference' => $runNumber,
+            'recorded_time' => $offset,
+            'duration_value' => $duration,
+            'id' => $testId,
+        ]);
+    }
+
     public function updateDraftDetails(int $testId, ?string $notes): void
     {
         $statement = $this->connection->prepare(
@@ -207,6 +239,22 @@ final readonly class TestRepository
             'notes' => $notes,
             'id' => $testId,
         ]);
+    }
+
+    /** @param array<array-key, mixed> $row */
+    private function nullableInt(array $row, string $key): ?int
+    {
+        $value = $row[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_int($value) && !is_string($value)) {
+            throw new RuntimeException('A test query returned invalid numeric data.');
+        }
+
+        return (int) $value;
     }
 
     /** @param array<array-key, mixed> $row */

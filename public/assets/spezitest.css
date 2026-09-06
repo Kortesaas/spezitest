@@ -351,11 +351,23 @@ table{border-collapse:collapse;width:100%}
 .rating{display:grid;grid-template-columns:1fr auto;gap:var(--sp-1) var(--sp-3);align-items:baseline}
 .rating__label{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--text-strong)}
 .rating__val{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
-.rating__bar{grid-column:1/-1;height:10px;background:var(--gray-075);border-radius:var(--radius-pill);overflow:hidden;position:relative}
+.rating__bar{grid-column:1/-1;display:block;height:10px;background:var(--gray-075);border-radius:var(--radius-pill);overflow:hidden;position:relative}
+.rating__track{grid-column:1/-1;position:relative}
 .rating__bar i{position:absolute;inset:0 auto 0 0;background:var(--navy);display:block}
 .rating--total .rating__bar i{background:var(--red)}
 .rating--total .rating__label,.rating--total .rating__val{font-size:var(--fs-body)}
 .rating__scale{display:flex;justify-content:space-between;font-size:var(--fs-label);color:var(--text-muted);letter-spacing:var(--ls-label)}
+/* Hover/focus a category bar to see each tester's grade for it. A small pill
+   pops up right above the bar (anchored to .rating__track, which is only as
+   tall as the bar), centred on the pointer, caret pointing down at it. */
+.rating--peek{position:relative}
+.rating--peek:focus-visible{outline:var(--bw-strong) solid var(--navy);outline-offset:4px;border-radius:var(--radius-sm)}
+.rating__peek{position:absolute;left:var(--peek-x,50%);bottom:calc(100% + 6px);z-index:6;width:max-content;max-width:100%;display:flex;gap:var(--sp-2);padding:5px 10px;background:var(--surface-invert);color:var(--text-on-navy);border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);font-size:var(--fs-label);letter-spacing:var(--ls-label);white-space:nowrap;opacity:0;visibility:hidden;transform:translate(-50%,3px);transition:opacity 110ms ease,transform 110ms ease,visibility 110ms;pointer-events:none}
+.rating__peek span:not(:first-child)::before{content:"·";margin-right:var(--sp-2);color:var(--line-on-navy)}
+.rating__peek::after{content:"";position:absolute;top:100%;left:50%;width:0;height:0;border:5px solid transparent;border-top-color:var(--surface-invert);transform:translateX(-50%)}
+.rating__peek b{margin-left:var(--sp-1);font-weight:var(--fw-bold);font-variant-numeric:tabular-nums}
+.rating--peek:hover>.rating__peek,.rating--peek:focus-visible>.rating__peek,.rating--peek:focus-within>.rating__peek{opacity:1;visibility:visible;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.rating__peek{transition:none}}
 .testers{display:grid;gap:var(--sp-3);grid-template-columns:repeat(3,1fr)}
 .tester{border-top:var(--bw-strong) solid var(--line-strong);padding-top:var(--sp-2)}
 .tester__name{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-muted)}
@@ -864,5 +876,666 @@ a.panel:hover{border-color:var(--navy);color:inherit}
   .admin-main .table td:nth-child(2){align-self:center}
   .admin-main .table form.cluster{flex-wrap:nowrap}
   .admin-main .table td .cluster{justify-content:flex-start!important}
+  /* Detailed Spezi overview: stacked cells keep their column name as a label. */
+  .admin-main .table--drinks tr{grid-template-columns:56px minmax(0,1fr)}
+  .admin-main .table--drinks td:first-child{grid-row:span 7}
+  .admin-main .table--drinks td[data-label]{display:flex;flex-wrap:wrap;gap:2px var(--sp-3);justify-content:space-between;align-items:baseline;min-width:0;overflow-wrap:anywhere}
+  .admin-main .table--drinks td[data-label]::before{content:attr(data-label);flex:0 0 auto;font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-muted);font-weight:var(--fw-bold)}
+  /* The per-tester result matrix is a compact numeric grid; keep it a real
+     table (scrolls sideways if needed) rather than collapsing it to cards. */
+  .admin-main .table--matrix thead{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
+  .admin-main .table--matrix tr{display:table-row;grid-template-columns:none;gap:0;padding:0;border:0}
+  .admin-main .table--matrix th,.admin-main .table--matrix td{display:table-cell;border-bottom:var(--bw-hair) solid var(--line-hairline);padding:var(--sp-2) var(--sp-3)}
+  .admin-main .table--matrix td:first-child{grid-row:auto}
 }
 .toolbar>form{flex-wrap:wrap}
+.result-matrix td:not(:first-child),.result-matrix th:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.result-matrix tfoot td{font-weight:var(--fw-bold);color:var(--text-strong)}
+
+/* ============================================================================
+   Admin redesign (local layer, beta UX pass)
+   ----------------------------------------------------------------------------
+   Same tokens, type scale, colours and image treatment as the public site; the
+   admin is only denser and task-first. Everything below deliberately overrides
+   the earlier local admin block where the two disagree. No new colours, no new
+   fonts, no new tokens.
+   ========================================================================== */
+
+/* ---- Shell ---------------------------------------------------------------
+   The sidebar stays in view while the work column scrolls, and the work column
+   stops growing on very wide monitors so table rows keep a readable measure. */
+.admin{min-height:100vh}
+.admin-top{min-height:60px;padding-block:var(--sp-2)}
+.admin-top__brand img{height:24px}
+.admin-body{align-items:start}
+.admin-main{padding:var(--sp-5) var(--gutter) var(--sp-9);max-width:calc(var(--w-admin) + var(--sp-7) * 2)}
+.admin-side{gap:2px}
+
+@media (min-width:1024px){
+  .admin-body{grid-template-columns:250px minmax(0,1fr)}
+  .admin-side{position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;
+    display:flex;flex-direction:column;padding:var(--sp-5) 0 var(--sp-4)}
+  .admin-main{padding:var(--sp-6) var(--sp-7) var(--sp-9)}
+}
+
+.admin-side__group{padding:var(--sp-5) var(--sp-4) var(--sp-2)}
+.admin-side__group:first-child{padding-top:0}
+.admin-side a{padding:10px var(--sp-4);gap:var(--sp-3)}
+.admin-side__count{flex:none;min-width:28px;padding:1px 8px;border-radius:var(--radius-pill);
+  background:var(--surface-subtle);color:var(--text-muted);font-size:var(--fs-xs);
+  font-weight:var(--fw-bold);text-align:center;font-variant-numeric:tabular-nums}
+.admin-side a:hover .admin-side__count{background:var(--white)}
+.admin-side a[aria-current="page"] .admin-side__count{background:var(--navy);color:var(--white)}
+.admin-side__foot{margin-top:auto;padding:var(--sp-4) var(--sp-4) 0;
+  border-top:var(--bw-hair) solid var(--line-hairline)}
+.admin-side__foot .meta{display:block;line-height:1.45}
+
+/* ---- Page header --------------------------------------------------------- */
+.admin-head{align-items:flex-end;gap:var(--sp-4);margin-bottom:var(--sp-5)}
+.admin-head__text{display:grid;gap:var(--sp-2);min-width:0}
+.admin-head__sub{font-size:var(--fs-sm);color:var(--text-muted);max-width:64ch}
+.admin-head__sub strong{color:var(--text-strong)}
+
+/* ---- Panels -------------------------------------------------------------- */
+.panel--flush{padding:0}
+.panel--flush>.table-scroll{border-radius:var(--radius-lg)}
+.panel--flush>.panel__head{padding:var(--sp-4) var(--sp-5);margin-bottom:0}
+.panel__head{padding-bottom:var(--sp-3);margin-bottom:var(--sp-4);align-items:baseline}
+.panel--danger{border-color:var(--red);box-shadow:inset var(--bw-block) 0 0 var(--red)}
+.panel--danger .panel__head{border-bottom-color:var(--red)}
+
+/* ---- Stat tiles ---------------------------------------------------------- */
+.stat{gap:var(--sp-3);padding:var(--sp-5);align-content:space-between;min-height:100%}
+.stat__num{font-size:clamp(1.875rem,3vw,2.5rem)}
+.stat__meter{display:block;width:100%;height:6px;border-radius:var(--radius-pill);background:var(--gray-075);overflow:hidden}
+.stat__meter i{display:block;height:100%;background:var(--navy)}
+.stat--identified .stat__meter i{background:var(--gray-300)}
+.stat--tested .stat__meter i{background:var(--red)}
+.stat__foot{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);
+  width:100%;font-size:var(--fs-xs);color:var(--text-muted)}
+.stat--total{border-top-color:var(--navy)}
+
+/* Stacked lifecycle progress: the admin twin of the public "In Zahlen" block. */
+.progress{display:flex;height:16px;border-radius:var(--radius-pill);overflow:hidden;background:var(--gray-075)}
+.progress i{display:block;height:100%}
+.progress i.is-identified,.progress-legend i.is-identified{background:var(--gray-300)}
+.progress i.is-acquired,.progress-legend i.is-acquired{background:var(--navy)}
+.progress i.is-tested,.progress-legend i.is-tested{background:var(--red)}
+.progress-legend{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);
+  font-size:var(--fs-sm);color:var(--text-muted)}
+.progress-legend span{display:inline-flex;align-items:center;gap:var(--sp-2)}
+.progress-legend b{color:var(--text-strong);font-variant-numeric:tabular-nums}
+.progress-legend i{width:10px;height:10px;border-radius:var(--radius-pill);flex:none}
+
+/* ---- Filter bar ---------------------------------------------------------- */
+.filterbar{display:grid;gap:var(--sp-4)}
+.filterbar__top{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center}
+.filterbar__search{flex:1 1 300px;min-width:0;max-width:520px}
+.filterbar__search .search input{min-height:48px;font-size:var(--fs-body);padding-inline:var(--sp-4)}
+.filterbar__sort{margin-left:auto;display:flex;align-items:center;gap:var(--sp-2)}
+.filterbar__row{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
+.filterbar__legend{flex:0 0 auto;min-width:78px;font-size:var(--fs-label);letter-spacing:var(--ls-label);
+  text-transform:uppercase;font-weight:var(--fw-bold);color:var(--text-muted)}
+.filterbar .chip{min-height:34px;padding-block:5px}
+.filterbar__summary{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4);align-items:baseline;
+  padding-top:var(--sp-3);border-top:var(--bw-hair) solid var(--line-hairline);
+  font-size:var(--fs-sm);color:var(--text-muted)}
+.filterbar__count{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
+
+/* ---- Data table ---------------------------------------------------------- */
+.table--drinks{font-size:var(--fs-sm)}
+.table--drinks th{background:var(--white);padding-block:var(--sp-3)}
+.table--drinks td{padding:var(--sp-3) var(--sp-4);vertical-align:middle}
+.table--drinks tbody tr:last-child td{border-bottom:0}
+.table--drinks th:first-child,.table--drinks td:first-child{width:52px;padding-right:0;padding-left:var(--sp-5)}
+.table--drinks th:last-child,.table--drinks td:last-child{padding-right:var(--sp-5)}
+.dt__name{display:block;overflow-wrap:anywhere}
+.dt__sub{display:block;font-size:var(--fs-xs);color:var(--text-muted);overflow-wrap:anywhere;margin-top:1px}
+.dt__note{display:block;font-size:var(--fs-xs);color:var(--text-muted);margin-top:var(--sp-1);
+  padding-left:var(--sp-3);border-left:var(--bw-hair) solid var(--line-hairline);overflow-wrap:anywhere}
+.dt__flags{display:flex;flex-wrap:wrap;gap:var(--sp-1);margin-top:var(--sp-2)}
+.dt__actions{display:flex;gap:var(--sp-2);align-items:center;justify-content:flex-end}
+.pimg--tile{aspect-ratio:3/4;width:44px;flex:0 0 44px;padding:2px;border-radius:var(--radius-1)}
+.pimg--tile img{object-position:center}
+.pimg--tile .pimg__ph::before{width:40%}
+.pimg--tile .pimg__ph span{display:none}
+
+/* The header stays legible while a long catalog scrolls past it. Sticky only
+   resolves against the viewport once the row is no longer inside a scroll
+   container, so the horizontal scroller is dropped at the width where the
+   table fits on its own. */
+@media (min-width:1280px){
+  .panel--flush>.table-scroll{overflow:visible;border-radius:0}
+  /* Only the flush panel drops its scroll container, so only its table can
+     stick. A table inside a padded panel still scrolls sideways, and a
+     sticky header there would be pushed down over its own first row. */
+  .panel--flush .table--drinks thead th{position:sticky;top:60px;z-index:2;
+    box-shadow:0 var(--bw-strong) 0 var(--line-strong)}
+}
+
+/* ---- Work queue ---------------------------------------------------------- */
+.queue__row{grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-4);padding:var(--sp-3) var(--sp-2)}
+.queue__row:hover{background:var(--surface-tint);border-radius:var(--radius-1)}
+.queue__name{font-size:var(--fs-body)}
+.queue__meta{display:flex;flex-wrap:wrap;gap:var(--sp-1) var(--sp-3);align-items:center;margin-top:2px}
+
+/* ---- Forms --------------------------------------------------------------- */
+/* A .field is itself a grid, so inside a form row it would stretch its control
+   to the tallest neighbour. Anchor every control to the top of its row. */
+.form-row{align-items:start;gap:var(--sp-4) var(--sp-5)}
+.form-row .field{align-content:start}
+.form-row--2{grid-template-columns:1fr}
+.form-row--wide{grid-column:1/-1}
+@media (min-width:640px){.form-row--2{grid-template-columns:1fr 1fr}}
+.label{display:flex;align-items:baseline;gap:var(--sp-2);flex-wrap:wrap}
+
+/* Unit-suffixed inputs (Preis, Menge) that read as one control. */
+.affix{display:flex;align-items:stretch;border:1px solid var(--line-hairline);border-radius:var(--radius-md);
+  background:#fff;overflow:hidden;transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.affix:hover{border-color:var(--gray)}
+.affix:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-050),0 0 0 1px var(--navy)}
+.affix .input{border:0;border-radius:0;flex:1;min-width:0;background:transparent}
+.affix .input:hover,.affix .input:focus-visible{border:0;box-shadow:none;outline:none}
+.affix__unit{display:flex;align-items:center;padding-inline:var(--sp-4);background:var(--surface-subtle);
+  border-left:1px solid var(--line-hairline);font-size:var(--fs-sm);font-weight:var(--fw-bold);
+  color:var(--text-muted)}
+
+/* A derived value the form recomputes as you type. */
+.readout{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+  gap:var(--sp-2) var(--sp-4);background:var(--surface-tint);border-radius:var(--radius-md);
+  padding:var(--sp-3) var(--sp-4)}
+.readout__label{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--text-muted)}
+.readout__value{font-size:var(--fs-h3);font-weight:var(--fw-bold);color:var(--navy);
+  font-variant-numeric:tabular-nums}
+
+/* One-tap presets beside a numeric field. */
+.presets{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-1)}
+.preset{min-height:32px;padding:2px 12px;border:var(--bw-hair) solid var(--gray-300);
+  border-radius:var(--radius-pill);background:var(--white);font-size:var(--fs-xs);
+  font-weight:var(--fw-bold);color:var(--text-body);cursor:pointer;transition:var(--motion-hover)}
+.preset:hover{border-color:var(--navy);color:var(--navy)}
+
+.segmented label{min-height:44px}
+.uploader--sm{min-height:76px}
+
+/* The save bar follows the form instead of hiding at the end of a long page. */
+.formbar{position:sticky;bottom:var(--sp-4);z-index:var(--z-sticky);display:flex;flex-wrap:wrap;
+  gap:var(--sp-3);align-items:center;margin-top:var(--sp-5);padding:var(--sp-3) var(--sp-4);
+  background:rgba(255,255,255,.96);border:var(--bw-hair) solid var(--line-hairline);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-overlay)}
+.formbar__end{margin-left:auto;display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center}
+
+/* ---- Aside cards (image, status, facts) ---------------------------------- */
+/* The image card stacks a heading, the preview, the upload control and a
+   hint. Without a layout of its own those sat flush against each other. */
+.aside-card{display:grid;gap:var(--sp-4);align-content:start}
+.aside-card>.panel__head{margin-bottom:0}
+.aside-card>.check{margin:0}
+.aside-card>.hint,.aside-card>.notice{margin:0}
+.aside-card .pimg{width:100%}
+@media (min-width:1024px){
+  .split--sidebar{grid-template-columns:minmax(0,1fr) 320px;gap:var(--sp-6)}
+  .aside-sticky{position:sticky;top:76px}
+}
+.facts{display:grid;gap:var(--sp-3)}
+.facts__row{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-4);
+  padding-bottom:var(--sp-3);border-bottom:var(--bw-hair) solid var(--line-hairline)}
+.facts__row:last-child{border-bottom:0;padding-bottom:0}
+.facts__key{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--text-muted)}
+.facts__val{font-weight:var(--fw-bold);color:var(--text-strong);text-align:right;
+  overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+
+/* ---- Test entry ---------------------------------------------------------- */
+.testbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;
+  position:sticky;top:60px;z-index:var(--z-sticky);margin-bottom:var(--sp-5);padding:var(--sp-4) var(--sp-5)}
+.testbar__body{display:grid;gap:var(--sp-2);min-width:0}
+.testbar__name{font-size:var(--fs-h3);font-weight:var(--fw-bold);color:var(--navy);
+  text-decoration:none;overflow-wrap:anywhere}
+.testbar__name:hover{color:var(--red)}
+.testbar__meta{display:flex;flex-wrap:wrap;gap:var(--sp-1) var(--sp-3);align-items:center;
+  font-size:var(--fs-sm);color:var(--text-muted)}
+.testbar__score{display:grid;justify-items:end;gap:var(--sp-1);text-align:right}
+.testbar__num{font-size:clamp(1.75rem,4vw,2.5rem);font-weight:var(--fw-bold);line-height:1;
+  letter-spacing:var(--ls-display);color:var(--text-strong);font-variant-numeric:tabular-nums}
+.testbar__num small{font-size:.42em;color:var(--text-muted);letter-spacing:0;margin-left:2px}
+.testbar__label{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--text-muted)}
+.testbar__steps{display:flex;gap:3px}
+.testbar__steps i{width:15px;height:5px;border-radius:var(--radius-pill);background:var(--gray-150)}
+.testbar__steps i.is-set{background:var(--red)}
+
+.gradegroup__weight{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--text-muted)}
+.gradegroup__avg{font-variant-numeric:tabular-nums;font-weight:var(--fw-bold);color:var(--text-strong)}
+.graderow{display:grid;gap:var(--sp-2)}
+.graderow+.graderow{margin-top:var(--sp-4);padding-top:var(--sp-4);
+  border-top:var(--bw-hair) solid var(--line-hairline)}
+.graderow__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3)}
+.graderow__tester{font-size:var(--fs-body);font-weight:var(--fw-bold);color:var(--text-strong);
+  letter-spacing:0;text-transform:none}
+.graderow__value{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--text-muted);
+  font-variant-numeric:tabular-nums}
+.grade-scale{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:var(--sp-1)}
+.grade-scale label{min-width:0;min-height:46px;font-size:var(--fs-body);border-radius:var(--radius-1)}
+.grade-scale__legend{display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-muted)}
+@media (max-width:640px){
+  .grade-scale{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .grade-scale label{min-height:44px}
+}
+
+.sticky-actions{align-items:center;border:var(--bw-hair) solid var(--line-hairline);border-bottom:0;
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+
+/* ---- Test result --------------------------------------------------------- */
+.resulthero{display:grid;gap:var(--sp-5);align-items:center;grid-template-columns:minmax(0,1fr)}
+@media (min-width:768px){.resulthero{grid-template-columns:auto minmax(0,1fr) auto}}
+.resulthero__score{display:grid;justify-items:start;gap:var(--sp-1)}
+.resulthero__num{font-size:clamp(2.5rem,6vw,3.5rem);font-weight:var(--fw-bold);line-height:1;
+  letter-spacing:var(--ls-display);color:var(--text-strong);font-variant-numeric:tabular-nums}
+.resulthero__num small{font-size:.4em;color:var(--text-muted);letter-spacing:0;margin-left:4px}
+.spoiler-card{display:grid;gap:var(--sp-3);align-content:start}
+.spoiler-card__num{font-size:clamp(1.75rem,4vw,2.25rem);font-weight:var(--fw-bold);line-height:1.1;
+  color:var(--text-strong);letter-spacing:var(--ls-display)}
+.spoiler-neighbours{display:grid;gap:var(--sp-3);grid-template-columns:1fr 1fr;font-size:var(--fs-sm)}
+[data-reveal-scope] .spoiler{filter:blur(9px)}
+.result-matrix th:first-child,.result-matrix td:first-child{width:30%}
+
+/* ---- Login --------------------------------------------------------------- */
+.auth{display:grid;place-items:center;min-height:calc(100vh - 60px);padding:var(--sp-7) var(--gutter)}
+.auth__inner{width:100%;max-width:400px;display:grid;gap:var(--sp-5);justify-items:center}
+.auth__inner .panel{width:100%}
+.auth__foot{font-size:var(--fs-sm);color:var(--text-muted);text-align:center}
+
+/* ---- Empty states -------------------------------------------------------- */
+.empty--panel{border:0;background:transparent;padding:var(--sp-7) var(--sp-4)}
+
+/* ---- Mobile -------------------------------------------------------------- */
+@media (max-width:1023px){
+  .admin-main{padding-top:var(--sp-4)}
+  .admin-head{flex-direction:column;align-items:stretch;gap:var(--sp-4)}
+  .admin-head .cluster{width:100%}
+  .filterbar__sort{margin-left:0;width:100%}
+  .filterbar__sort .select{flex:1}
+  .formbar{bottom:0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    margin-inline:calc(var(--gutter) * -1);padding-inline:var(--gutter)}
+  .formbar .btn{flex:1 1 auto}
+  .formbar__end{margin-left:0;width:100%}
+  .testbar{top:0;padding:var(--sp-3) var(--sp-4);gap:var(--sp-3);align-items:center}
+  .testbar>.pimg--tile{width:34px;flex:0 0 34px}
+  .testbar__name{font-size:var(--fs-h4);display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .testbar__meta{display:none}
+  .testbar__num{font-size:var(--fs-h2)}
+  .testbar__label{display:none}
+  .spoiler-neighbours{grid-template-columns:1fr}
+
+  /* The catalog table becomes one card per Spezi. */
+  .admin-main .table--drinks tr{display:grid;grid-template-columns:52px minmax(0,1fr);
+    gap:var(--sp-2) var(--sp-4);padding:var(--sp-4) var(--sp-2);align-items:start}
+  .admin-main .table--drinks td:first-child{grid-row:span 5;padding-left:0}
+  .admin-main .table--drinks td[data-label]::before{content:attr(data-label);flex:0 0 auto;
+    font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+    color:var(--text-muted);font-weight:var(--fw-bold)}
+  .admin-main .table--drinks td[data-label="Spezi"]{display:block}
+  .admin-main .table--drinks td[data-label="Spezi"]::before{content:none}
+  .admin-main .table--drinks td.table__num{text-align:left}
+  .admin-main .table--drinks .dt__actions{justify-content:flex-start;flex-wrap:wrap}
+  /* The tab strip has no room for the sidebar footer. */
+  .admin-side__foot{display:none}
+}
+
+/* ---- Fixes from the first live pass ------------------------------------- */
+/* The destructive confirmation needs a filled button, not an outlined one. */
+.btn--danger-solid{background:var(--red);border-color:var(--red);color:var(--text-on-red)}
+.btn--danger-solid:hover{background:var(--red-900);border-color:var(--red-900);color:var(--text-on-red)}
+
+/* The vendored `.empty p` rule outranks `.empty__title`, so the heading of an
+   empty state renders as muted body text. And on the admin's tinted page the
+   card needs its own ground to read as a card at all. */
+.empty p.empty__title{font-size:var(--fs-h3);color:var(--text-strong);line-height:var(--lh-heading)}
+.admin-main .empty{background:var(--white)}
+.admin-main .empty--panel{background:transparent}
+
+/* "Alle" is a reset, not a removable filter, so it carries no × affordance. */
+.chip--all.chip--active::after,.chip--all[aria-pressed="true"]::after{content:none}
+
+/* Both score headers stack their lines; the name is a span by default. */
+.testbar__name{display:block}
+.resulthero__text{display:grid;gap:var(--sp-1);min-width:0}
+.resulthero__text .meta{overflow-wrap:anywhere}
+
+.admin-side__foot{padding-bottom:var(--sp-2)}
+.gradegroup__avg{white-space:nowrap}
+
+@media (max-width:640px){
+  /* The save bar explains itself through the page subtitle on a phone. */
+  .sticky-actions .meta,.formbar .meta{display:none}
+  .admin-head__sub{font-size:var(--fs-xs)}
+}
+
+/* A bare `1fr` track is `minmax(auto,1fr)`, so a tile whose min-content is
+   wider than its share pushes the whole row past the viewport. */
+.admin-main .grid--4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.admin-main .grid--2{grid-template-columns:minmax(0,1fr)}
+.stat__foot{flex-wrap:wrap;row-gap:2px}
+@media (min-width:768px){
+  .admin-main .grid--4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .admin-main .grid--2{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---- Sortable column headings -------------------------------------------
+   Click once to sort ascending, again to reverse, a third time to return to
+   the default order. The arrow shows the current state; a muted double arrow
+   marks the columns that can be sorted at all. */
+.table--drinks th{padding:0}
+.table--drinks th>.th-sort,.table--drinks th>span{display:block;padding:var(--sp-3) var(--sp-4)}
+.table--drinks th:first-child>span,.table--drinks th:first-child>.th-sort{padding-left:var(--sp-5)}
+.table--drinks th:last-child{padding:var(--sp-3) var(--sp-5)}
+.th-sort{display:flex;align-items:center;gap:var(--sp-2);color:var(--text-muted);
+  text-decoration:none;font-weight:var(--fw-bold);cursor:pointer;transition:var(--motion-hover)}
+.table a.th-sort{color:var(--text-muted)}
+.th-sort::after{content:"\21C5";font-size:1.1em;line-height:1;opacity:.4}
+.table a.th-sort:hover{color:var(--navy);text-decoration:none}
+.th-sort:hover::after{opacity:.85}
+.th-sort:focus-visible{outline:var(--bw-rule) solid var(--focus-ring);outline-offset:-3px}
+.table--drinks th[aria-sort="ascending"] .th-sort,
+.table--drinks th[aria-sort="descending"] .th-sort{color:var(--navy)}
+.table--drinks th[aria-sort="ascending"] .th-sort::after{content:"\25B4";opacity:1;color:var(--red)}
+.table--drinks th[aria-sort="descending"] .th-sort::after{content:"\25BE";opacity:1;color:var(--red)}
+.table--drinks th.table__num .th-sort{justify-content:flex-end}
+
+/* ============================================================================
+   Round two: row actions, catalog paging, the detail verdict row, and the
+   homepage Testsieger. Same tokens as everything above.
+   ========================================================================== */
+
+/* ---- Admin: quiet row actions -------------------------------------------
+   A dense table gets one lightweight button per row instead of a heavy
+   outlined one, and a status control that actually looks openable. */
+.btn--quiet{min-height:32px;padding:4px 12px;font-size:var(--fs-xs);font-weight:var(--fw-bold);
+  background:var(--white);color:var(--navy);border:var(--bw-hair) solid var(--gray-300);
+  border-radius:var(--radius-1);gap:var(--sp-1)}
+.btn--quiet:hover{background:var(--surface-tint);border-color:var(--navy);color:var(--navy);box-shadow:none}
+.btn--quiet:active{background:var(--navy-100)}
+
+/* The status picker: a captioned control with a permanent caret, so it reads
+   as "open me" rather than as a static box printing the current status. */
+.statuspick{display:inline-flex;align-items:stretch;border:var(--bw-hair) solid var(--gray-300);
+  border-radius:var(--radius-1);overflow:hidden;background:var(--white);
+  transition:border-color var(--dur-fast) var(--ease-out)}
+.statuspick:hover{border-color:var(--navy)}
+.statuspick:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-050)}
+.statuspick::before{content:"";flex:none;align-self:center;width:9px;height:9px;border-radius:var(--radius-pill);
+  margin-left:10px}
+.statuspick--identified::before{background:transparent;box-shadow:inset 0 0 0 1px var(--gray)}
+.statuspick--acquired::before{background:var(--navy)}
+.statuspick--tested::before{background:var(--red)}
+.select--status{min-height:34px;width:auto;border:0;border-radius:0;background-color:transparent;
+  padding:2px 26px 2px var(--sp-2);font-size:var(--fs-sm);font-weight:var(--fw-bold);
+  color:var(--text-strong);background-position:right 8px center}
+.select--status:hover,.select--status:focus-visible{border:0;box-shadow:none;outline:none;background-color:transparent}
+.dt__actions{gap:var(--sp-3)}
+.status-form{display:inline-flex}
+
+/* ---- Catalog: "Mehr laden" and the pager --------------------------------- */
+.load-more{display:grid;justify-items:center;gap:var(--sp-2);padding-top:var(--sp-2)}
+.load-more__btn{min-width:min(320px,100%);justify-content:center}
+.load-more__note{text-align:center}
+.load-more.is-busy .load-more__btn{opacity:.6;pointer-events:none}
+
+.pagination{gap:var(--sp-2) var(--sp-3);justify-content:center}
+.pagination__pages{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;justify-content:center}
+.pagination__gap{border:0;min-width:auto;padding-inline:0;color:var(--text-muted)}
+.pagination__step{display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch-min);
+  padding-inline:var(--sp-4);border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-1);
+  font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;background:var(--white);
+  transition:var(--motion-hover)}
+.pagination a.pagination__step:hover{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.pagination__step--prev::before{content:"\2190"}
+.pagination__step--next::after{content:"\2192"}
+.pagination__step[aria-disabled="true"]{border-color:var(--gray-150);color:var(--gray-300);
+  background:var(--white);cursor:not-allowed}
+@media (max-width:640px){
+  .pagination__pages{order:-1;flex-basis:100%}
+  .pagination__step{flex:1 1 40%}
+}
+
+/* ---- Spezi detail: the verdict row carries Preis/Leistung ----------------- */
+.verdict-row{gap:var(--sp-4) var(--sp-6)}
+/* The figures stay one group so a narrow column wraps them together
+   instead of stranding a single score on its own line. */
+.verdict-scores{display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--sp-4) var(--sp-5)}
+.verdict-scores .score+.score{padding-left:var(--sp-5);border-left:var(--bw-hair) solid var(--line-hairline)}
+.verdict-row .score--pp .score__num{color:var(--text-body)}
+@media (max-width:520px){
+  .verdict-scores .score+.score{padding-left:0;border-left:0}
+}
+
+/* A compact facts strip replaces the old Preis/Leistung section. */
+
+/* ---- Homepage Testsieger -------------------------------------------------
+   The whole block is one link, so it answers the pointer as one object: the
+   bottle lifts and grows a little, the panel gains depth, and the red tag
+   rises off it. Clicking presses the whole thing back down. */
+.winner{transition:transform var(--dur-base) var(--ease-out)}
+.winner .pimg--hero{transition:box-shadow var(--dur-base) var(--ease-out),
+  background-color var(--dur-base) var(--ease-out)}
+.winner .pimg--hero img{transition:transform var(--dur-slow) var(--ease-out)}
+.winner__tag{transition:transform var(--dur-base) var(--ease-out),
+  box-shadow var(--dur-base) var(--ease-out),background-color var(--dur-fast) var(--ease-out)}
+.winner__name{text-decoration-thickness:2px;text-underline-offset:3px}
+
+.winner:hover .pimg--hero,.winner:focus-visible .pimg--hero{box-shadow:var(--shadow-overlay)}
+.winner:hover .pimg--hero img,.winner:focus-visible .pimg--hero img{transform:scale(1.05) translateY(-8px)}
+.winner:hover .winner__tag,.winner:focus-visible .winner__tag{background:var(--red-900);
+  transform:translateY(-6px);box-shadow:0 20px 44px rgba(0,45,85,.26)}
+.winner:hover .winner__name,.winner:focus-visible .winner__name{text-decoration:underline}
+.winner:focus-visible{outline:var(--bw-rule) solid var(--focus-ring);outline-offset:6px;border-radius:var(--radius-3)}
+
+.winner:active{transform:scale(.994)}
+.winner:active .pimg--hero{box-shadow:var(--shadow-sm)}
+.winner:active .pimg--hero img{transform:scale(1.01) translateY(-2px);transition-duration:var(--dur-fast)}
+.winner:active .winner__tag{transform:translateY(-1px);box-shadow:var(--shadow-sm);
+  transition-duration:var(--dur-fast)}
+
+@media (prefers-reduced-motion:reduce){
+  .winner:hover,.winner:active,.winner:focus-visible,
+  .winner:hover .pimg--hero img,.winner:active .pimg--hero img,.winner:focus-visible .pimg--hero img,
+  .winner:hover .winner__tag,.winner:active .winner__tag,.winner:focus-visible .winner__tag{transform:none}
+}
+
+/* ---- Round three -------------------------------------------------------- */
+
+/* The recorded price sits between the Gesamtwertung and the figure derived
+   from it, so the row reads score → price → verdict. */
+.verdict-row .score--price .score__num{font-size:var(--fs-h2);color:var(--text-strong)}
+.verdict-row .score--pp .score__num{font-size:var(--fs-h2)}
+
+/* The per-tester peek is a child of .rating__track, not of the row, so the
+   vendored child combinator could never match it and the panel never
+   appeared. Same rule, as a descendant selector. */
+.rating--peek:hover .rating__peek,
+.rating--peek:focus-visible .rating__peek,
+.rating--peek:focus-within .rating__peek{opacity:1;visibility:visible;transform:translate(-50%,0)}
+
+/* The Testsieger tag keeps its red on hover; only the depth changes. */
+.winner:hover .winner__tag,.winner:focus-visible .winner__tag{background:var(--surface-accent)}
+.winner:active .winner__tag{background:var(--surface-accent)}
+
+/* The detail hero gives the bottle more height at the same width, so the
+   product itself is bigger rather than the panel around it. Beside a wide
+   content column the panel simply takes that column's height, and the
+   bottle grows with it; stacked on a phone it keeps a portrait ratio. */
+.hero--detail .pimg--hero{aspect-ratio:3/4;padding:var(--sp-4)}
+@media (min-width:1024px){
+  .hero--detail{align-items:stretch}
+  .hero--detail>div:first-child{display:flex;flex-direction:column}
+  .hero--detail .pimg--hero{aspect-ratio:auto;flex:1;min-height:440px}
+}
+
+/* ---- Spezi detail: previous / next by Wertung ----------------------------
+   Back sits on the left edge and forward on the right, each led by an arrow
+   that points the way it goes, so the direction reads before the label does.
+   The "next" card mirrors: arrow outermost, text right-aligned. */
+.pager-nav{display:flex;flex-wrap:wrap;gap:var(--sp-4);align-items:stretch;
+  border-top:var(--bw-hair) solid var(--line-hairline);padding-top:var(--sp-5)}
+.neighbour{flex:0 1 auto;max-width:min(100%,26rem);align-items:center;gap:var(--sp-3);
+  padding:var(--sp-3);border-radius:var(--radius-2);
+  transition:background-color var(--dur-fast) var(--ease-out)}
+.neighbour--next{margin-left:auto;flex-direction:row-reverse;text-align:right}
+.neighbour--next .neighbour__text{justify-items:end}
+.neighbour:hover{background:var(--surface-tint);color:inherit}
+
+.neighbour__arrow{flex:none;display:flex;align-items:center;justify-content:center;
+  width:38px;height:38px;border-radius:var(--radius-pill);
+  border:var(--bw-hair) solid var(--line-hairline);background:var(--white);
+  color:var(--navy);font-weight:var(--fw-bold);line-height:1;
+  transition:background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out),
+    transform var(--dur-base) var(--ease-out)}
+.neighbour--prev .neighbour__arrow::before{content:"\2190"}
+.neighbour--next .neighbour__arrow::before{content:"\2192"}
+.neighbour:hover .neighbour__arrow{background:var(--navy);border-color:var(--navy);color:var(--white)}
+.neighbour--prev:hover .neighbour__arrow{transform:translateX(-3px)}
+.neighbour--next:hover .neighbour__arrow{transform:translateX(3px)}
+.neighbour:focus-visible{outline:var(--bw-rule) solid var(--focus-ring);outline-offset:2px;
+  border-radius:var(--radius-2)}
+
+@media (prefers-reduced-motion:reduce){
+  .neighbour--prev:hover .neighbour__arrow,
+  .neighbour--next:hover .neighbour__arrow{transform:none}
+}
+@media (max-width:640px){
+  /* Stacked, both cards keep their own direction but share the full width. */
+  .pager-nav{flex-direction:column;gap:var(--sp-2)}
+  .neighbour{max-width:100%}
+  .neighbour--next{margin-left:0}
+}
+
+/* ---- Test entry: square grade buttons -----------------------------------
+   Stretching the 0-10 buttons across the panel made them read as bars, not
+   as a scale. They go back to fixed squares that wrap when the row runs out
+   of room, left-aligned so every tester row starts at the same place. */
+.grade-scale{display:flex;flex-wrap:wrap;gap:var(--sp-2);--grade-size:52px}
+.grade-scale label{flex:none;width:var(--grade-size);height:var(--grade-size);
+  min-width:var(--grade-size);min-height:var(--grade-size);font-size:var(--fs-body-lg)}
+@media (max-width:520px){
+  /* Six per row rather than five plus a stranded "10": the grade panels give
+     back their side padding so the squares can stay a 44px touch target. */
+  .gradegroup.panel--pad{padding-inline:var(--sp-4)}
+  .grade-scale{--grade-size:44px;gap:6px}
+  .grade-scale label{font-size:var(--fs-body)}
+}
+
+/* A bare chevron reads as direction; the circle around it read as a button
+   competing with the card it sits on. Drawn from two borders on a rotated
+   square so the stroke matches the rest of the rules on the page. */
+.neighbour__arrow{width:18px;height:auto;align-self:center;border:0;background:none;
+  border-radius:0;color:var(--navy);
+  transition:color var(--dur-fast) var(--ease-out),transform var(--dur-base) var(--ease-out)}
+.neighbour--prev .neighbour__arrow::before,
+.neighbour--next .neighbour__arrow::before{content:"";display:block;width:11px;height:11px;
+  border-top:var(--bw-strong) solid currentColor;border-right:var(--bw-strong) solid currentColor}
+.neighbour--prev .neighbour__arrow::before{transform:rotate(-135deg);margin-left:4px}
+.neighbour--next .neighbour__arrow::before{transform:rotate(45deg);margin-right:4px}
+.neighbour:hover .neighbour__arrow{background:none;border:0;color:var(--red)}
+@media (prefers-reduced-motion:no-preference){
+  .neighbour--prev:hover .neighbour__arrow{transform:translateX(-4px)}
+  .neighbour--next:hover .neighbour__arrow{transform:translateX(4px)}
+}
+
+/* A light scale behind the Preis/Leistung scatter: ten-point rules across
+   the Gesamtwertung and four price steps, so a dot can be read off the
+   chart instead of only hovered. */
+.scatter__grid line{stroke:var(--line-hairline);stroke-width:.6}
+.scatter__grid line.is-axis{stroke:var(--gray-300);stroke-width:.9}
+.scatter__tick{fill:var(--text-muted);font-family:var(--font-core);font-size:7px}
+.scatter__plot{max-height:400px}
+
+/* The two routes to this tasting, under the verdict row. Deliberately quiet:
+   the score is the headline, these are a footnote with buttons. */
+.stream-link{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-3);
+  margin-top:var(--sp-4)}
+.stream-link__watch::before{content:"\25B6";font-size:.72em;margin-right:var(--sp-1)}
+.stream-link__watch::after{content:"\2197";margin-left:var(--sp-1);opacity:.7}
+.stream-link__note{flex-basis:100%;color:var(--text-muted)}
+
+/* Segment times are read as single tokens. */
+.table--drinks td[data-label="Dauer"],
+.table--drinks td[data-label="Zeitstempel"]{white-space:nowrap}
+
+/* ---- Streams: overview cards --------------------------------------------
+   One card per Testabend. The bottles from that evening make the card
+   recognisable at a glance; the title and the primary button both open the
+   evening's own page, and a second link opens the recording. */
+.episode-card{display:flex;flex-direction:column}
+.episode-card__strip{display:flex;align-items:flex-end;gap:var(--sp-2);
+  padding:var(--sp-5) var(--sp-5) var(--sp-4);background:var(--surface-tint);min-height:132px}
+.episode-card__thumb{flex:1 1 0;min-width:0;display:flex;align-items:flex-end;justify-content:center}
+.episode-card__thumb .pimg{width:100%;padding:0;aspect-ratio:auto}
+.episode-card__thumb img{max-height:96px;width:auto;margin-inline:auto}
+.episode-card__more{flex:none;align-self:center;font-size:var(--fs-sm);font-weight:var(--fw-bold);
+  color:var(--text-muted);font-variant-numeric:tabular-nums}
+.episode-card__link{color:inherit;text-decoration:none}
+.episode-card__link:hover{color:var(--red);text-decoration:underline;
+  text-decoration-thickness:2px;text-underline-offset:3px}
+.episode-card__actions{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;
+  margin-top:auto;padding-top:var(--sp-4)}
+.episode-card__watch::after{content:"\2197";margin-left:var(--sp-1)}
+.episode-card:hover{border-color:var(--navy-100);box-shadow:var(--shadow-card-hover)}
+.episode-card:hover .episode-card__strip{background:var(--navy-050)}
+
+/* ---- Streams: one evening's tasting list ---------------------------------
+   Position, bottle, name, score, and a jump button that says what it does:
+   a play mark next to the timestamp, not a bare icon. */
+.tasting{display:grid;counter-reset:none}
+.tasting__row{display:grid;
+  grid-template-columns:2.25rem 44px minmax(0,1fr) auto auto;
+  gap:var(--sp-4);align-items:center;padding:var(--sp-3) var(--sp-2);
+  border-bottom:var(--bw-hair) solid var(--line-hairline)}
+.tasting__row:last-child{border-bottom:0}
+.tasting__row:hover{background:var(--white);box-shadow:inset var(--bw-rule) 0 0 var(--red)}
+.tasting__pos{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--text-muted);
+  text-align:right;font-variant-numeric:tabular-nums}
+.tasting__row>.pimg--thumb{width:44px;flex:none}
+.tasting__text{display:grid;gap:1px;min-width:0}
+.tasting__name{font-size:var(--fs-body);font-weight:var(--fw-bold);color:var(--text-strong);
+  text-decoration:none;overflow-wrap:anywhere}
+.tasting__name:hover{color:var(--red);text-decoration:underline;text-decoration-thickness:2px}
+.tasting__sub{font-size:var(--fs-xs);color:var(--text-muted);overflow-wrap:anywhere}
+.tasting__score{text-align:right;font-size:var(--fs-body);font-weight:var(--fw-bold);
+  color:var(--text-strong);font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
+.tasting__score small{display:block;font-size:var(--fs-label);letter-spacing:var(--ls-label);
+  text-transform:uppercase;color:var(--gray-300);font-weight:var(--fw-bold)}
+
+.tasting__jump{display:inline-flex;align-items:center;gap:var(--sp-2);min-height:38px;
+  padding:var(--sp-2) 14px;border:var(--bw-hair) solid var(--gray-300);border-radius:var(--radius-pill);
+  background:var(--white);color:var(--navy);font-size:var(--fs-sm);font-weight:var(--fw-bold);
+  text-decoration:none;white-space:nowrap;font-variant-numeric:tabular-nums;
+  transition:var(--motion-hover)}
+.tasting__jump::before{content:"\25B6";font-size:.75em;line-height:1}
+.tasting__jump:hover{background:var(--red);border-color:var(--red);color:var(--white)}
+.tasting__jump--none{border-style:dashed;color:var(--text-muted);pointer-events:none}
+.tasting__jump--none::before{content:none}
+
+@media (max-width:768px){
+  .tasting__row{grid-template-columns:44px minmax(0,1fr) auto;
+    gap:var(--sp-2) var(--sp-3);padding-block:var(--sp-4)}
+  .tasting__pos{display:none}
+  .tasting__score{grid-column:2;text-align:left;font-size:var(--fs-sm)}
+  .tasting__score small{display:inline;margin-left:var(--sp-2)}
+  .tasting__jump{grid-row:1/span 2;grid-column:3;align-self:center}
+}
+
+/* The evening's superlatives: each names a Spezi and links to it. */
+.episode-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--sp-4)}
+.episode-fact{display:grid;gap:var(--sp-1);align-content:start;padding-top:var(--sp-3);
+  border-top:var(--bw-rule) solid var(--line-accent)}
+.episode-fact__label{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);
+  text-transform:uppercase;color:var(--text-muted)}
+.episode-fact__name{font-size:var(--fs-h4);font-weight:var(--fw-bold);color:var(--text-strong);
+  text-decoration:none;overflow-wrap:anywhere}
+.episode-fact__name:hover{color:var(--red);text-decoration:underline;text-decoration-thickness:2px}
+.episode-fact__value{font-size:var(--fs-sm);color:var(--text-muted);font-variant-numeric:tabular-nums}

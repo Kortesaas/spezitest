@@ -1,0 +1,192 @@
+# Spezitest livestream index — supplied by the product owner on 2026-09-06.
+#
+# One block per Testabend. `url:` is the episode's YouTube address, `title:`
+# its video title and `date:` the recording date as YYYY-MM-DD (leave empty
+# when unknown). Every following line is a chapter marker as it appears on
+# the video: a timestamp followed by its label. Labels that are not a tested
+# Spezi (intro, breaks, recap, outro) are recognised by plan.php and skipped.
+#
+# Each Spezi's segment length is derived from the gap to the next chapter, so
+# the chapter list must stay complete — including the non-Spezi markers.
+#
+# This file is the reviewed source for the stream index import. Edit it here,
+# re-run the plan, and re-apply — never hand-edit the database.
+
+[stream 1]
+url: https://youtube.com/live/GuiS6SvNoT4
+title: Spezi mit den Spezis - Das große Spezi-Tasting!
+date:
+0:00:00 Countdown
+0:02:00 Intro
+0:04:35 Spezi Ausblick
+0:05:36 Bewertungskriterien
+0:07:24 Kuchlbauer Cola Mix
+0:12:43 Frucade Cola-Mix
+0:18:14 Afri Cola Mix
+0:25:00 isis Cola Orange
+0:30:52 Krombacher Spezi
+0:35:40 Riegele Spezi
+0:40:58 Dreh und Trink Cola-Mix
+0:49:30 wita
+0:53:54 Red Bull Black Orange
+0:58:26 SilberQuelle Cola-Mix
+1:02:52 Bazi Cola-Mix
+1:08:31 Staudenbräu Kola-Mix
+1:13:20 Now Bio Black Orange Cola
+1:18:36 Leikeim Cola Mix
+1:24:08 Giesinger Kracherl Cola Mix
+1:30:06 fritz-kola MischMasch
+1:36:00 Gerolsteiner Cola-Mix
+1:41:35 Schwip Schwap Zero
+1:46:38 Pause: Koleines Päusle
+1:55:45 Feldschlößchen MIXX
+1:59:14 Pause: Excelkursion
+2:05:27 Alaska Fifty-Fifty
+2:10:25 Allgäuer Cola Gmisch
+2:15:31 Libella Cola Mix
+2:19:29 Mezzo Mix
+2:24:36 Glorietta Cola-Mix
+2:29:05 Brunnthaler Cola-Mix
+2:35:07 Dietenbronner ColaMix
+2:40:21 Adelholzener Primella Cola Mix
+2:44:30 Adelholzener Cola-Mix
+2:48:54 Schäffler Cola-Mix
+2:55:32 Kühbacher Cola-Mix
+3:01:45 Allgäuer Fifty Fifty
+3:07:18 Calypzo
+3:11:32 Pause: Frischluftpause
+3:18:46 Mecki-Mix
+3:24:28 Paulaner Spezi
+3:29:50 Sinalco Cola-Mix
+3:35:27 Fz Cola Mix
+3:41:08 UB Cubana Cola-Mix
+3:46:57 Frankenbrunnen Mexi
+3:51:36 Autenrieder Orange-Cola
+3:56:15 Andechser Colamix
+4:00:55 Krumbach cola mix
+4:05:15 VC Cola-Orangen-Limonade
+4:09:14 Pause: Für kleine Spezitester
+4:13:55 Leo Cola Mix
+4:18:00 Vitaperle Cola-Mix
+4:21:27 Pause: Tonproblemchen
+4:28:21 Flumi Cola-Mix-Limonade
+4:32:08 Hubauer Cola-Mix Limonade
+4:35:44 Flötzinger Cola-Mix
+4:41:00 Auswertung
+4:55:45 Outro
+
+[stream 2]
+url: https://youtube.com/live/t3yjL4xt6GQ
+title: Spezi mit den Spezis - Das große Spezi-Tasting! TEIL 2
+date:
+02:33 Intro
+06:08 Our Essentials Cola-Mix Orange by Amazon
+13:52 KITZ MIX
+20:31 Veltins Fassbrause Cola-Orange
+26:17 Spezi (aber aus Österreich) von Almdudler
+31:01 I am SPECIAL Orange & Cola Premium Limonade
+35:51 ZSCH Colamix
+40:29 Der Aufgeweckte
+46:03 Waldi Cola-Mix
+51:41 Stieglitz Limonade Cola-Orange
+56:56 Randegger Cola-Mix
+1:01:24 Gilbert's Cola-Mix
+1:05:30 Pause
+1:14:10 Weiter geht’s
+1:14:20 ebner Cola-Mix
+1:21:23 Aqua Römer Quelle Cola-Mix
+1:26:18 Bissinger Auerquelle Cola-Mix
+1:32:09 Haldina ColaMix
+1:37:33 Härtsfelder ColaMix
+1:42:26 Oettinger Cola-Orange
+1:47:18 Kostbarer Cola-Mix
+1:53:18 Schartner Bombe Spezi
+2:01:24 Kurpfalz Bräu cola mix
+2:06:31 Teinacher Cola Mix
+2:12:23 Paderborner Limo Cola-Orange-Mix
+2:17:10 Rückblick auf alle getesteten Cola-Mix-Getränke
+2:25:23 Special Guest & Spezi-Krapfen
+
+[stream 3]
+url: https://youtube.com/live/cO8bOrmAmJ4
+title: Spezi mit den Spezis - Das große Spezi-Tasting! TEIL 3
+date:
+00:36 Intro
+08:46 Schussenrieder Cola Mix
+14:57 Schloss Cola-Mix
+20:22 Maierbräu Cola-Mix
+28:19 ZWO Cola-Mix
+35:48 Sonnenland Cola Mix
+41:55 MIO MIO Cola+Orange Mische
+49:45 Roth's Fruchtflaschl Cola-Mix
+56:38 Bischofshof Cola Mix
+1:05:56 Göbel Cola-Mixx
+1:12:38 castello Cola Mix
+1:20:14 Pöllinger Mineralquelle Cola Mix
+1:23:23 Große Pause
+1:31:52 Weiter geht’s
+1:32:30 RaGGar Dricka ELDFLAMES
+1:39:57 Neunspringe Cola Mix
+1:45:48 MOY Gaudi Cola Mix
+1:51:02 Wüteria Cola Mix
+2:00:51 Cubanita Cola Mix
+2:05:04 Königs Cola-Mix
+2:11:02 YIPPY Cola Orange
+2:17:29 Odenwald Quelle Mix
+2:21:42 Bähringer Mix
+2:25:10 colamix Brauerei Gold Ochsen
+2:29:10 Rückblick / Fazit
+
+[stream 4]
+url: https://youtube.com/live/_VJUx9MZA2o
+title: Spezi mit den Spezis - Das große Spezi-Tasting! TEIL 4
+date:
+01:49 Intro
+07:09 Dreiser Cola-Mix
+13:39 bizzl Cola-Mix
+19:23 Fürst Wallerstein Colamix
+25:41 Flensburger Küsten Mix Cola-Orange
+34:33 MixCola
+40:36 Autenrieder Orange Cola
+48:33 King's Mix Cola-Mix-Limonade
+55:37 Finkbeiner Colamix
+1:01:23 FETZ! Cola-Mix
+1:07:10 Unsere eigene Spezi!
+1:28:23 Endlich Cola-Mix
+1:37:56 Kurze Pause... "technische Schwierigkeiten"
+1:46:54 Weiter mit den regulären Tests
+1:47:16 Faust Cola-Mix
+1:52:43 Spalter Bunte Heimat Cola-Mix
+1:59:00 IsarPerle cola-mix
+2:04:42 REMUS COLA-MIX
+2:09:32 Vita Cola Mix
+2:15:01 Krombacher's Fassbrause Cola & Orange
+2:20:34 Bad Brambacher Cola-Mix
+2:28:51 Kondrauer "MAXL"
+2:36:09 Rückblick / Fazit
+
+[stream 5]
+url: https://youtube.com/live/x1hrPY_AIdk
+title: Spezi mit den Spezis - Das große Spezi-Tasting! TEIL 5
+date:
+01:12 Intro
+04:49 Berliner Jungs Hauptstadt Limonade
+12:54 Cola-Orange Remix Limonade
+22:02 Bad Brückenauer Cola-Mix
+29:23 Haller Wildbadquelle Cola Mix Limonade
+34:56 Elephant Bay Cola Mix
+40:39 Braustübl COLA MIX
+46:32 Liebharts Bio Limonade Cola Orange
+54:11 St. GeorgenBräu Cola-Mix Hauslimonade
+58:49 BENNY Kids Colamix
+1:06:47 Distel Strolch Cola-Mix-Getränk
+1:14:10 Granini Die Spezial Limo Cola-Orange
+1:22:44 Oechsner Cola Mix
+1:30:01 Pause
+1:33:51 Weiter geht’s
+1:33:53 Spessart specht Cola-Mix
+1:40:14 MARTINS COLA-MIX
+1:44:53 Pyraser Waldquelle Cola-Mix
+1:50:24 Grünten-Perle Cola-Mix
+1:55:57 Cola-Mix Wurm
+2:02:39 Fazit / Auswertung

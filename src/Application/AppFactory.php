@@ -128,6 +128,8 @@ final class AppFactory
             $group->get('/datenschutz', [$controller, 'datenschutz']);
             $group->get('/ranking', [$controller, 'ranking']);
             $group->get('/statistik', [$controller, 'statistik']);
+            $group->get('/streams', [$controller, 'streams']);
+            $group->get('/streams/{number:[1-9][0-9]*}', [$controller, 'stream']);
             $group->get('/ueber', [$controller, 'ueber']);
             $group->get('/spezi/{id:[0-9]+}/bild', [$controller, 'image']);
             $group->get('/spezi/{ref:[0-9][A-Za-z0-9-]*}', [$controller, 'detail']);
@@ -156,6 +158,11 @@ final class AppFactory
                 $group->get('', [$adminController, 'dashboard']);
                 $group->post('/logout', [$adminController, 'logout'])->add($csrfMiddleware);
                 $group->get('/test', [$adminController, 'testQueue']);
+                $group->get('/testabende', [$adminController, 'testRuns']);
+                $group->post('/testabende', [$adminController, 'startTestRun'])->add($csrfMiddleware);
+                $group->get('/testabende/{number:[1-9][0-9]*}', [$adminController, 'testRun']);
+                $group->post('/testabende/{number:[1-9][0-9]*}', [$adminController, 'updateTestRun'])->add($csrfMiddleware);
+                $group->post('/testabende/{number:[1-9][0-9]*}/complete', [$adminController, 'completeTestRun'])->add($csrfMiddleware);
                 $group->get('/drinks', [$adminController, 'drinks']);
                 $group->get('/drinks/new', [$adminController, 'createForm']);
                 $group->post('/drinks', [$adminController, 'create'])->add($csrfMiddleware);

@@ -6,12 +6,19 @@ namespace Spezitest\Website\Catalog;
 
 /**
  * The parsed, sanitised state of the public Spezi browser (search, lifecycle
- * filter, sort, page). Unknown values fall back to safe defaults so the page
- * always renders.
+ * filter, sort, page, page size). Unknown values fall back to safe defaults so
+ * the page always renders.
  */
 final readonly class CatalogQuery
 {
+    /** The page size a first visit gets, and the step "Mehr laden" adds. */
     public const PER_PAGE = 24;
+
+    /**
+     * The largest page "Mehr laden" can grow to. Without a ceiling a single
+     * request could be asked to render the whole catalog at once.
+     */
+    public const MAX_PER_PAGE = self::PER_PAGE * 8;
 
     public const SORTS = ['best', 'name', 'recent', 'worst'];
 
@@ -19,6 +26,8 @@ final readonly class CatalogQuery
 
     /**
      * @param list<string> $statuses
+     * @param int $perPage always a whole multiple of {@see PER_PAGE}, between
+     *        one step and {@see MAX_PER_PAGE}
      */
     public function __construct(
         public string $search,
@@ -26,6 +35,7 @@ final readonly class CatalogQuery
         public bool $withImageOnly,
         public string $sort,
         public int $page,
+        public int $perPage = self::PER_PAGE,
     ) {
     }
 
@@ -58,7 +68,48 @@ final readonly class CatalogQuery
             ($params['with_image'] ?? null) === '1',
             $sort,
             $page,
+            self::normalizePerPage($params['per'] ?? null),
         );
+    }
+
+    /**
+     * "Mehr laden" only ever grows the page by whole steps, so the value is
+     * snapped to the nearest step and clamped instead of being trusted.
+     */
+    private static function normalizePerPage(mixed $raw): int
+    {
+        if (!is_string($raw) || !ctype_digit($raw)) {
+            return self::PER_PAGE;
+        }
+
+        $steps = (int) round((int) $raw / self::PER_PAGE);
+
+        return max(1, min(self::MAX_PER_PAGE / self::PER_PAGE, $steps)) * self::PER_PAGE;
+    }
+
+    /**
+     * The same list with one more page-sized step visible. The window is
+     * re-anchored on the first item currently shown, so everything already on
+     * screen stays on screen and only new Spezis appear underneath.
+     */
+    public function withMoreItems(): self
+    {
+        $perPage = min(self::MAX_PER_PAGE, $this->perPage + self::PER_PAGE);
+        $firstIndex = ($this->page - 1) * $this->perPage;
+
+        return new self(
+            $this->search,
+            $this->statuses,
+            $this->withImageOnly,
+            $this->sort,
+            intdiv($firstIndex, $perPage) + 1,
+            $perPage,
+        );
+    }
+
+    public function canLoadMore(): bool
+    {
+        return $this->perPage < self::MAX_PER_PAGE;
     }
 
     public function isFiltered(): bool
@@ -97,9 +148,25 @@ final readonly class CatalogQuery
             $pairs[] = 'page=' . $effectivePage;
         }
 
+        if ($this->perPage !== self::PER_PAGE) {
+            $pairs[] = 'per=' . $this->perPage;
+        }
+
         return implode('&', $pairs);
     }
 
+    /** The relative URL for this state, ready to put in an `href`. */
+    public function url(?int $page = null): string
+    {
+        $query = $this->toQueryString($page);
+
+        return $query === '' ? '/spezis' : '/spezis?' . $query;
+    }
+
+    /**
+     * Changing a filter returns to the first page at the default size: the old
+     * window would otherwise point into a different result set.
+     */
     public function withoutStatus(string $status): self
     {
         return new self(
