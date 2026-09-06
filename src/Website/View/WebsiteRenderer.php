@@ -75,9 +75,9 @@ final class WebsiteRenderer
             . '<div class="stack-lg"><div class="stack">'
             . '<span class="eyebrow eyebrow--accent">Spezitest</span>'
             . '<h1 class="display-1">' . Html::e($this->headline($counts['tested'])) . '</h1>'
-            . '<p class="lede">Wir suchen Cola-Mix aus Deutschland und den Nachbarländern zusammen, kaufen ihn '
-            . 'selbst und bewerten ihn zu dritt nach Optik, Süffigkeit und Geschmack. Immer nach denselben '
-            . 'Regeln, immer aus reinem Privatvergnügen.</p></div>'
+            . '<p class="lede">Wir suchen Cola-Mixe aus ganz Deutschland und den Nachbarländern zusammen, kaufen sie '
+            . 'und bewerten sie zu dritt nach Optik, Süffigkeit und Geschmack. '
+            . 'Den Bewertungsprozess könnt ihr in unseren Livestreams verfolgen.</p></div>'
             . '<div class="cluster"><a class="btn btn--primary btn--lg" href="/spezis">Zum Katalog</a>'
             . '<a class="btn btn--secondary btn--lg" href="/ranking">Zum Ranking</a></div></div>';
 
