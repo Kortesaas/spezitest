@@ -715,9 +715,9 @@ final class WebsiteRenderer
             . '<section class="wrap section" id="tester"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Die Abteilung</span><h2 class="display-3">Drei Tester, eine Skala</h2></div>'
             . '<div class="grid grid--3">'
-            . $this->testerCard('Manu', 'Treibt die Flaschen auf und schleppt die Kästen.')
-            . $this->testerCard('Fabi', 'Merkt als Erster, wenn etwas zu süß ist.')
-            . $this->testerCard('Schorsch', 'Pflegt den Katalog und schreibt mit, was am Tisch gesagt wird.')
+            . $this->testerCard('Manu', 'Treibt die Flaschen auf und schleppt die Kästen.', 'manu')
+            . $this->testerCard('Fabi', 'Merkt als Erster, wenn etwas zu süß ist.', 'fabi')
+            . $this->testerCard('Schorsch', 'Pflegt den Katalog und schreibt mit, was am Tisch gesagt wird.', 'schorsch')
             . '</div></div></section>'
 
             . '<section class="wrap section" id="projekt"><div class="prose stack-lg">'
@@ -1608,9 +1608,11 @@ final class WebsiteRenderer
         return (string) (int) round((float) $grade);
     }
 
-    private function testerCard(string $name, string $description): string
+    private function testerCard(string $name, string $description, string $image): string
     {
-        return '<div class="card"><figure class="pimg pimg--square"><div class="pimg__ph"><span>Foto folgt</span></div></figure>'
+        return '<div class="card"><figure class="pimg pimg--square pimg--bare"><img src="/assets/testers/'
+            . Html::e($image) . '.webp" alt="Porträt von ' . Html::e($name)
+            . '" width="640" height="640" loading="lazy"></figure>'
             . '<div class="card__body"><span class="card__title">' . Html::e($name) . '</span>'
             . '<p class="meta">' . Html::e($description) . '</p></div></div>';
     }
