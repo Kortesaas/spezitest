@@ -45,7 +45,7 @@ final readonly class DrinkRepository
     }
 
     /**
-     * @return list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool}>
+     * @return list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool, needs_new_photo: bool}>
      */
     public function search(string $search, ?string $status): array
     {
@@ -69,6 +69,7 @@ final readonly class DrinkRepository
                 d.name,
                 d.lifecycle_status,
                 d.manufacturer,
+                d.needs_new_photo,
                 CASE WHEN di.id IS NULL THEN 0 ELSE 1 END AS has_primary_image
             FROM drinks d
             LEFT JOIN drink_images di
@@ -95,6 +96,7 @@ final readonly class DrinkRepository
             $lifecycleStatus = $row['lifecycle_status'] ?? null;
             $manufacturer = $row['manufacturer'] ?? null;
             $hasPrimaryImage = $row['has_primary_image'] ?? null;
+            $needsNewPhoto = $row['needs_new_photo'] ?? null;
 
             if (
                 (!is_int($id) && !is_string($id))
@@ -102,6 +104,7 @@ final readonly class DrinkRepository
                 || !is_string($lifecycleStatus)
                 || ($manufacturer !== null && !is_string($manufacturer))
                 || (!is_int($hasPrimaryImage) && !is_string($hasPrimaryImage))
+                || (!is_int($needsNewPhoto) && !is_string($needsNewPhoto))
             ) {
                 throw new RuntimeException('The drink search returned invalid data.');
             }
@@ -112,6 +115,7 @@ final readonly class DrinkRepository
                 'lifecycle_status' => $lifecycleStatus,
                 'manufacturer' => $manufacturer,
                 'has_primary_image' => (int) $hasPrimaryImage === 1,
+                'needs_new_photo' => (int) $needsNewPhoto === 1,
             ];
         }
 
@@ -119,13 +123,13 @@ final readonly class DrinkRepository
     }
 
     /**
-     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int}|null
+     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int, needs_new_photo: bool}|null
      */
     public function find(int $id, bool $forUpdate = false): ?array
     {
         $sql = <<<'SQL'
             SELECT id, name, lifecycle_status, manufacturer, origin_location, origin_region, notes,
-                   price_amount, price_volume_ml
+                   price_amount, price_volume_ml, needs_new_photo
             FROM drinks
             WHERE id = :id
             SQL;
@@ -149,8 +153,14 @@ final readonly class DrinkRepository
         $idValue = $row['id'] ?? null;
         $name = $row['name'] ?? null;
         $status = $row['lifecycle_status'] ?? null;
+        $needsNewPhoto = $row['needs_new_photo'] ?? null;
 
-        if ((!is_int($idValue) && !is_string($idValue)) || !is_string($name) || !is_string($status)) {
+        if (
+            (!is_int($idValue) && !is_string($idValue))
+            || !is_string($name)
+            || !is_string($status)
+            || (!is_int($needsNewPhoto) && !is_string($needsNewPhoto))
+        ) {
             throw new RuntimeException('The drink query returned invalid data.');
         }
 
@@ -164,6 +174,7 @@ final readonly class DrinkRepository
             'notes' => $this->nullableString($row, 'notes'),
             'price_amount' => $this->nullableString($row, 'price_amount'),
             'price_volume_ml' => $this->nullableInt($row, 'price_volume_ml'),
+            'needs_new_photo' => (int) $needsNewPhoto === 1,
         ];
     }
 
@@ -214,6 +225,17 @@ final readonly class DrinkRepository
         $statement->execute(['status' => $status, 'id' => $id]);
 
         return $statement->rowCount() === 1 || $this->find($id) !== null;
+    }
+
+    public function setNeedsNewPhoto(int $id, bool $needsNewPhoto): void
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE drinks SET needs_new_photo = :needs_new_photo WHERE id = :id',
+        );
+        $statement->execute([
+            'needs_new_photo' => $needsNewPhoto ? 1 : 0,
+            'id' => $id,
+        ]);
     }
 
     public function hasCompletedTest(int $drinkId): bool

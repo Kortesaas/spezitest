@@ -27,6 +27,10 @@ Packet 8 (beta) adds a forward migration that adds `price_amount` and
 volume, from which the application derives a €-per-0.5 L Preis/Leistung basis.
 `drink_tests.price_amount` remains for legacy-imported test records only.
 
+The September 2026 photo-follow-up migration adds the boolean
+`drinks.needs_new_photo` marker. It deliberately stores no image path and does
+not change lifecycle semantics.
+
 MariaDB DDL can commit implicitly. A failed multi-statement migration may
 therefore leave partial schema changes even though its version is not recorded.
 Production migrations require review, a verified backup, a recovery plan, and

@@ -15,9 +15,10 @@ Slim Framework 4, a PSR-7 implementation, optional local `.env` loading, and a
 small lazy PDO connection layer. PHPUnit and PHPStan (level max) are the
 development quality tools. The application uses `public/` as its only intended
 web document root. Database changes use CLI-only, forward SQL migrations outside
-`public/`; Packet 8 added no migrations (test entry uses the existing
-`drink_tests` / `ratings` tables). The Python utilities in `tools/legacy-audit/`
-and `tools/legacy-import/` are local migration/audit tooling and are not
+`public/`; test entry uses the existing `drink_tests` / `ratings` tables, and a
+later forward migration adds the operational `drinks.needs_new_photo` marker.
+The Python utilities in `tools/legacy-audit/`, `tools/legacy-import/`, and
+`tools/primary-refresh/` are local migration/audit tooling and are not
 production runtime code.
 
 The public site and admin share one vendored stylesheet at
@@ -47,7 +48,8 @@ Never edit an applied
 migration; add a reviewed forward migration.
 
 Unless explicitly performing the reviewed Packet 6 workflow documented in
-`docs/LEGACY_IMPORT.md`, do not import or merge workbook data. Read
+`docs/LEGACY_IMPORT.md` or the non-production refresh in
+`docs/PRIMARY_REFRESH.md`, do not import or merge workbook data. Read
 `docs/ADMIN.md` before modifying authentication, sessions, admin persistence,
 or images. Unless the user explicitly starts a later phase, do not:
 
@@ -158,7 +160,9 @@ results before production use.
 - Ordinary primary images are validated originals only: accept detected
   JPEG/PNG/WebP within the configured size limit, use generated filenames,
   store portable relative paths outside `public/`, and serve them through the
-  authenticated controller. Do not trust client names or MIME headers.
+  authenticated controller. Do not trust client names or MIME headers. The
+  reviewed Primärliste refresh may use its documented local-only deterministic
+  640×1024/WebP preparation step; this is not HTTP upload processing.
 - Keep image replacement/removal coordinated with database transactions and
   never construct a filesystem path directly from HTTP input.
 - Make database changes only through tracked, reviewable migrations.

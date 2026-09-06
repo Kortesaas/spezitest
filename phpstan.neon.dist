@@ -7,3 +7,4 @@ parameters:
         - src
         - tests
         - tools/legacy-import/php
+        - tools/primary-refresh/apply.php

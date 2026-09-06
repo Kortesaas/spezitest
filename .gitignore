@@ -35,6 +35,7 @@ __pycache__/
 /var/legacy-images/
 /var/admin-images/
 /var/test-admin-images/
+/var/primary-refresh/
 
 # IDE and operating-system files
 .DS_Store

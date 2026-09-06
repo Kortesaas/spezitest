@@ -40,6 +40,7 @@ final class DomainSchemaMigrationTest extends TestCase
             '20260904000100_seed_canonical_testers',
             '20260904000200_prepare_legacy_import',
             '20260905000000_add_drink_price_and_volume',
+            '20260906000000_add_needs_new_photo_flag',
         ], $this->migrator->migrate());
         self::assertSame([], $this->migrator->migrate());
 
@@ -85,6 +86,19 @@ final class DomainSchemaMigrationTest extends TestCase
 
         $this->expectException(PDOException::class);
         $this->insertDrink('Invalid lifecycle', 'unknown');
+    }
+
+    public function testPhotoFlagDefaultsToFalseAndRejectsNonBooleanValues(): void
+    {
+        $this->migrator->migrate();
+        $drinkId = $this->insertDrink('Photo flag', 'identified');
+        $statement = $this->connection->prepare('SELECT needs_new_photo FROM drinks WHERE id = :id');
+        $statement->execute(['id' => $drinkId]);
+        self::assertSame(0, (int) $statement->fetchColumn());
+
+        $this->expectException(PDOException::class);
+        $this->connection->prepare('UPDATE drinks SET needs_new_photo = 2 WHERE id = :id')
+            ->execute(['id' => $drinkId]);
     }
 
     public function testForeignKeysRejectUnknownParents(): void

@@ -65,10 +65,14 @@ decimal comma.
   image, metadata, anomaly, and migration-risk findings.
 - `docs/LEGACY_IMPORT.md`: dry-run, duplicate review, local apply, image
   recovery, corrections, and import safety procedure.
+- `docs/PRIMARY_REFRESH.md`: controlled non-production refreshes from a newer
+  Primärliste and normalized primary images.
 - `docs/ADMIN.md`: authentication, admin routes, image-storage controls, and
   current operational limitations.
 - `public/`: the only intended web document root and the minimal front
   controller.
+- `resources/primary-images/`: reviewed, tracked WebP source assets for the
+  controlled Primärliste refresh; runtime copies remain outside `public/`.
 - `src/`: application/configuration code, database infrastructure, and isolated
   rating domain logic.
 - `config/`: environment loading and application bootstrap.
@@ -77,6 +81,9 @@ decimal comma.
   runtime code.
 - `tools/legacy-import/`: local plan construction, reports, review support, and
   import-only PHP services; never an HTTP feature.
+- `tools/primary-refresh/`: controlled non-production Primärliste refresh,
+  offline 640×1024/WebP image preparation, and application; never an HTTP
+  feature or production runtime dependency.
 - `bin/migrate.php`: CLI-only migration command; never an HTTP endpoint.
 - `bin/legacy-import.php`: CLI-only legacy plan verifier/apply command.
 - `database/migrations/`: reviewed, forward-only SQL migration files.

@@ -32,6 +32,7 @@ One row is one persistent Cola-Mix product. The minimum creation facts are
 | `notes` | `TEXT NULL` | Optional operational notes |
 | `price_amount` | `DECIMAL(12,4) NULL` | Raw entered price for `price_volume_ml` |
 | `price_volume_ml` | `SMALLINT UNSIGNED NULL` | Container volume the price was paid for |
+| `needs_new_photo` | `TINYINT(1)` | Operational follow-up marker; `0` or `1` |
 | `created_at`, `updated_at` | `DATETIME(6)` | Record timestamps |
 
 `price_amount` and `price_volume_ml` are always both present or both absent
@@ -46,6 +47,10 @@ MariaDB enforces both the nonblank name and allowed lifecycle values. There is
 intentionally no `UNIQUE(name)`: audited history contains same-name products
 that are not necessarily the same drink. Lifecycle lists are views over this
 single table; a status transition updates the same row.
+
+`needs_new_photo` is independent of lifecycle and image presence: an older
+primary image may remain available while this marker requests a replacement.
+It is not a second image status or a substitute for `drink_images`.
 
 ### `testers`
 

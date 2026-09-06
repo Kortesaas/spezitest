@@ -111,6 +111,12 @@ final class AdminApplicationIntegrationTest extends TestCase
         $secondId = $this->createDrink('Doppelter Name', 'acquired');
         self::assertNotSame($firstId, $secondId);
         self::assertSame(2, $this->tableCount('drinks'));
+        self::assertTrue($this->needsNewPhoto($firstId));
+        self::assertTrue($this->needsNewPhoto($secondId));
+        self::assertStringContainsString(
+            'Neues Foto nötig',
+            (string) $this->request('GET', '/admin/drinks')->getBody(),
+        );
 
         $dashboard = (string) $this->request('GET', '/admin')->getBody();
         self::assertMatchesRegularExpression(
@@ -190,6 +196,7 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertSame('image/png', $first['mime_type']);
         $firstPath = $this->temporaryRoot . '/' . $first['storage_path'];
         self::assertFileExists($firstPath);
+        self::assertFalse($this->needsNewPhoto($drinkId));
 
         $served = $this->request('GET', '/admin/drinks/' . $drinkId . '/image');
         self::assertSame(200, $served->getStatusCode());
@@ -211,6 +218,7 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertNotSame($first['storage_path'], $second['storage_path']);
         self::assertFileDoesNotExist($firstPath);
         self::assertFileExists($this->temporaryRoot . '/' . $second['storage_path']);
+        self::assertFalse($this->needsNewPhoto($drinkId));
 
         $remove = $this->request('POST', '/admin/drinks/' . $drinkId, [
             '_csrf' => $this->csrfToken(),
@@ -221,6 +229,11 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertSame(303, $remove->getStatusCode());
         self::assertSame(0, $this->tableCount('drink_images'));
         self::assertFileDoesNotExist($this->temporaryRoot . '/' . $second['storage_path']);
+        self::assertTrue($this->needsNewPhoto($drinkId));
+        self::assertStringContainsString(
+            'Neues Foto nötig',
+            (string) $this->request('GET', '/admin/drinks/' . $drinkId . '/edit')->getBody(),
+        );
         self::assertSame(404, $this->request('GET', '/admin/drinks/' . $drinkId . '/image')->getStatusCode());
 
         $executable = '<?php system($_GET["command"]);';
@@ -354,6 +367,14 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertNotFalse($statement);
 
         return (int) $statement->fetchColumn();
+    }
+
+    private function needsNewPhoto(int $drinkId): bool
+    {
+        $statement = $this->connection->prepare('SELECT needs_new_photo FROM drinks WHERE id = :id');
+        $statement->execute(['id' => $drinkId]);
+
+        return (int) $statement->fetchColumn() === 1;
     }
 
     private function tableCount(string $table): int

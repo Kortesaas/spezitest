@@ -4,8 +4,8 @@
 
 The admin (Design System admin shell as of Packet 8, deliberately compact)
 supports a single environment-configured administrator, lifecycle counts, drink
-search/filtering and CRUD, status changes, one optional primary image, and
-test/rating entry. It does not provide accounts, roles, self-registration,
+search/filtering and CRUD, status changes, one optional primary image, a
+`needs_new_photo` follow-up marker, and test/rating entry. It does not provide accounts, roles, self-registration,
 password reset, or an image gallery. The public website is separate (see
 `README.md`); admin image uploads are also read on the public detail pages
 through a controlled route.
@@ -48,8 +48,8 @@ is still CSRF-protected.
 | GET | `/admin` | Lifecycle dashboard |
 | POST | `/admin/logout` | Destroy session |
 | GET | `/admin/drinks` | List, search, and lifecycle filter |
-| GET | `/admin/drinks/new` | Quick-create form |
-| POST | `/admin/drinks` | Create from name, status, and optional picture |
+| GET | `/admin/drinks/new` | Creation form with optional enrichment |
+| POST | `/admin/drinks` | Create from required basics plus optional enrichment |
 | GET | `/admin/drinks/{id}/edit` | Metadata and primary-image edit form |
 | POST | `/admin/drinks/{id}` | Update drink and optionally replace/remove image |
 | POST | `/admin/drinks/{id}/status` | Change lifecycle on the existing record |
@@ -111,6 +111,18 @@ dimensions. The file is written with restricted permissions under a random
 48-hex-character filename. Only its portable `admin/...` path and detected
 metadata enter `drink_images`.
 
+`drinks.needs_new_photo` is an operational follow-up marker, not an image
+status or lifecycle state. It may remain set while an older primary image is
+still displayed. Creating a drink without a picture or removing its picture
+sets the marker; uploading or replacing a picture clears it. The admin list,
+dashboard queue, and edit form display the marker so a replacement can be
+captured during a future test.
+
+The controlled non-production workbook/image refresh that can populate this
+marker is documented in `docs/PRIMARY_REFRESH.md`. Its reviewed batch assets
+are cropped offline to 640×1024 and converted to WebP before publication. This
+does not add image processing to HTTP uploads.
+
 Image creation/replacement is coordinated with the database transaction. A
 new file is removed if persistence fails. Replaced or removed files are
 deleted only after the database commit, preventing a rollback from leaving a
@@ -170,9 +182,11 @@ authoritative value via `Spezitest\Domain\Rating\PriceNormalizer`. See
 
 ## Current limitations
 
-- GD and Imagick availability on production hosting is not confirmed. Packet 7
-  retains the validated original and performs no resize, recompression, or
-  conversion; optimization remains pending.
+- GD and Imagick availability on production hosting is not confirmed. Normal
+  admin uploads retain the validated original and perform no resize,
+  recompression, or conversion. The reviewed refresh dataset has a separate
+  local-only WebP optimization step; automatic upload optimization remains
+  pending.
 - Production Fileinfo and PHP image-parser/WebP capability still require a
   deployment check. An unsupported format fails closed as an invalid image.
 - Only one configured administrator exists. Account management, multiple
@@ -183,4 +197,3 @@ authoritative value via `Spezitest\Domain\Rating\PriceNormalizer`. See
   service uses staging/cleanup ordering and logs a generic cleanup failure, but
   an operational disk failure after commit can still require private-storage
   reconciliation.
-- Rating/test entry and public presentation are outside this packet.

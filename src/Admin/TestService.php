@@ -114,7 +114,7 @@ final readonly class TestService
     }
 
     /**
-     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string}
+     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, needs_new_photo: bool}
      */
     private function requireTestableDrink(int $drinkId): array
     {

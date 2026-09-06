@@ -6,11 +6,11 @@ Spezitest will be an internet-facing production application that catalogs
 Cola-Mix / Spezi drinks, primarily from Germany and surrounding countries. This
 document records architectural constraints and the PHP/runtime foundation.
 Slim Framework 4 with a PSR-7 implementation is selected for HTTP delivery,
-with Composer PSR-4 autoloading under the `Spezitest` namespace. Packet 5 adds
-the first MariaDB domain schema and rating engine, Packet 6 adds controlled
-legacy import, and Packet 7 adds the first functional admin application. There
-is still no public catalog, rating-entry workflow, template system, image
-gallery/optimization, or final frontend design.
+with Composer PSR-4 autoloading under the `Spezitest` namespace. Packet 5 added
+the first MariaDB domain schema and rating engine, Packet 6 added controlled
+legacy import, Packet 7 added the first functional admin application, and
+Packet 8 added rating entry and the public catalog. There is still no image
+gallery, automatic runtime image optimization, or account-management system.
 
 ## Runtime structure
 
@@ -136,6 +136,12 @@ otherwise-empty domain tables.
 `legacy_import_runs` stores plan/source hashes and a run summary to prevent a
 silent second import. Generated reports and images are ignored local artifacts.
 Python and workbook parsing libraries are not production web dependencies.
+
+`tools/primary-refresh/` provides a separate, CLI-only non-production refresh
+for a newer Primärliste and pre-normalized images. It requires a one-to-one
+match to the reviewed imported dataset, verifies source/image hashes and all
+rating totals/ranks, writes a private database snapshot, and changes data in a
+transaction. It is not an HTTP or production-deployment path.
 
 ## Application boundaries
 

@@ -53,6 +53,9 @@
             "python3 tools/legacy-import/plan.py",
             "php bin/legacy-import.php verify"
         ],
+        "primary-refresh:optimize-images": "python3 tools/primary-refresh/optimize-images.py",
+        "primary-refresh:apply": "php tools/primary-refresh/apply.php apply",
+        "primary-refresh:verify": "php tools/primary-refresh/apply.php verify",
         "migrate": "php bin/migrate.php",
         "serve": [
             "Composer\\Config::disableProcessTimeout",
@@ -66,6 +69,9 @@
         "dev": "Start the local development server at http://localhost:8080 (uses .env and the local database; never resets it).",
         "dev:load-legacy": "Rebuild the local database from the reviewed legacy dataset (drops and reloads domain tables; asks first).",
         "migrate": "Apply pending forward SQL migrations to the configured database.",
+        "primary-refresh:optimize-images": "Crop reviewed 1024px PNGs to 640×1024 and create web-optimized WebPs (local tooling only).",
+        "primary-refresh:apply": "Apply a verified Primärliste refresh plan to a non-production database.",
+        "primary-refresh:verify": "Verify a Primärliste refresh plan and its non-production target without changing data.",
         "check": "Run unit tests and PHPStan (no database).",
         "test:integration": "Run the destructive integration suite against the spezitest_test database (see .env.testing)."
     }

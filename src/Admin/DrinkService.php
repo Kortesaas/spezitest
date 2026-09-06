@@ -37,6 +37,8 @@ final readonly class DrinkService
                 $this->repository->replacePrimaryImage($drinkId, $storedImage);
             }
 
+            $this->repository->setNeedsNewPhoto($drinkId, $storedImage === null);
+
             $this->connection->commit();
 
             return $drinkId;
@@ -91,9 +93,11 @@ final readonly class DrinkService
 
             if ($storedImage !== null) {
                 $this->repository->replacePrimaryImage($drinkId, $storedImage);
+                $this->repository->setNeedsNewPhoto($drinkId, false);
                 $oldImagePath = $oldImage['storage_path'] ?? null;
             } elseif ($removeImage && $oldImage !== null) {
                 $this->repository->deleteImages($drinkId);
+                $this->repository->setNeedsNewPhoto($drinkId, true);
                 $oldImagePath = $oldImage['storage_path'];
             }
 

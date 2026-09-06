@@ -50,7 +50,7 @@ final class HtmlRenderer
 
     /**
      * @param array{identified: int, acquired: int, tested: int} $counts
-     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool}> $waiting
+     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool, needs_new_photo: bool}> $waiting
      */
     public function dashboard(array $counts, array $waiting, string $csrfToken): string
     {
@@ -63,6 +63,7 @@ final class HtmlRenderer
                 . '<span class="queue__body"><a class="queue__name" href="/admin/drinks/' . $drink['id'] . '/edit">'
                 . $this->escape($drink['name']) . '</a>'
                 . ($drink['manufacturer'] === null ? '' : '<span class="meta">' . $this->escape($drink['manufacturer']) . '</span>')
+                . ($drink['needs_new_photo'] ? '<span class="badge">Neues Foto nötig</span>' : '')
                 . '</span>'
                 . '<a class="btn btn--primary btn--sm" href="/admin/drinks/' . $drink['id'] . '/test">Testen</a></li>';
         }
@@ -98,7 +99,7 @@ final class HtmlRenderer
     }
 
     /**
-     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool}> $drinks
+     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool, needs_new_photo: bool}> $drinks
      */
     public function drinks(
         array $drinks,
@@ -117,7 +118,8 @@ final class HtmlRenderer
             $rows .= '<tr><td>' . $this->thumbnail($id, $drink['has_primary_image']) . '</td>'
                 . '<td><a href="/admin/drinks/' . $id . '/edit"><strong>' . $this->escape($drink['name']) . '</strong></a>'
                 . ($drink['manufacturer'] === null ? '' : '<br><span class="meta">' . $this->escape($drink['manufacturer']) . '</span>') . '</td>'
-                . '<td>' . $this->stateBadge($drink['lifecycle_status']) . '</td>'
+                . '<td>' . $this->stateBadge($drink['lifecycle_status'])
+                . ($drink['needs_new_photo'] ? '<br><span class="badge">Neues Foto nötig</span>' : '') . '</td>'
                 . '<td class="table__actions"><div class="cluster cluster--tight" style="justify-content:flex-end">'
                 . '<form method="post" action="/admin/drinks/' . $id . '/status" class="cluster cluster--tight status-form">'
                 . $this->csrfField($csrfToken)
@@ -206,7 +208,7 @@ final class HtmlRenderer
     }
 
     /**
-     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int} $drink
+     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int, needs_new_photo: bool} $drink
      */
     public function editForm(array $drink, bool $hasImage, string $csrfToken, ?string $error = null): string
     {
@@ -216,6 +218,11 @@ final class HtmlRenderer
                 . '<label class="check" style="margin-top:var(--sp-3)"><input type="checkbox" name="remove_image" value="1">'
                 . '<span>Bild entfernen</span></label>'
             : '<figure class="pimg pimg--square"><div class="pimg__ph"><span>Kein Bild</span></div></figure>';
+
+        if ($drink['needs_new_photo']) {
+            $imageBlock .= '<p class="hint" style="margin-top:var(--sp-3)"><strong>Neues Foto nötig.</strong> '
+                . 'Die Markierung wird beim Hochladen eines neuen Bildes automatisch entfernt.</p>';
+        }
 
         $testLink = in_array($drink['lifecycle_status'], ['acquired', 'tested'], true)
             ? '<a class="btn btn--secondary btn--sm" href="/admin/drinks/' . $id . '/test">'
@@ -282,7 +289,7 @@ final class HtmlRenderer
     }
 
     /**
-     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string} $drink
+     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, needs_new_photo: bool} $drink
      */
     public function deleteConfirmation(array $drink, string $csrfToken, ?string $error = null): string
     {
@@ -301,7 +308,7 @@ final class HtmlRenderer
     }
 
     /**
-     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int} $drink
+     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int, needs_new_photo: bool} $drink
      */
     public function testForm(
         array $drink,
