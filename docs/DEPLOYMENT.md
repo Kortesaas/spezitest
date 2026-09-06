@@ -13,16 +13,17 @@ Nothing here connects to production automatically. Follow the steps in order.
 
 ## 0. What you deploy
 
-Build both artifacts locally (`sh tools/build-release.sh`, then the data steps
-in section 8). You upload:
+Build both artifacts locally with `composer build:full-release`. You upload:
 
 | Artifact | Contents | Where it goes |
 | --- | --- | --- |
 | `dist/spezitest-<version>.tar.gz` | Application + production Composer deps. No tests, no dev tooling, no secrets, no Excel sources. | Application root on the server |
-| `dist/spezitest-initial-data-<runid>.tar.gz` | `spezitest-initial-data.sql` (schema + 3 testers + the reviewed historical catalogue) and `legacy-images/legacy/<run-id>/…` (195 product images). `MANIFEST.txt` has SHA-256s and row counts. | SQL → phpMyAdmin import · images → private `var/` directory |
+| `dist/spezitest-initial-data-<version>.tar.gz` | Data-only `spezitest-data.sql`, manifests, manuals, and all 195 private product images arranged beneath `var/`. | SQL → phpMyAdmin after migrations · `var/` → private application storage |
 
-The historical catalogue is 196 drinks (56 identified, 32 acquired, 108 tested),
-108 completed tests, 324 raw ratings, 195 images. All five fuzzy duplicate
+The reviewed catalogue is 196 drinks (54 identified, 17 acquired, 125 tested),
+125 completed tests, 375 raw ratings, 195 images. Of those images, 186 are
+optimized 640×1024 WebPs and nine are retained older fallbacks; ten products
+are marked as needing a new photograph. All five fuzzy duplicate
 candidates were resolved **DIFFERENT_PRODUCTS**.
 
 ---
@@ -34,14 +35,16 @@ candidates were resolved **DIFFERENT_PRODUCTS**.
 - **PHP** → set the domain to **PHP 8.3**, handler **FPM served by Apache**.
 - **PHP extensions**: `pdo_mysql` and `fileinfo` must be enabled (Plesk → PHP
   Settings, or a `phpinfo()` you delete straight after). GD / Imagick are **not
-  required** — the app stores validated originals and never resizes.
+  required** — ordinary admin uploads retain validated originals, while the
+  reviewed catalogue WebPs were already generated offline.
 - **PHP settings** for the domain: `display_errors = Off`. `memory_limit`
   256M and `upload_max_filesize` / `post_max_size` 64M are already the host
   defaults and are fine.
 - **SSL/TLS certificate** issued and valid for `www.spezitest.de` (Let's
   Encrypt via Plesk is fine). The admin session cookie is `Secure` in
   production, so admin login only works over HTTPS.
-- **Disk quota** headroom: the app is ~15 MB, the image set ~25 MB.
+- **Disk quota** headroom: allow at least 100 MB for the application, current
+  images, upload growth, extraction overhead, and logs.
 - Confirm whether the domain is served **Apache + `.htaccess`** (normal) or
   **nginx-only**. If nginx-only, you will paste the nginx directives from
   section 5 instead of relying on `public/.htaccess`.
@@ -188,58 +191,33 @@ database → import the pre-import export (or restore via Backup Manager).
 
 ---
 
-## 8. Build the initial-data package (local, one-time)
+## 8. Build both deployment packages locally
 
-Do this once on a machine with PHP 8.3 and a disposable local MariaDB 10.11
-(Docker is fine — it is not a production dependency). The five duplicate
-decisions are already resolved in
-`tools/legacy-import/duplicate-decisions.resolved.json`.
+Use a clean, reviewed checkout with PHP 8.3 and Composer 2. The tracked seed and
+images mean the legacy workbooks, the developer's current database, Python,
+Node.js, and MariaDB are not required merely to build the archives.
 
-```bash
-# 1. Fresh disposable database
-#    (example for a local docker container named spezitest-mariadb)
-mysql -h127.0.0.1 -uroot -p -e "CREATE DATABASE spezitest_seed
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-
-# 2. Local env for the import ONLY (APP_ENV must be local/development/testing;
-#    the importer refuses production)
-cat > .env <<'EOF'
-APP_ENV=local
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=spezitest_seed
-DB_USER=<local user>
-DB_PASSWORD=<local password>
-DB_CHARSET=utf8mb4
-LEGACY_IMAGE_STORAGE_ROOT=var/legacy-images
-EOF
-
-# 3. Put the two source workbooks in place (owner-held, never committed)
-#    var/legacy-import/primaerliste.xlsx
-#    var/legacy-import/beschaffungsliste.xlsx
-
-# 4. Regenerate the plan with the resolved decisions
-cp tools/legacy-import/duplicate-decisions.resolved.json \
-   var/legacy-import-output/current/duplicate-decisions.json
-composer legacy-import:plan        # must report "Apply ready: yes"
-
-# 5. Migrate + apply into the disposable database
-composer migrate
-composer legacy-import:apply       # verifies all 108 Gesamt/rank/PL, records the run
-
-# 6. Export schema + data + images
-mysqldump --single-transaction --no-tablespaces --default-character-set=utf8mb4 \
-  spezitest_seed > dist/spezitest-initial-data.sql
-# (strip the leading MariaDB "sandbox mode" comment line if your client adds it)
-
-mkdir -p dist/legacy-data && cp dist/spezitest-initial-data.sql dist/legacy-data/
-cp -R var/legacy-images/legacy dist/legacy-data/legacy-images-legacy
-tar -C dist/legacy-data -czf dist/spezitest-initial-data-<runid>.tar.gz .
+```sh
+composer install
+composer check
+composer build:full-release
 ```
 
-`composer legacy-import:apply` aborts on any hash, rating, ranking, or image
-mismatch, so a successful run is your verification that the data is faithful.
-Keep `apply-report.md` for the record.
+The build verifies the data SQL hash and all 195 image hashes, MIME types, and
+dimensions before creating:
+
+- `dist/spezitest-<version>.tar.gz`; and
+- `dist/spezitest-initial-data-<version>.tar.gz`.
+
+The initial-data archive includes `INSTALL.md`, `PLESK-DEPLOYMENT.md`,
+`DATA-MANIFEST.json`, and a SHA-256 `MANIFEST.txt`. The build prints a SHA-256
+for each archive; verify both uploaded archives against those values before
+extracting them. After extraction, `shasum -a 256 -c MANIFEST.txt` verifies
+every file inside the initial-data package when shell access is available.
+
+`composer initial-data:export` is not part of normal deployment. It exists only
+to deliberately regenerate the tracked seed from the verified non-production
+database after a reviewed data change, and it refuses production.
 
 ---
 
@@ -263,21 +241,28 @@ it will show empty-state pages until the data is imported, which is expected.
 
 ### C. Back up (section 7)
 
-### D. Import the initial data
+### D. Create the schema, import the data, and install images
 
-1. **Schema + rows:** phpMyAdmin → select the Spezitest database → **Import** →
-   choose `spezitest-initial-data.sql` → Go. It drops and recreates the seven
-   tables and loads all rows (196 drinks, 108 tests, 324 ratings, 195 image
-   rows, 3 testers, 3 migration records, 1 import-run record).
+1. **Schema:** create a one-off **Plesk → Scheduled Tasks** job using
+   `/opt/plesk/php/8.3/bin/php <app-root>/bin/migrate.php` (adjust the PHP and
+   app paths to the subscription). Run it once and confirm exactly five
+   migrations are applied. Disable the task after successful verification.
+2. **Rows:** phpMyAdmin → select the Spezitest database → **Import** → choose
+   `spezitest-data.sql` from the initial-data archive → Go. The data-only seed
+   requires the migrated tables to be empty, never drops tables, and loads 196
+   drinks, 125 tests, 375 ratings, 195 image rows, and one provenance row. The
+   three canonical testers already come from the migrations.
    - If the file is over phpMyAdmin's upload limit, gzip it
-     (`spezitest-initial-data.sql.gz`) — phpMyAdmin imports `.gz` directly — or
+     (`spezitest-data.sql.gz`) — phpMyAdmin imports `.gz` directly — or
      use Plesk → Databases → *Import Dump*.
-2. **Images:** upload `legacy-images/legacy/<run-id>/` (195 files) via SFTP /
-   File Manager into `httpdocs/var/legacy-images/`, so the final path is
-   `httpdocs/var/legacy-images/legacy/<run-id>/<sha>.png|jpg`. This must match
-   `LEGACY_IMAGE_STORAGE_ROOT` in `.env` (`var/legacy-images` → resolves to
-   `httpdocs/var/legacy-images`). The database already stores the portable
-   `legacy/<run-id>/<sha>.<ext>` paths.
+3. **Images:** merge the initial-data archive's `var/` directory into the app
+   root's `var/`. The final files must include:
+   - `var/admin-images/admin/640x1024/` — 186 WebPs; and
+   - `var/legacy-images/legacy/<run-id>/` — nine retained JPEG/PNG fallbacks.
+
+   These locations match `ADMIN_IMAGE_STORAGE_ROOT=var/admin-images` and
+   `LEGACY_IMAGE_STORAGE_ROOT=var/legacy-images`. Keep them outside `public/`
+   and writable by PHP-FPM. Do not rename any image.
 
 ### E. Verify (section 10)
 
@@ -285,7 +270,7 @@ it will show empty-state pages until the data is imported, which is expected.
 > skip D. Run migrations instead as a one-off **Plesk → Scheduled Tasks** job:
 > command `/opt/plesk/php/8.3/bin/php /var/www/vhosts/<domain>/httpdocs/bin/migrate.php`
 > (adjust paths to your subscription). Run it once, confirm the output
-> "Applied 4 migration(s).", then delete or disable the task. Add drinks and
+> "Applied 5 migration(s).", then delete or disable the task. Add drinks and
 > tests through `/admin`.
 
 ---
@@ -294,23 +279,24 @@ it will show empty-state pages until the data is imported, which is expected.
 
 | Check | Expected |
 | --- | --- |
-| `GET /` | 200, homepage, "108 Spezis. Ein Urteil." |
-| `GET /spezis` | 200, "196 Einträge im Katalog", card grid |
+| `GET /` | 200, homepage, "125 Spezis getestet." |
+| `GET /spezis` | 200, "196 Ergebnisse", card grid |
 | `GET /ranking` | 200, podium, Flötzinger Cola-Mix at rank 1 with Gesamtwertung **55,33** |
-| `GET /statistik` | 200, "108 Spezis getestet" |
+| `GET /statistik` | 200, "125 Spezis getestet" |
 | `GET /spezi/109` | 301 → `/spezi/109-flotzinger-cola-mix` |
-| `GET /spezi/109/bild` | 200, `image/jpeg`, `X-Content-Type-Options: nosniff` |
+| `GET /spezi/109/bild` | 200, `image/webp`, `X-Content-Type-Options: nosniff` |
 | `GET /assets/spezitest.css` | 200, `text/css` |
 | `GET /nonsense` | 404, branded page, no stack trace |
 | `GET /.env` | 404 |
 | `GET /admin` | 302 → `/admin/login` |
-| Admin login (HTTPS) | succeeds; dashboard shows 56 / 32 / 108 |
+| Admin login (HTTPS) | succeeds; dashboard shows 54 / 17 / 125 |
 | Admin: open a tested drink → Test bearbeiten | grades 0–10 shown, Gesamtwertung recomputed identically |
 | Admin: upload a JPEG/PNG on a drink | stored under `var/admin-images/`, visible on the public detail page |
 | Provoke an error (e.g. wrong `DB_PASSWORD` briefly) | generic 500, no SQL/paths in the response; details only in the server log |
 
-Rating spot-check: pick any tested drink, confirm the public Gesamtwertung
-equals `apply-report.md`'s value for that source row.
+Rating spot-check: Flötzinger Cola-Mix must remain rank 1 with Gesamtwertung
+**55,33**; then open its admin test form and confirm the recomputed result is
+identical.
 
 ---
 

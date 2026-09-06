@@ -79,7 +79,9 @@ echo "==> Restoring development dependencies"
 composer install --no-interaction --no-progress >/dev/null
 
 SIZE=$(du -h "$OUT/$NAME.tar.gz" | cut -f1)
+ARCHIVE_HASH=$(php -r 'echo hash_file("sha256", $argv[1]);' "$OUT/$NAME.tar.gz")
 echo
 echo "Release artifact:  dist/$NAME.tar.gz  ($SIZE)"
+echo "SHA-256: $ARCHIVE_HASH"
 echo "Contents (top level):"
 tar -tzf "$OUT/$NAME.tar.gz" | awk -F/ '{print $2}' | sort -u | sed 's/^/  /'

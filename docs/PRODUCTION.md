@@ -66,12 +66,12 @@ They have been exercised only against disposable local MariaDB 10.11 and have
 not been applied to production. There is no HTTP migration or import endpoint.
 
 The production execution mechanism is now decided and documented in
-`docs/DEPLOYMENT.md`: the initial schema and reviewed historical catalogue are
-loaded by importing one verified SQL dump through Plesk phpMyAdmin, and future
-forward migrations run as a one-off **Plesk Scheduled Task** invoking
-`bin/migrate.php`. No SSH is assumed. The legacy importer never runs on
-production — it is run locally against a disposable database and its output
-(SQL + images) is what gets uploaded.
+`docs/DEPLOYMENT.md`: the initial schema is created by a one-off **Plesk
+Scheduled Task** invoking `bin/migrate.php`, then the reviewed tracked data-only
+seed is loaded through Plesk phpMyAdmin. No SSH is assumed. The legacy importer
+never runs on production, and the source workbooks are not needed to deploy.
+The separately built initial-data archive contains the seed and all referenced
+private images.
 
 MariaDB DDL may implicitly commit, so automatic transactional rollback cannot
 be promised. Every production migration needs serialized execution, careful
@@ -135,8 +135,10 @@ server request limit, generates internal filenames, and stores files under
 `ADMIN_IMAGE_STORAGE_ROOT` outside `public/`. Images are served through an
 authenticated route and cannot execute as PHP. Production must provision a
 writable private directory and retain it across releases. GD/Imagick
-availability remains unverified, so validated originals are retained without
-resizing or conversion; optimization remains pending.
+availability remains unverified, so new admin uploads are retained without
+runtime resizing or conversion. The reviewed primary catalogue images were
+optimized offline and are deployed as pre-generated WebPs; retained legacy
+fallbacks remain JPEG/PNG.
 
 The production PHP build must provide Fileinfo and safe image-header parsing;
 Composer declares Fileinfo as a runtime extension. WebP is accepted only when

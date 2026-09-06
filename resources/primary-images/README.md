@@ -11,6 +11,12 @@ storage, and stores portable `admin/640x1024/...` paths in `drink_images`.
 Public and admin pages serve the files only through the application image
 controllers.
 
+`legacy/` contains the nine older JPEG/PNG images deliberately retained for
+products that had no new photograph. Together these directories provide all
+195 files referenced by the reviewed initial-data seed. The affected products
+remain marked `needs_new_photo`; retaining an older image does not clear that
+follow-up marker.
+
 The 64-character filename stem is the reviewed legacy image mapping key. It is
 intentionally retained across normalization and conversion so each asset maps
 back to the corresponding reviewed drink; it is not the WebP file's content

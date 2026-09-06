@@ -30,12 +30,14 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
 Release preparation added: the five fuzzy duplicate candidates resolved
 **DIFFERENT_PRODUCTS** (`tools/legacy-import/duplicate-decisions.resolved.json`);
 a re-verification of the rating input scale against all 972 historical grade
-values; `tools/build-release.sh` to produce a production artifact; a production
-`.htaccess`, `robots.txt` and `.env.production.example`; and the full Plesk
-procedure in **`docs/DEPLOYMENT.md`**.
+values; a complete tracked initial dataset and private image set; reproducible
+application/data release archives; a production `.htaccess`, `robots.txt` and
+`.env.production.example`; and full installation manuals in
+**`docs/INSTALLATION.md`** and **`docs/DEPLOYMENT.md`**.
 
-Image optimisation is still out of scope (validated originals only; no
-GD/Imagick dependency). Everything has been validated only against
+The reviewed primary catalogue images are pre-generated as 640×1024 WebPs;
+ordinary admin uploads still retain their validated originals because runtime
+GD/Imagick support is not assumed. Everything has been validated only against
 disposable/local MariaDB. **No production database has been created or
 contacted.**
 
@@ -54,7 +56,9 @@ decimal comma.
 - `docs/ARCHITECTURE.md`: architectural boundaries and runtime structure.
 - `docs/PRODUCTION.md`: hosting and production security constraints.
 - `docs/DEPLOYMENT.md`: the step-by-step Plesk deployment procedure, environment
-  checklist, database creation, legacy-data import, and verification.
+  checklist, database creation, initial-data import, and verification.
+- `docs/INSTALLATION.md`: complete fresh-install instructions for another
+  development computer and for building the two server deployment archives.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
   migration classification.
 - `docs/DATA_MODEL.md`: implemented tables/relationships and clearly separated
@@ -71,8 +75,10 @@ decimal comma.
   current operational limitations.
 - `public/`: the only intended web document root and the minimal front
   controller.
-- `resources/primary-images/`: reviewed, tracked WebP source assets for the
-  controlled Primärliste refresh; runtime copies remain outside `public/`.
+- `resources/primary-images/`: reviewed primary WebPs plus retained fallback
+  images; runtime copies remain outside `public/`.
+- `resources/initial-data/`: reviewed data-only SQL seed and integrity manifest
+  for recreating the current beta catalogue on an empty migrated database.
 - `src/`: application/configuration code, database infrastructure, and isolated
   rating domain logic.
 - `config/`: environment loading and application bootstrap.
@@ -208,14 +214,17 @@ server without the env pinning.
 | `composer dev` | Start the local site at `http://localhost:8080` |
 | *(Ctrl+C)* | Stop it |
 | `composer migrate` | Apply pending forward migrations to the local database |
+| `composer initial-data:verify` | Verify the tracked seed and all 195 private images without a database |
+| `composer build:full-release` | Build both archives needed for a fresh server installation |
 | `composer dev:load-legacy` | Drop and reload the local catalogue from the reviewed legacy dataset (asks first; needs the two workbooks in `var/legacy-import/`) |
-| `composer check` | Unit tests + PHPStan (no database) |
+| `composer check` | Initial-data verification + unit tests + PHPStan (no database) |
 | `composer test` / `composer analyse` | Unit tests / PHPStan individually |
 | `composer test:integration` | Destructive integration suite against `spezitest_test` (see below) |
 | `composer test:legacy-import` | Python importer tests (Python 3 stdlib only) |
 
-`composer check` deliberately runs unit tests and static analysis only. It does
-not connect to or mutate a database. Local development always uses the local
+`composer check` runs the database-free initial-data verification, unit tests,
+and static analysis. It does not connect to or mutate a database. Local
+development always uses the local
 `spezitest` database from `.env`; it never touches production. Legacy planning
 and its importer tests additionally require Python 3 (standard library only).
 
@@ -324,13 +333,12 @@ Composer or command-line access on the server. Production also does not require
 Node.js.
 
 The real production database and user do not exist yet and will be created
-later through Plesk. Creating the empty database and applying/importing its
-schema are separate operations. Database names, users, passwords, and endpoint
-settings are deployment configuration and never belong in migrations.
-
-No final production migration mechanism has been selected. It may later use a
-secure CLI/task facility if Plesk supports one, or an explicitly reviewed
-manual deployment procedure. It will never use an HTTP migration endpoint.
+later through Plesk. Creating the empty database, applying migrations, and
+importing the reviewed data-only seed are separate operations. Database names,
+users, passwords, and endpoint settings are deployment configuration and never
+belong in migrations or the seed. The reviewed procedure uses a disabled-after-
+use Plesk Scheduled Task for migrations and phpMyAdmin for the seed; it never
+exposes an HTTP migration endpoint.
 
 ## Legacy audit tooling
 
@@ -366,8 +374,9 @@ resolved **DIFFERENT_PRODUCTS**; the reviewed decisions are tracked at
 the planner). The apply command refuses unless `APP_ENV` is
 `local`/`development`/`testing` and the target has the migrated schema, canonical
 testers, and otherwise empty domain tables — so the historical catalogue is
-imported into a disposable local database and the resulting SQL + images are
-uploaded to production (`docs/DEPLOYMENT.md`).
+imported only into a disposable/local database. Production installation uses
+the reviewed tracked data-only seed and image package described in
+`docs/INSTALLATION.md`; it does not run the importer or require the workbooks.
 
 See `docs/LEGACY_IMPORT.md` before reviewing decisions or running the local
 apply command. The importer has no production-force shortcut and is not
@@ -388,8 +397,9 @@ See `docs/DATA_MODEL.md` for exact fields and relationships and
 
 ## Next phase
 
-The deployment procedure is documented (`docs/DEPLOYMENT.md`) and the release
-artifacts are reproducible (`tools/build-release.sh` + section 8 of that doc),
+Fresh-computer installation is documented in `docs/INSTALLATION.md`; the Plesk
+procedure is in `docs/DEPLOYMENT.md`. Both required release artifacts are built
+reproducibly with `tools/build-full-release.sh`,
 but **no production database has been created and nothing has been deployed or
 connected to production.** The actual deployment is performed by the project
 owner following that document. Do not connect to or create the production/Plesk

@@ -38,9 +38,12 @@
     "scripts": {
         "analyse": "phpstan analyse --no-progress",
         "check": [
+            "@initial-data:verify",
             "@test",
             "@analyse"
         ],
+        "build:full-release": "sh tools/build-full-release.sh",
+        "build:initial-data": "sh tools/build-initial-data-package.sh",
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "@putenv APP_ENV=local",
@@ -53,6 +56,8 @@
             "python3 tools/legacy-import/plan.py",
             "php bin/legacy-import.php verify"
         ],
+        "initial-data:export": "php tools/initial-data.php export",
+        "initial-data:verify": "php tools/initial-data.php verify",
         "primary-refresh:optimize-images": "python3 tools/primary-refresh/optimize-images.py",
         "primary-refresh:apply": "php tools/primary-refresh/apply.php apply",
         "primary-refresh:verify": "php tools/primary-refresh/apply.php verify",
@@ -66,13 +71,17 @@
         "test:integration": "phpunit --testsuite integration"
     },
     "scripts-descriptions": {
+        "build:full-release": "Build the application and complete reviewed initial-data archives for a fresh installation.",
+        "build:initial-data": "Build the verified data/image archive from tracked repository resources.",
         "dev": "Start the local development server at http://localhost:8080 (uses .env and the local database; never resets it).",
         "dev:load-legacy": "Rebuild the local database from the reviewed legacy dataset (drops and reloads domain tables; asks first).",
         "migrate": "Apply pending forward SQL migrations to the configured database.",
+        "initial-data:export": "Regenerate the tracked initial-data seed from the verified non-production database.",
+        "initial-data:verify": "Verify the tracked SQL seed and all 195 private image assets without a database.",
         "primary-refresh:optimize-images": "Crop reviewed 1024px PNGs to 640×1024 and create web-optimized WebPs (local tooling only).",
         "primary-refresh:apply": "Apply a verified Primärliste refresh plan to a non-production database.",
         "primary-refresh:verify": "Verify a Primärliste refresh plan and its non-production target without changing data.",
-        "check": "Run unit tests and PHPStan (no database).",
+        "check": "Verify initial data, then run unit tests and PHPStan (no database).",
         "test:integration": "Run the destructive integration suite against the spezitest_test database (see .env.testing)."
     }
 }
