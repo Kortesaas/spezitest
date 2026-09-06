@@ -1,9 +1,9 @@
 {
     "schema_version": 1,
     "source_workbook_sha256": "39b7d954dc3b39dabe71852d841ac66f02e7564390af55b5cf1eb413cf0ca096",
-    "refresh_plan_sha256": "806c3f11ebba829150f1cb5e1b351b9a6443000c4a13f21c02f49f020e8c1c8c",
+    "refresh_plan_sha256": "4cb41e75aaed1123003f531cb4c05eb3680263be85300ae63fb8bce8495d602a",
     "sql_path": "resources/initial-data/spezitest-data.sql",
-    "sql_sha256": "2512b716e69760655e284ef37c3fc0ec8efcf268c9c02574a37887fd3728bc66",
+    "sql_sha256": "d34c72c2de2105916b4c9680c0232222681c6692bb5f25abfb98a1d7c9ad43c9",
     "counts": {
         "drinks": 196,
         "testers": 3,

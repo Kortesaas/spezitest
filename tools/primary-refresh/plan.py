@@ -90,7 +90,10 @@ def value(rows: dict[int, dict[int, dict[str, Any]]], row: int, column: int) -> 
 
 def relative_or_absolute(path: Path) -> str:
     path = path.resolve()
-    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    # Plans promoted into the repository must never capture a developer's
+    # absolute path. Repository inputs stay relative; external workbook inputs
+    # retain only their filename while their content hash provides identity.
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name
 
 
 def webp_dimensions(data: bytes) -> tuple[str, int | None, int | None]:

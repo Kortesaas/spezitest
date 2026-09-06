@@ -77,8 +77,9 @@ decimal comma.
   controller.
 - `resources/primary-images/`: reviewed primary WebPs plus retained fallback
   images; runtime copies remain outside `public/`.
-- `resources/initial-data/`: reviewed data-only SQL seed and integrity manifest
-  for recreating the current beta catalogue on an empty migrated database.
+- `resources/initial-data/`: portable reviewed refresh plan, data-only SQL seed,
+  and integrity manifest for recreating the current beta catalogue on an empty
+  migrated database.
 - `src/`: application/configuration code, database infrastructure, and isolated
   rating domain logic.
 - `config/`: environment loading and application bootstrap.

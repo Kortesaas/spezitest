@@ -77,7 +77,7 @@
         "dev:load-legacy": "Rebuild the local database from the reviewed legacy dataset (drops and reloads domain tables; asks first).",
         "migrate": "Apply pending forward SQL migrations to the configured database.",
         "initial-data:export": "Regenerate the tracked initial-data seed from the verified non-production database.",
-        "initial-data:verify": "Verify the tracked SQL seed and all 195 private image assets without a database.",
+        "initial-data:verify": "Verify the reviewed plan, SQL seed, and all 195 private image assets without a database.",
         "primary-refresh:optimize-images": "Crop reviewed 1024px PNGs to 640×1024 and create web-optimized WebPs (local tooling only).",
         "primary-refresh:apply": "Apply a verified Primärliste refresh plan to a non-production database.",
         "primary-refresh:verify": "Verify a Primärliste refresh plan and its non-production target without changing data.",

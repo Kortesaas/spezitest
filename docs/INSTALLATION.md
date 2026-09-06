@@ -5,6 +5,7 @@ Spezitest beta on another computer or a fresh server:
 
 - application source and locked Composer dependencies;
 - all tracked database migrations;
+- the portable reviewed refresh plan and its approved source hashes;
 - the reviewed data-only seed for 196 drinks, 125 completed tests, and 375 raw
   ratings;
 - all 195 referenced private images: 186 optimized WebPs and nine retained
@@ -26,9 +27,11 @@ composer initial-data:verify
 composer check
 ```
 
-`initial-data:verify` checks the SQL seed hash and every image's hash, MIME type,
-and dimensions. Expected totals are 195 images and the documented 196/125/375
-data counts.
+`initial-data:verify` checks the exact reviewed refresh-plan hash, SQL seed hash,
+and every image's hash, MIME type, and dimensions. Expected totals are 195
+images and the documented 196/125/375 data counts. `.gitattributes` forces LF
+line endings for these integrity-checked files, including on Windows; do not
+copy or save the generated SQL through a text-mode converter.
 
 ## Install the full dataset on another development computer
 
@@ -92,8 +95,8 @@ This produces two ignored artifacts under `dist/`:
 
 - `spezitest-<version>.tar.gz`: application plus production dependencies; and
 - `spezitest-initial-data-<version>.tar.gz`: data-only SQL, both installation
-  manuals, integrity manifests, and all private image files already arranged
-  beneath `var/`.
+  manuals, reviewed refresh plan, integrity manifests, and all private image
+  files already arranged beneath `var/`.
 
 The data archive can be built without a database because its reviewed inputs
 are tracked. `composer initial-data:export` is only for deliberately refreshing

@@ -42,6 +42,13 @@ Apply it only after reviewing `var/primary-refresh/current/refresh-plan.json`:
 composer primary-refresh:apply
 ```
 
+After the apply and database verification are accepted, regenerate the plan
+with `--output resources/initial-data/refresh-plan.json` to promote a portable
+reviewed copy. External workbook paths are reduced to the filename; repository
+inputs remain relative, and hashes retain source identity. The initial-data
+export and integrity gate use this tracked copy, never the ignored working file
+under `var/`.
+
 Before a write, apply stores a private JSON snapshot of every application table
 under `var/primary-refresh/backups/` with mode `0600`. Database changes are made
 in one transaction. The verified WebP sources are copied into the configured

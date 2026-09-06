@@ -26,6 +26,7 @@ mkdir -p "$OUT" "$STAGE/$NAME/var/admin-images/admin" "$STAGE/$NAME/var/legacy-i
 
 cp resources/initial-data/spezitest-data.sql "$STAGE/$NAME/spezitest-data.sql"
 cp resources/initial-data/manifest.json "$STAGE/$NAME/DATA-MANIFEST.json"
+cp resources/initial-data/refresh-plan.json "$STAGE/$NAME/REVIEWED-REFRESH-PLAN.json"
 cp docs/INSTALLATION.md "$STAGE/$NAME/INSTALL.md"
 cp docs/DEPLOYMENT.md "$STAGE/$NAME/PLESK-DEPLOYMENT.md"
 cp -R resources/primary-images/640x1024 "$STAGE/$NAME/var/admin-images/admin/"

@@ -143,14 +143,15 @@ match to the reviewed imported dataset, verifies source/image hashes and all
 rating totals/ranks, writes a private database snapshot, and changes data in a
 transaction. It is not an HTTP or production-deployment path.
 
-The resulting reviewed operational snapshot is exported as a data-only SQL
-seed under `resources/initial-data/`; its 195 referenced image files are tracked
-under `resources/primary-images/`. `tools/initial-data.php verify` checks their
-hashes and expected counts without a database. The seed is only for a freshly
-migrated empty database and contains no schema, environment configuration, or
-credentials. `tools/build-full-release.sh` packages the application and this
-initial dataset separately so a clean checkout is sufficient for installation;
-the source workbooks and a developer database are not deployment dependencies.
+The portable reviewed refresh plan and resulting data-only SQL seed live under
+`resources/initial-data/`; the seed's 195 referenced image files are tracked
+under `resources/primary-images/`. `tools/initial-data.php verify` requires the
+exact approved plan hash and checks the SQL/image hashes and expected counts
+without a database. The seed is only for a freshly migrated empty database and
+contains no schema, environment configuration, credentials, or local absolute
+paths. `tools/build-full-release.sh` packages the application and this initial
+dataset separately so a clean checkout is sufficient for installation; the
+source workbooks and a developer database are not deployment dependencies.
 
 ## Application boundaries
 

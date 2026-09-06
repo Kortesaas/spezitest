@@ -18,7 +18,7 @@ Build both artifacts locally with `composer build:full-release`. You upload:
 | Artifact | Contents | Where it goes |
 | --- | --- | --- |
 | `dist/spezitest-<version>.tar.gz` | Application + production Composer deps. No tests, no dev tooling, no secrets, no Excel sources. | Application root on the server |
-| `dist/spezitest-initial-data-<version>.tar.gz` | Data-only `spezitest-data.sql`, manifests, manuals, and all 195 private product images arranged beneath `var/`. | SQL → phpMyAdmin after migrations · `var/` → private application storage |
+| `dist/spezitest-initial-data-<version>.tar.gz` | Data-only `spezitest-data.sql`, reviewed refresh plan, manifests, manuals, and all 195 private product images arranged beneath `var/`. | SQL → phpMyAdmin after migrations · `var/` → private application storage |
 
 The reviewed catalogue is 196 drinks (54 identified, 17 acquired, 125 tested),
 125 completed tests, 375 raw ratings, 195 images. Of those images, 186 are
@@ -210,10 +210,11 @@ dimensions before creating:
 - `dist/spezitest-initial-data-<version>.tar.gz`.
 
 The initial-data archive includes `INSTALL.md`, `PLESK-DEPLOYMENT.md`,
-`DATA-MANIFEST.json`, and a SHA-256 `MANIFEST.txt`. The build prints a SHA-256
-for each archive; verify both uploaded archives against those values before
-extracting them. After extraction, `shasum -a 256 -c MANIFEST.txt` verifies
-every file inside the initial-data package when shell access is available.
+`REVIEWED-REFRESH-PLAN.json`, `DATA-MANIFEST.json`, and a SHA-256
+`MANIFEST.txt`. The build prints a SHA-256 for each archive; verify both
+uploaded archives against those values before extracting them. After
+extraction, `shasum -a 256 -c MANIFEST.txt` verifies every file inside the
+initial-data package when shell access is available.
 
 `composer initial-data:export` is not part of normal deployment. It exists only
 to deliberately regenerate the tracked seed from the verified non-production

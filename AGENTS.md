@@ -35,11 +35,12 @@ The project is at release-preparation stage. The five fuzzy duplicate
 candidates are resolved **DIFFERENT_PRODUCTS**
 (`tools/legacy-import/duplicate-decisions.resolved.json`). Deployment is
 documented in `docs/DEPLOYMENT.md`; the release artifact is built by
-`tools/build-full-release.sh`. The repository tracks a reviewed data-only seed
-plus all 195 referenced private images under `resources/`; together with the
-migrations, these are the portable source for a fresh installation described
-in `docs/INSTALLATION.md`. Regenerating that seed is an explicit reviewed,
-non-production operation; never edit it by hand or export production data.
+`tools/build-full-release.sh`. The repository tracks a portable reviewed
+refresh plan, data-only seed, and all 195 referenced private images under
+`resources/`; together with the migrations, these are the source for a fresh
+installation described in `docs/INSTALLATION.md`. Regenerating that seed is an
+explicit reviewed, non-production operation; never edit it or its manifest by
+hand, substitute an unapproved plan, or export production data.
 **No production database exists and nothing has been
 deployed.** Do not connect to or create the production database, run the legacy
 importer against production (its `APP_ENV` guard forbids it anyway), or deploy,

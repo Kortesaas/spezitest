@@ -1,0 +1,4 @@
+# Integrity-checked release inputs must retain byte-identical LF endings on
+# every operating system, including checkouts with core.autocrlf enabled.
+/resources/initial-data/*.sql text eol=lf
+/resources/initial-data/*.json text eol=lf
