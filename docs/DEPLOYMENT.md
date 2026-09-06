@@ -303,15 +303,31 @@ identical.
 
 ## 11. Robots / indexing recommendation
 
-`public/robots.txt` (shipped) disallows `/admin` and allows the rest. The
-catalogue is real data from day one, so indexing the public site at launch is
-fine.
+`public/robots.txt` (shipped) disallows `/admin`, allows the rest, and points
+crawlers at `https://www.spezitest.de/sitemap.xml`. The catalogue is real data
+from day one, so indexing the public site at launch is fine.
 
 If you want a quiet soft-launch, edit `public/robots.txt` to `Disallow: /`
 (keeping the `/admin` line), and additionally enable **Plesk → Search Engine
 Indexing → block** for a few days. Revert both once you are satisfied with the
-public pages. There is no per-page `noindex` on public pages; the admin already
-sends `noindex, nofollow`.
+public pages. The 404 page sends `noindex`; the admin sends `noindex, nofollow`;
+every ordinary public page is indexable.
+
+### SEO / discovery endpoints (all generated from live data, no config)
+
+| URL | What it is |
+| --- | --- |
+| `/sitemap.xml` | Every public page plus one entry per Spezi and Testabend, with `lastmod`. |
+| `/feed.xml` | Atom feed of the most recently tested Spezis. Linked from every page's `<head>`. |
+| `/site.webmanifest`, `/favicon.ico`, `/assets/icon-*.png`, `/assets/apple-touch-icon.png` | Icons + PWA manifest. Regenerate from the source SVG with `python3 tools/icons/build.py` (needs Chrome + Pillow locally; never on the server). |
+| JSON-LD in each page `<head>` | `Organization`/`WebSite` everywhere; `Product` + `Review` on Spezi pages; `BreadcrumbList`; `VideoObject` on Testabend pages that have a recording URL. |
+
+After launch: submit `https://www.spezitest.de/sitemap.xml` in **Google Search
+Console** and **Bing Webmaster Tools**. If the canonical host is ever not
+`https://www.spezitest.de`, set `APP_URL` in `.env` — it drives the canonical
+tag, link previews, the sitemap and the feed. `public/robots.txt` still names
+the domain literally (the `Sitemap:` directive requires an absolute URL); edit
+it there too.
 
 ---
 

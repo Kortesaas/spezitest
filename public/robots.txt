@@ -8,3 +8,5 @@ Disallow: /admin
 # are happy with the public content, replace the line above with:
 #   Disallow: /
 # and revert once ready.
+
+Sitemap: https://www.spezitest.de/sitemap.xml

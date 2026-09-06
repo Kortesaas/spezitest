@@ -37,6 +37,8 @@ __pycache__/
 /var/test-admin-images/
 /var/primary-refresh/
 /var/stream-index-plan*.json
+/var/share-card.html
+/var/icons/
 
 # IDE and operating-system files
 .DS_Store

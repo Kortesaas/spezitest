@@ -22,6 +22,48 @@ final class WebsiteRenderer
 {
     private const TESTERS = ['manu' => 'Manu', 'fabi' => 'Fabi', 'schorsch' => 'Schorsch'];
 
+    private readonly string $siteUrl;
+
+    private readonly StructuredData $schema;
+
+    public function __construct(string $siteUrl = 'https://www.spezitest.de')
+    {
+        $this->siteUrl = rtrim($siteUrl, '/');
+        $this->schema = new StructuredData($this->siteUrl);
+    }
+
+    /**
+     * Wraps {@see Layout::page()} so every page carries the configured origin
+     * and, unless it is unindexed (the 404), the shared Organization/WebSite
+     * structured data plus whatever page-specific nodes the caller adds.
+     *
+     * @param list<array<string, mixed>> $schemaNodes
+     */
+    private function shell(
+        string $title,
+        string $main,
+        string $active,
+        ?string $description = null,
+        ?string $path = null,
+        array $schemaNodes = [],
+        ?string $imagePath = null,
+        string $ogType = 'website',
+    ): string {
+        $structuredData = $path === null ? '' : $this->schema->script($schemaNodes);
+
+        return Layout::page(
+            $title,
+            $main,
+            $active,
+            $description,
+            $path,
+            $this->siteUrl,
+            $structuredData,
+            $imagePath,
+            $ogType,
+        );
+    }
+
     public function home(RatedDrinkCollection $collection): string
     {
         $counts = $collection->lifecycleCounts();
@@ -77,11 +119,12 @@ final class WebsiteRenderer
             . '<p style="margin-top:var(--sp-5)"><a class="btn btn--secondary btn--block" href="/spezis?status%5B%5D=identified">Liste ansehen</a></p></div>'
             . '</aside></div></section>';
 
-        return Layout::page(
+        return $this->shell(
             'Start',
             $hero . $topSection . $tailSection . $this->figuresSection($collection),
             'start',
             'Cola-Mix und Spezi im Test: Katalog, Ranking und Statistik der Abteilung Spezitest.',
+            '/',
         );
     }
 
@@ -111,7 +154,15 @@ final class WebsiteRenderer
             . $this->catalogResults($page)
             . '</div></div></div>';
 
-        return Layout::page('Spezis', $body, 'spezis', 'Alle katalogisierten Cola-Mix- und Spezi-Getränke mit Status und Gesamtwertung.');
+        return $this->shell(
+            'Spezis',
+            $body,
+            'spezis',
+            'Alle katalogisierten Cola-Mix- und Spezi-Getränke mit Status und Gesamtwertung.',
+            // Every filter, sort and page of the catalog is the same content in a
+            // different order: they all canonicalise to the catalog root.
+            '/spezis',
+        );
     }
 
     public function detail(RatedDrink $drink, RatedDrinkCollection $collection): string
@@ -159,13 +210,26 @@ final class WebsiteRenderer
 
         $body = $hero . $this->previousNextNav($drink, $collection) . '</article>';
 
-        return Layout::page(
+        return $this->shell(
             $drink->name,
             $body,
             'spezis',
             $result !== null
                 ? $drink->name . ' im Spezitest: Gesamtwertung ' . Html::grade($result->gesamt()) . '.'
                 : $drink->name . ' im Spezitest-Katalog.',
+            '/spezi/' . $drink->slug(),
+            [
+                $this->schema->breadcrumb([
+                    ['name' => 'Start', 'path' => '/'],
+                    ['name' => 'Spezis', 'path' => '/spezis'],
+                    ['name' => $drink->name, 'path' => null],
+                ]),
+                $this->schema->drink($drink, count($collection->tested())),
+            ],
+            // Share the Spezi's own photo when there is one, so a link to this
+            // page previews the bottle rather than the generic card.
+            $drink->hasImage ? '/spezi/' . $drink->id . '/bild' : null,
+            'article',
         );
     }
 
@@ -184,9 +248,9 @@ final class WebsiteRenderer
             . '</p></div></div></div>';
 
         if ($ranked === []) {
-            return Layout::page('Ranking', $band . '<div class="wrap section"><div class="empty">'
+            return $this->shell('Ranking', $band . '<div class="wrap section"><div class="empty">'
                 . '<p class="empty__title">Noch kein Ranking</p>'
-                . '<p>Es wurde noch kein Test abgeschlossen.</p></div></div>', 'ranking');
+                . '<p>Es wurde noch kein Test abgeschlossen.</p></div></div>', 'ranking', null, '/ranking');
         }
 
         $body = $band . '<div class="wrap section">'
@@ -196,7 +260,14 @@ final class WebsiteRenderer
             . '<a href="/ueber#methode">Methode</a></p>'
             . '</div>';
 
-        return Layout::page('Ranking', $body, 'ranking', 'Das vollständige Spezitest-Ranking nach Gesamtwertung.');
+        return $this->shell(
+            'Ranking',
+            $body,
+            'ranking',
+            'Das vollständige Spezitest-Ranking nach Gesamtwertung.',
+            '/ranking',
+            [$this->schema->ranking(array_slice($ranked, 0, 25))],
+        );
     }
 
     public function statistik(Statistics $stats, OriginMap $map): string
@@ -208,7 +279,7 @@ final class WebsiteRenderer
             $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Noch keine Auswertung</p>'
                 . '<p>Erscheint mit dem ersten abgeschlossenen Test. Erfasst: ' . $stats->total . '.</p></div></section>';
 
-            return Layout::page('Statistik', $intro, 'statistik');
+            return $this->shell('Statistik', $intro, 'statistik', null, '/statistik');
         }
 
         $intro .= '<div class="figure-row" style="margin-top:var(--sp-6)">'
@@ -230,12 +301,13 @@ final class WebsiteRenderer
             . '<div class="barchart">' . $this->categoryAverageRows($stats) . '</div></div></div>'
             . '</div></section>';
 
-        return Layout::page(
+        return $this->shell(
             'Statistik',
             $intro . $this->originMapSection($map) . $distribution
                 . $this->priceLeistungSection($stats),
             'statistik',
             'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester und Preis/Leistung.',
+            '/statistik',
         );
     }
 
@@ -378,7 +450,7 @@ final class WebsiteRenderer
 
         return '<figure class="scatter" data-scatter>'
             . '<svg class="scatter__plot" viewBox="0 0 ' . $width . ' ' . $height . '" role="img" '
-            . 'aria-label="Streudiagramm: Preis je 0,5 Liter gegen Gesamtwertung, ein Punkt je getesteter Spezi" '
+            . 'aria-label="Streudiagramm: Preis je 0,5 Liter gegen Gesamtwertung, ein Punkt je getestete Spezi" '
             . 'preserveAspectRatio="xMidYMid meet">' . $grid . $dots . '</svg>'
             . '<figcaption class="scatter__caption">'
             . '<span>← günstiger je 0,5 l</span><span>höhere Wertung ↑</span><span>teurer →</span></figcaption>'
@@ -403,12 +475,14 @@ final class WebsiteRenderer
             . 'was dort verkostet wurde. Jede Zeile springt direkt an die passende Stelle im Video.</p></div></div>';
 
         if ($episodes === []) {
-            return Layout::page(
+            return $this->shell(
                 'Streams',
                 $head . '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="empty">'
                     . '<p class="empty__title">Noch keine Aufzeichnung</p>'
                     . '<p>Hier erscheinen die Testabende, sobald sie gestreamt wurden.</p></div></div>',
                 'streams',
+                null,
+                '/streams',
             );
         }
 
@@ -436,12 +510,13 @@ final class WebsiteRenderer
             $cards .= $this->episodeCard($episode);
         }
 
-        return Layout::page(
+        return $this->shell(
             'Streams',
             $head . '<div class="wrap" style="padding-bottom:var(--sp-9)">'
                 . $figures . '<div class="grid grid--2">' . $cards . '</div></div>',
             'streams',
             'Alle Spezitest-Testabende als Aufzeichnung, mit Sprungmarke zu jeder verkosteten Spezi.',
+            '/streams',
         );
     }
 
@@ -504,11 +579,22 @@ final class WebsiteRenderer
             . '<ol class="tasting">' . $rows . '</ol></div></section>'
             . $this->episodePager($newer, $older);
 
-        return Layout::page(
+        return $this->shell(
             'Testabend ' . $episode->number,
             $body,
             'streams',
             $episode->title . ': ' . $episode->count() . ' Spezis im Test, mit Sprungmarken ins Video.',
+            '/streams/' . $episode->number,
+            [
+                $this->schema->breadcrumb([
+                    ['name' => 'Start', 'path' => '/'],
+                    ['name' => 'Streams', 'path' => '/streams'],
+                    ['name' => 'Testabend ' . $episode->number, 'path' => null],
+                ]),
+                $this->schema->streamEpisode($episode),
+            ],
+            null,
+            'article',
         );
     }
 
@@ -684,7 +770,7 @@ final class WebsiteRenderer
         $counts = $collection->lifecycleCounts();
         $body = '<section class="wrap section"><div class="split" style="align-items:center">'
             . '<div class="stack"><span class="eyebrow eyebrow--accent">Über das Projekt</span>'
-            . '<h1 class="display-2">Wir trinken das, damit du es nicht musst.</h1>'
+            . '<h1 class="display-2">Fabi, Manu und Schorsch trinken alle Spezis.</h1>'
             . '<p class="lede">Ein Hobbyprojekt von drei Leuten mit einer selbstgestellten Aufgabe: möglichst '
             . 'jede Spezi auftreiben, selbst kaufen und nach immer denselben Kriterien bewerten. Bisher '
             . $counts['tested'] . ' ' . ($counts['tested'] === 1 ? 'getestete Spezi' : 'getestete Spezis') . '.</p></div>'
@@ -741,11 +827,12 @@ final class WebsiteRenderer
             . 'Was dort fehlt, suchen wir.</p>'
             . '<div class="cluster"><a class="btn btn--on-navy" href="/spezis">Katalog prüfen</a></div></div></div></section>';
 
-        return Layout::page(
+        return $this->shell(
             'Über Spezitest',
             $body,
             'ueber',
             'Testmethode, Tester und Selbstverständnis hinter Spezitest. Ein privates, nicht kommerzielles Projekt.',
+            '/ueber',
         );
     }
 
@@ -835,11 +922,12 @@ final class WebsiteRenderer
 
             . '</div></section>';
 
-        return Layout::page(
+        return $this->shell(
             'Impressum',
             $body,
             'impressum',
             'Impressum von Spezitest. Ein privates, nicht kommerzielles Projekt rund um Cola-Mix.',
+            '/impressum',
         );
     }
     public function datenschutz(): string
@@ -903,11 +991,12 @@ final class WebsiteRenderer
 
             . '</div></section>';
 
-        return Layout::page(
+        return $this->shell(
             'Datenschutz',
             $body,
             'datenschutz',
             'Datenschutz bei Spezitest: keine Cookies, kein Tracking, keine Dienste Dritter.',
+            '/datenschutz',
         );
     }
     public function notFound(): string
@@ -924,7 +1013,25 @@ final class WebsiteRenderer
             . '<div class="cluster"><a class="btn btn--primary" href="/">Startseite</a>'
             . '<a class="btn btn--secondary" href="/spezis">Alle Spezis</a></div></div></section>';
 
-        return Layout::page('Seite nicht gefunden', $body, '');
+        return $this->shell('Seite nicht gefunden', $body, '');
+    }
+
+    /**
+     * The branded 500 page. Built from static markup only — it must render even
+     * when the database or a downstream service is the thing that failed.
+     */
+    public function serverError(): string
+    {
+        $body = '<section class="wrap section section--lg" style="min-height:55vh;display:flex;align-items:center">'
+            . '<div class="stack-lg" style="max-width:520px"><div class="stack">'
+            . '<span class="mark display-2" style="line-height:1">500</span>'
+            . '<h1 class="display-3">Da ist uns die Kohlensäure ausgegangen.</h1>'
+            . '<p class="lede">Auf dem Server ist etwas schiefgelaufen. Wir kümmern uns darum. '
+            . 'Bitte später noch einmal versuchen.</p></div>'
+            . '<div class="cluster"><a class="btn btn--primary" href="/">Startseite</a>'
+            . '<a class="btn btn--secondary" href="/spezis">Alle Spezis</a></div></div></section>';
+
+        return $this->shell('Serverfehler', $body, '');
     }
 
     // --- fragments --------------------------------------------------------

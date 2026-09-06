@@ -59,10 +59,13 @@ final class AppFactory
         );
         /** @var Closure(): PDO $connectionFactory */
         $connectionFactory = static fn (): PDO => $adminRuntime->connection();
+        $siteUrl = $configuration->siteUrl();
+        $websiteRenderer = new WebsiteRenderer($siteUrl);
         $websiteController = new WebsiteController(
             $connectionFactory,
             $imageStorage,
-            new WebsiteRenderer(),
+            $websiteRenderer,
+            $siteUrl,
         );
 
         $responseFactory = $app->getResponseFactory();
@@ -92,6 +95,22 @@ final class AppFactory
                 );
             },
         );
+
+        // In production every other failure renders the branded 500 page rather
+        // than Slim's bare text. In debug the framework's detailed handler is
+        // kept so a developer still sees the stack trace.
+        if (!$configuration->debug()) {
+            $errorMiddleware->setDefaultErrorHandler(
+                static function () use ($websiteRenderer, $responseFactory): ResponseInterface {
+                    $response = $responseFactory->createResponse(500);
+                    $response->getBody()->write($websiteRenderer->serverError());
+
+                    return WebsiteSecurityHeadersMiddleware::apply(
+                        $response->withHeader('Content-Type', 'text/html; charset=UTF-8'),
+                    );
+                },
+            );
+        }
 
         // Local-development live reload. Never active in production: it requires
         // a non-production environment AND APP_DEBUG=true. Added last so it is
@@ -131,6 +150,8 @@ final class AppFactory
             $group->get('/streams', [$controller, 'streams']);
             $group->get('/streams/{number:[1-9][0-9]*}', [$controller, 'stream']);
             $group->get('/ueber', [$controller, 'ueber']);
+            $group->get('/sitemap.xml', [$controller, 'sitemap']);
+            $group->get('/feed.xml', [$controller, 'feed']);
             $group->get('/spezi/{id:[0-9]+}/bild', [$controller, 'image']);
             $group->get('/spezi/{ref:[0-9][A-Za-z0-9-]*}', [$controller, 'detail']);
         })->add($securityHeaders);

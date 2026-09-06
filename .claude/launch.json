@@ -4,7 +4,7 @@
     {
       "name": "spezitest-dev",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["-S", "127.0.0.1:8099", "-t", "public"],
+      "runtimeArgs": ["-S", "127.0.0.1:8099", "-t", "public", "public/index.php"],
       "port": 8099
     }
   ]

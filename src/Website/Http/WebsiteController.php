@@ -15,8 +15,12 @@ use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
 use Spezitest\Website\Catalog\CatalogRepository;
 use Spezitest\Website\Catalog\OriginMap;
+use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Slug;
 use Spezitest\Website\Catalog\Statistics;
+use Spezitest\Website\Catalog\StreamEpisode;
+use Spezitest\Website\Seo\FeedBuilder;
+use Spezitest\Website\Seo\SitemapBuilder;
 use Spezitest\Website\View\WebsiteRenderer;
 
 /**
@@ -38,6 +42,7 @@ final class WebsiteController
         private readonly Closure $connectionFactory,
         private readonly ImageStorage $imageStorage,
         private readonly WebsiteRenderer $renderer,
+        private readonly string $siteUrl = 'https://www.spezitest.de',
     ) {
     }
 
@@ -178,6 +183,47 @@ final class WebsiteController
     }
 
     /**
+     * `/sitemap.xml`: every public page plus one entry per Spezi and per
+     * Testabend, with `lastmod` from each record. Referenced from robots.txt.
+     */
+    public function sitemap(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $collection = $this->catalogRepository()->ratedDrinks();
+        $xml = (new SitemapBuilder($this->siteUrl))->build($collection, $this->streamEpisodes($collection));
+
+        return $this->xml($response, $xml);
+    }
+
+    /**
+     * `/feed.xml`: an Atom feed of the most recently tested Spezis, so the
+     * verdicts can be followed in a reader.
+     */
+    public function feed(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $xml = (new FeedBuilder($this->siteUrl))->build($this->catalogRepository()->ratedDrinks());
+
+        return $this->xml($response, $xml);
+    }
+
+    /**
+     * The Testabende as the streams pages see them, newest first, each carrying
+     * its recording date.
+     *
+     * @return list<StreamEpisode>
+     */
+    private function streamEpisodes(RatedDrinkCollection $collection): array
+    {
+        $recordedOn = $this->recordingDates();
+
+        return array_map(
+            static fn (StreamEpisode $episode): StreamEpisode => $episode->withRecordedOn(
+                $recordedOn[$episode->number] ?? null,
+            ),
+            StreamEpisode::fromCollection($collection),
+        );
+    }
+
+    /**
      * Type-ahead for the catalog search box. Read-only JSON, matched against
      * the same fields as the catalog itself so a suggestion always yields
      * results when it is submitted.
@@ -279,5 +325,14 @@ final class WebsiteController
         return $response
             ->withStatus($status)
             ->withHeader('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    private function xml(ResponseInterface $response, string $xml): ResponseInterface
+    {
+        $response->getBody()->write($xml);
+
+        return $response
+            ->withHeader('Content-Type', 'application/xml; charset=UTF-8')
+            ->withHeader('Cache-Control', 'public, max-age=3600');
     }
 }
