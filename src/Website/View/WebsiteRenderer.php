@@ -792,13 +792,29 @@ final class WebsiteRenderer
             . '<p class="meta">Alle Flaschen kaufen wir selbst. Es gibt keine bezahlten Tests, keine '
             . 'Kooperationen und keine nachträglichen Änderungen an der Methodik. Auch dann nicht, wenn '
             . 'uns ein Ergebnis nicht passt.</p></div>'
-            . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Spezi-Lifecycle</span>'
-            . '<div class="cluster cluster--tight" style="margin-top:var(--sp-3)">'
-            . Html::stateBadge('identified') . Html::stateBadge('acquired') . Html::stateBadge('tested') . '</div>'
-            . '<p class="meta" style="margin-top:var(--sp-3)">Jeder Eintrag hat genau einen dieser Zustände: '
-            . 'gesehen, im Kasten, getestet.</p></div></aside></div></section>'
+            . '<aside class="stack-lg"><div class="panel">'
+            . '<span class="eyebrow">Spezi-Lifecycle</span>'
+            . '<p class="meta" style="margin-top:var(--sp-2)">Jeder Eintrag durchläuft dieselben drei Zustände '
+            . '– und hat immer genau einen davon.</p>'
+            . '<div style="margin-top:var(--sp-5);display:flex;flex-direction:column">'
+            . $this->lifecycleStep(
+                'identified',
+                'Wir wissen, dass es die Spezi gibt – gesehen, aber noch nicht im Kasten.',
+                false,
+            )
+            . $this->lifecycleStep(
+                'acquired',
+                'Mindestens eine Flasche steht bei uns und wartet auf den Testabend.',
+                false,
+            )
+            . $this->lifecycleStep(
+                'tested',
+                'Zu dritt verkostet und nach denselben Regeln bewertet.',
+                true,
+            )
+            . '</div></div></aside></div></section>'
 
-            . '<section class="wrap section" id="tester"><div class="stack-lg">'
+            . '<section class="wrap section" id="tester" style="padding-bottom:var(--sp-6)"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Die Spezitester</span><h2 class="display-3">Was man über uns wissen muss:</h2></div>'
             . '<div class="grid grid--3">'
             . $this->testerCard('Manu', 'Trinkt sehr gerne Spezi.', 'manu')
@@ -806,7 +822,7 @@ final class WebsiteRenderer
             . $this->testerCard('Schorsch', 'Trinkt auch sehr gerne Spezi.', 'schorsch')
             . '</div></div></section>'
 
-            . '<section class="wrap section" id="projekt"><div class="prose stack-lg">'
+            . '<section class="wrap section" id="projekt" style="padding-block:var(--sp-6)"><div class="prose stack-lg">'
             . '<div class="stack"><span class="eyebrow">Zur Einordnung</span>'
             . '<h2 class="display-3">Privatvergnügen, kein Geschäft!</h2></div>'
             . '<p>Spezitest ist ein Hobby. Wir verdienen hier nichts: keine Werbung, keine Affiliate-Links, '
@@ -1720,5 +1736,24 @@ final class WebsiteRenderer
             . '" width="640" height="640" loading="lazy"></figure>'
             . '<div class="card__body"><span class="card__title">' . Html::e($name) . '</span>'
             . '<p class="meta">' . Html::e($description) . '</p></div></div>';
+    }
+
+    /**
+     * One stage of the drink lifecycle in the vertical diagram on /ueber: the
+     * status pill, a plain-language line, and a connector down to the next
+     * stage (omitted for the last).
+     */
+    private function lifecycleStep(string $status, string $meaning, bool $last): string
+    {
+        $connector = $last
+            ? ''
+            : '<span aria-hidden="true" style="align-self:flex-start;width:var(--bw-strong);height:22px;'
+                . 'margin:var(--sp-2) 0 var(--sp-2) 17px;background:var(--line-strong)"></span>';
+
+        return '<div class="stack-sm">'
+            . Html::stateBadge($status, true)
+            . '<p class="meta" style="margin:0">' . Html::e($meaning) . '</p>'
+            . '</div>'
+            . $connector;
     }
 }
