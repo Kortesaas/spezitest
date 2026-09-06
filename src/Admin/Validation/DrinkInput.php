@@ -13,6 +13,8 @@ final readonly class DrinkInput
         public ?string $originLocation,
         public ?string $originRegion,
         public ?string $notes,
+        public ?string $priceAmount,
+        public ?int $priceVolumeMl,
     ) {
     }
 }

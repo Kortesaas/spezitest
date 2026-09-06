@@ -119,12 +119,13 @@ final readonly class DrinkRepository
     }
 
     /**
-     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string}|null
+     * @return array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int}|null
      */
     public function find(int $id, bool $forUpdate = false): ?array
     {
         $sql = <<<'SQL'
-            SELECT id, name, lifecycle_status, manufacturer, origin_location, origin_region, notes
+            SELECT id, name, lifecycle_status, manufacturer, origin_location, origin_region, notes,
+                   price_amount, price_volume_ml
             FROM drinks
             WHERE id = :id
             SQL;
@@ -161,6 +162,8 @@ final readonly class DrinkRepository
             'origin_location' => $this->nullableString($row, 'origin_location'),
             'origin_region' => $this->nullableString($row, 'origin_region'),
             'notes' => $this->nullableString($row, 'notes'),
+            'price_amount' => $this->nullableString($row, 'price_amount'),
+            'price_volume_ml' => $this->nullableInt($row, 'price_volume_ml'),
         ];
     }
 
@@ -169,9 +172,11 @@ final readonly class DrinkRepository
         $statement = $this->connection->prepare(
             <<<'SQL'
                 INSERT INTO drinks (
-                    name, lifecycle_status, manufacturer, origin_location, origin_region, notes
+                    name, lifecycle_status, manufacturer, origin_location, origin_region, notes,
+                    price_amount, price_volume_ml
                 ) VALUES (
-                    :name, :lifecycle_status, :manufacturer, :origin_location, :origin_region, :notes
+                    :name, :lifecycle_status, :manufacturer, :origin_location, :origin_region, :notes,
+                    :price_amount, :price_volume_ml
                 )
                 SQL,
         );
@@ -190,7 +195,9 @@ final readonly class DrinkRepository
                     manufacturer = :manufacturer,
                     origin_location = :origin_location,
                     origin_region = :origin_region,
-                    notes = :notes
+                    notes = :notes,
+                    price_amount = :price_amount,
+                    price_volume_ml = :price_volume_ml
                 WHERE id = :id
                 SQL,
         );
@@ -328,7 +335,7 @@ final readonly class DrinkRepository
         return $statement->rowCount() === 1;
     }
 
-    /** @return array{name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string} */
+    /** @return array{name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int} */
     private function parameters(DrinkInput $input): array
     {
         return [
@@ -338,6 +345,8 @@ final readonly class DrinkRepository
             'origin_location' => $input->originLocation,
             'origin_region' => $input->originRegion,
             'notes' => $input->notes,
+            'price_amount' => $input->priceAmount,
+            'price_volume_ml' => $input->priceVolumeMl,
         ];
     }
 
@@ -351,5 +360,21 @@ final readonly class DrinkRepository
         }
 
         return $value;
+    }
+
+    /** @param array<array-key, mixed> $row */
+    private function nullableInt(array $row, string $key): ?int
+    {
+        $value = $row[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_int($value) && !is_string($value)) {
+            throw new RuntimeException('A database query returned invalid numeric data.');
+        }
+
+        return (int) $value;
     }
 }

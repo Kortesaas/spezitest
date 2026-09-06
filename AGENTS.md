@@ -95,10 +95,16 @@ drink creation must never depend on optional metadata. A future phone workflow
 must support quickly recording a name, lifecycle status, and optionally one
 primary product picture.
 
-The quick-create form stays minimal: name, status, optional picture. Do not add
-optional metadata to the create form; it belongs on the edit form after
-creation. Duplicate names remain valid and must not be rejected or silently
-merged. A drink reaches `tested` only by completing a test through the
+Basic creation still requires only name and status; every other field
+(picture, Hersteller, Ort, Region/Land, Notizen, Preis/Menge) stays optional
+and must never become a prerequisite for creating the drink record. Per an
+explicit product-owner decision (beta test-workflow revision), the dedicated
+`/admin/drinks/new` page shows all of this optional enrichment inline — so a
+newly added Spezi can be made theoretically test-ready in one step — while the
+dashboard's separate "Schnell erfassen" shortcut widget stays deliberately
+minimal (name, status, optional picture) for fast one-tap logging, e.g. from a
+phone in a Getränkemarkt. Duplicate names remain valid and must not be
+rejected or silently merged. A drink reaches `tested` only by completing a test through the
 test-entry workflow (all nine grades present, run through the verified engine);
 a status-only action must never fabricate it. Existing/imported tested records
 remain editable without inventing new test data.

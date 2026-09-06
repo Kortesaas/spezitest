@@ -22,6 +22,11 @@ Packet 6 adds a forward migration that expands test-price precision to
 `DECIMAL(12,5)` and creates the isolated `legacy_import_runs` safety table. It
 does not contain workbook data or sample drinks.
 
+Packet 8 (beta) adds a forward migration that adds `price_amount` and
+`price_volume_ml` to `drinks`: the drink's own raw entered price and container
+volume, from which the application derives a €-per-0.5 L Preis/Leistung basis.
+`drink_tests.price_amount` remains for legacy-imported test records only.
+
 MariaDB DDL can commit implicitly. A failed multi-statement migration may
 therefore leave partial schema changes even though its version is not recorded.
 Production migrations require review, a verified backup, a recovery plan, and

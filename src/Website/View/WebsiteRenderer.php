@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Spezitest\Website\View;
 
+use Spezitest\Domain\Rating\PriceNormalizer;
 use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
 use Spezitest\Website\Catalog\OriginMap;
@@ -40,7 +41,7 @@ final class WebsiteRenderer
             $leader = $top[0];
             $hero .= '<a class="winner" href="/spezi/' . Html::e($leader->slug()) . '">'
                 . $this->productImage($leader, 'pimg--hero')
-                . '<span class="winner__tag"><span class="winner__score">' . Html::grade($best->gesamt()) . '</span>'
+                . '<span class="winner__tag"><span class="winner__score">' . Html::gradeOfMax($best->gesamt(), Html::GESAMT_MAX) . '</span>'
                 . '<span class="winner__label">Testsieger</span><span class="winner__name">' . Html::e($leader->name) . '</span></span></a>';
         } else {
             $hero .= '<div class="empty"><p class="empty__title">Noch kein Testsieger</p>'
@@ -141,15 +142,15 @@ final class WebsiteRenderer
                     : '')
                 . '<div class="score"><span class="score__num">' . Html::grade($result->gesamt()) . '</span>'
                 . '<span class="score__label">Gesamtwertung · 0–60</span></div></div>'
-                . $this->ratingBreakdown($result)
-                . $this->testerGrid($drink);
+                . $this->ratingBreakdown($result);
         } else {
             $hero .= '<div class="notice"><span>Noch nicht getestet – Wertung und Einzelnoten folgen nach dem Testabend.</span></div>';
         }
 
         $hero .= '</div></div></section>';
 
-        $body = $hero . $this->detailSidebar($drink, $collection) . '</article>';
+        $body = $hero . $this->detailSidebar($drink, $collection)
+            . $this->previousNextNav($drink, $collection) . '</article>';
 
         return Layout::page(
             $drink->name,
@@ -235,10 +236,96 @@ final class WebsiteRenderer
 
         return Layout::page(
             'Statistik',
-            $intro . $this->originMapSection($map) . $distribution . $tables,
+            $intro . $this->originMapSection($map) . $distribution
+                . $this->priceLeistungSection($stats) . $tables,
             'statistik',
-            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester und Hersteller.',
+            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester, Preis/Leistung und Hersteller.',
         );
+    }
+
+    private function priceLeistungSection(Statistics $stats): string
+    {
+        if ($stats->pricedCount === 0) {
+            return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack"><span class="eyebrow">Preis / Leistung</span>'
+                . '<h2 class="display-3">Noch keine Preise erfasst</h2>'
+                . '<p class="meta">Erscheint, sobald ein getesteter Spezi einen Preis hat.</p></div></section>';
+        }
+
+        $bestCaption = $stats->bestValue !== null
+            ? '<p class="meta">Bestes Verhältnis: <a href="/spezi/' . Html::e($stats->bestValue['slug']) . '">'
+                . Html::e($stats->bestValue['name']) . '</a> (' . Html::price((string) $stats->bestValue['price'])
+                . ' je 0,5 l · ' . Html::gradeOfMax($stats->bestValue['gesamt'], Html::GESAMT_MAX) . ').</p>'
+            : '';
+
+        $figures = '<div class="figure-row">'
+            . $this->figure((string) $stats->pricedCount, 'mit Preis erfasst')
+            . $this->figure(
+                $stats->averagePriceHalfLiter !== null ? Html::price((string) $stats->averagePriceHalfLiter) : '–',
+                'Ø Preis je 0,5 l',
+            )
+            . $this->figure(
+                $stats->bestValue !== null ? Html::grade($stats->bestValue['score'] * 100, 0) : '–',
+                'beste Preis/Leistung · von 100',
+            )
+            . '</div>';
+
+        return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack-lg">'
+            . '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
+            . '<h2 class="display-3">Wer ist sein Geld wert?</h2>'
+            . '<p class="meta">Jeder Punkt ein getesteter Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
+            . 'antippen oder mit der Maus darüberfahren.</p></div>'
+            . $figures . $bestCaption . $this->priceScatterChart($stats)
+            . '</div></section>';
+    }
+
+    private function priceScatterChart(Statistics $stats): string
+    {
+        $points = $stats->priceScatter;
+
+        if (count($points) < 2) {
+            return '<p class="meta">Braucht mindestens zwei bepreiste Tests für die Übersicht.</p>';
+        }
+
+        $prices = array_map(static fn (array $point): float => $point['price'], $points);
+        $minPrice = min($prices);
+        $priceSpan = max($prices) - $minPrice;
+
+        $width = 320.0;
+        $height = 180.0;
+        $padLeft = 14.0;
+        $padRight = 14.0;
+        $padTop = 14.0;
+        $padBottom = 14.0;
+        $plotWidth = $width - $padLeft - $padRight;
+        $plotHeight = $height - $padTop - $padBottom;
+
+        $dots = '';
+
+        foreach ($points as $point) {
+            $xShare = $priceSpan > 0.0 ? ($point['price'] - $minPrice) / $priceSpan : 0.5;
+            $yShare = max(0.0, min(1.0, $point['gesamt'] / Html::GESAMT_MAX));
+            $x = round($padLeft + $xShare * $plotWidth, 1);
+            $y = round($padTop + (1 - $yShare) * $plotHeight, 1);
+            $scoreLabel = $point['score'] !== null ? Html::grade($point['score'] * 100, 0) . ' / 100' : 'k. A.';
+
+            $dots .= '<a class="scatter__dot map__dot" href="/spezi/' . Html::e($point['slug']) . '"'
+                . ' data-scatter-name="' . Html::e($point['name']) . '"'
+                . ' data-scatter-price="' . Html::e(Html::price((string) $point['price'])) . ' je 0,5 l"'
+                . ' data-scatter-gesamt="' . Html::e(Html::gradeOfMax($point['gesamt'], Html::GESAMT_MAX)) . '"'
+                . ' data-scatter-score="' . Html::e($scoreLabel) . '">'
+                . '<circle class="map__halo" cx="' . $x . '" cy="' . $y . '" r="9"></circle>'
+                . '<circle class="map__pin" cx="' . $x . '" cy="' . $y . '" r="4"></circle>'
+                . '<title>' . Html::e($point['name']) . '</title></a>';
+        }
+
+        return '<figure class="scatter" data-scatter>'
+            . '<svg class="scatter__plot" viewBox="0 0 ' . $width . ' ' . $height . '" role="img" '
+            . 'aria-label="Streudiagramm: Preis je 0,5 Liter gegen Gesamtwertung, ein Punkt je getesteter Spezi" '
+            . 'preserveAspectRatio="xMidYMid meet">' . $dots . '</svg>'
+            . '<figcaption class="scatter__caption">'
+            . '<span>← günstiger je 0,5 l</span><span>höhere Wertung ↑</span><span>teurer →</span></figcaption>'
+            . '<div class="scatter__readout" data-scatter-readout hidden></div>'
+            . '</figure>';
     }
 
     public function ueber(RatedDrinkCollection $collection): string
@@ -263,7 +350,8 @@ final class WebsiteRenderer
             . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Abgang.</p>'
             . '<h3>Geschmack</h3><p>Verhältnis von Cola zu Orange, Aromatik, Eigenständigkeit.</p>'
             . '<h3>Gesamtwertung</h3><p>Gewichtet: Optik ×1, Süffigkeit ×2, Geschmack ×3. Ergebnis 0 bis 60.</p>'
-            . '<h3>Preis / Leistung</h3><p>Nur, wenn ein Preis erfasst wurde.</p>'
+            . '<h3>Preis / Leistung</h3><p>Nur, wenn ein Preis erfasst wurde. Verglichen wird auf Basis '
+            . 'des Preises je 0,5 l.</p>'
             . '<p class="meta">Keine bezahlten Tests. Keine nachträgliche Änderung der Methodik.</p></div>'
             . '<aside class="stack-lg"><div class="panel"><span class="eyebrow">Lebenszyklus</span>'
             . '<div class="cluster cluster--tight" style="margin-top:var(--sp-3)">'
@@ -463,7 +551,7 @@ final class WebsiteRenderer
                 . $this->productImage($drink, 'pimg--thumb')
                 . '<span class="rank__text"><span class="rank__name">' . Html::e($drink->name) . '</span>'
                 . '<span class="rank__sub">' . Html::e($drink->manufacturer ?? '–') . '</span></span>'
-                . '<span class="rank__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span></a>';
+                . '<span class="rank__score">' . Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) . '<small>Wertung</small></span></a>';
         }
 
         return $rows;
@@ -492,7 +580,7 @@ final class WebsiteRenderer
                 . '</span>'
                 . '<span class="podium__body"><span class="rank__name">' . Html::e($drink->name) . '</span>'
                 . '<span class="rank__sub">' . Html::e($drink->manufacturer ?? '–') . '</span></span>'
-                . '<span class="podium__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span>'
+                . '<span class="podium__score">' . Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) . '<small>Wertung</small></span>'
                 . '</a>';
         }
 
@@ -522,30 +610,6 @@ final class WebsiteRenderer
         return $html;
     }
 
-    private function testerGrid(RatedDrink $drink): string
-    {
-        if ($drink->testerGrades === []) {
-            return '';
-        }
-
-        $cells = '';
-
-        foreach (self::TESTERS as $code => $label) {
-            $grades = $drink->testerGrades[$code] ?? null;
-
-            if ($grades === null) {
-                continue;
-            }
-
-            $mean = ((float) $grades['optik'] + (float) $grades['sueffigkeit'] + (float) $grades['geschmack']) / 3;
-            $cells .= '<div class="tester"><span class="tester__name">' . Html::e($label) . '</span><br>'
-                . '<span class="tester__val">' . Html::grade($mean, 1) . '</span></div>';
-        }
-
-        return '<div class="stack"><span class="eyebrow">Tester · Mittel</span>'
-            . '<div class="testers">' . $cells . '</div></div>';
-    }
-
     private function detailSidebar(RatedDrink $drink, RatedDrinkCollection $collection): string
     {
         // The hero subtitle already carries the manufacturer and the display
@@ -571,50 +635,49 @@ final class WebsiteRenderer
             $factsHtml .= '<dt>' . Html::e($term) . '</dt><dd>' . Html::e($value) . '</dd>';
         }
 
-        $noteHtml = '';
-
-        if ($drink->testNotes !== null) {
-            $noteHtml = '<div class="stack"><span class="eyebrow">Testnotiz</span>'
-                . '<div class="prose"><p>' . nl2br(Html::e($drink->testNotes)) . '</p></div></div>';
-        }
-
         $priceHtml = '';
 
-        if ($drink->priceAmount !== null) {
+        if ($drink->priceAmount !== null && $drink->priceVolumeMl !== null) {
             $pp = $drink->pricePerformance;
+            $normalizedNote = $drink->priceVolumeMl === 500
+                ? ''
+                : '<p class="meta">→ ' . Html::e(Html::price(
+                    (string) (new PriceNormalizer())->perReferenceVolume($drink->priceAmount, $drink->priceVolumeMl),
+                )) . ' je 0,5 l — die für Preis/Leistung verwendete Basis.</p>';
             $priceHtml = '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
                 . '<div class="cluster" style="gap:var(--sp-6)">'
                 . '<div class="score"><span class="score__num">' . Html::e(Html::price($drink->priceAmount)) . '</span>'
-                . '<span class="score__label">pro Gebinde</span></div>'
+                . '<span class="score__label">/ ' . $drink->priceVolumeMl . ' ml</span></div>'
                 . ($pp !== null
                     ? '<div class="score"><span class="score__num">' . Html::grade((float) $pp->normalized() * 100, 0) . '</span>'
                         . '<span class="score__label">von 100 · Preis / Leistung</span></div>'
                     : '')
                 . '</div>'
-                . ($pp !== null ? '<p class="meta">100 = bestes Verhältnis aus Gesamtwertung und Preis unter allen '
-                    . 'getesteten Spezis mit erfasstem Preis.</p>' : '')
+                . $normalizedNote
+                . ($pp !== null ? '<p class="meta">100 = bestes Verhältnis aus Gesamtwertung und Preis je 0,5 l unter '
+                    . 'allen getesteten Spezis mit erfasstem Preis.</p>' : '')
                 . '</div>';
         }
 
-        $neighbours = $this->rankingNeighbours($drink, $collection);
-
-        if ($noteHtml === '' && $priceHtml === '' && $factsHtml === '' && $neighbours === '') {
+        if ($priceHtml === '' && $factsHtml === '') {
             return '';
         }
 
         return '<section class="section section--tint"><div class="wrap split split--sidebar"><div class="stack-lg">'
-            . $noteHtml
             . $priceHtml
-            . ($noteHtml === '' && $priceHtml === '' ? '<p class="meta">Keine weiteren Angaben erfasst.</p>' : '')
+            . ($priceHtml === '' ? '<p class="meta">Keine weiteren Angaben erfasst.</p>' : '')
             . '</div><aside class="stack-lg">'
             . ($factsHtml !== ''
                 ? '<div class="panel"><span class="eyebrow">Details</span><dl class="meta--dl meta--dl-stack" style="margin-top:var(--sp-3)">' . $factsHtml . '</dl></div>'
                 : '')
-            . $neighbours
             . '</aside></div></section>';
     }
 
-    private function rankingNeighbours(RatedDrink $drink, RatedDrinkCollection $collection): string
+    /**
+     * A simple previous/next pager by Gesamtwertung rank, spanning the full
+     * page width rather than living inside the sidebar.
+     */
+    private function previousNextNav(RatedDrink $drink, RatedDrinkCollection $collection): string
     {
         if (!$drink->isTested()) {
             return '';
@@ -635,26 +698,35 @@ final class WebsiteRenderer
             return '';
         }
 
-        $rows = '';
+        $previous = $ranked[$position - 1] ?? null;
+        $next = $ranked[$position + 1] ?? null;
 
-        foreach ([$position - 1, $position + 1] as $neighbourIndex) {
-            $neighbour = $ranked[$neighbourIndex] ?? null;
-
-            if ($neighbour === null || $neighbour->result === null) {
-                continue;
-            }
-
-            $rows .= '<a class="rank__row" href="/spezi/' . Html::e($neighbour->slug()) . '" style="grid-template-columns:auto 1fr auto">'
-                . '<span class="rank__pos">' . ($neighbour->rank ?? '') . '</span>'
-                . '<span class="rank__name" style="font-size:var(--fs-body)">' . Html::e($neighbour->name) . '</span>'
-                . '<span class="rank__score" style="font-size:var(--fs-h4)">' . Html::grade($neighbour->result->gesamt()) . '</span></a>';
-        }
-
-        if ($rows === '') {
+        if ($previous === null && $next === null) {
             return '';
         }
 
-        return '<div class="stack"><span class="eyebrow">Nachbarn im Ranking</span><div class="rank">' . $rows . '</div></div>';
+        return '<section class="wrap section" style="padding-top:0">'
+            . '<nav class="grid grid--2" style="gap:var(--sp-3) var(--sp-4)" aria-label="Weitere Spezis nach Wertung">'
+            . ($previous !== null ? $this->neighbourRow($previous, 'Vorheriger') : '<div></div>')
+            . ($next !== null ? $this->neighbourRow($next, 'Nächster') : '<div></div>')
+            . '</nav></section>';
+    }
+
+    private function neighbourRow(RatedDrink $drink, string $label): string
+    {
+        $result = $drink->result;
+        $subParts = array_filter([
+            $drink->manufacturer,
+            $result !== null ? Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) : null,
+        ]);
+
+        return '<a class="neighbour" href="/spezi/' . Html::e($drink->slug()) . '">'
+            . $this->productImage($drink, 'pimg--thumb')
+            . '<span class="neighbour__text">'
+            . '<span class="neighbour__label">' . Html::e($label) . ' · #' . ($drink->rank ?? '') . '</span>'
+            . '<span class="neighbour__name">' . Html::e($drink->name) . '</span>'
+            . '<span class="neighbour__sub">' . Html::e(implode(' · ', $subParts)) . '</span></span>'
+            . '</a>';
     }
 
     private function catalogCard(RatedDrink $drink): string
@@ -665,7 +737,7 @@ final class WebsiteRenderer
                 . ($drink->rank !== null
                     ? '<span class="card__rank">#' . $drink->rank . '</span>'
                     : '<span class="card__rank card__rank--none">Getestet</span>')
-                . '<span class="card__score">' . Html::grade($result->gesamt()) . '<small>Wertung</small></span></div>'
+                . '<span class="card__score">' . Html::gradeOfMax($result->gesamt(), Html::GESAMT_MAX) . '<small>Wertung</small></span></div>'
             : '<div class="card__foot">' . Html::stateBadge($drink->lifecycleStatus) . '</div>';
 
         return '<a class="card card-link" href="/spezi/' . Html::e($drink->slug()) . '">'
@@ -815,9 +887,23 @@ final class WebsiteRenderer
         foreach ($stats->gesamtDistribution as $index => $bin) {
             $width = $max > 0 ? (int) round($bin['count'] / $max * 100) : 0;
             $accent = $index >= 4 ? ' barchart__row--accent' : '';
-            $rows .= '<div class="barchart__row' . $accent . '"><span class="barchart__label">' . Html::e($bin['label']) . '</span>'
+            $hasDrinks = $bin['drinks'] !== [];
+            $trigger = $hasDrinks ? ' data-bin-trigger tabindex="0" role="button" aria-expanded="false"' : '';
+            $rows .= '<div class="barchart__row' . $accent . '"' . $trigger . '>'
+                . '<span class="barchart__label">' . Html::e($bin['label']) . '</span>'
                 . '<span class="barchart__track"><i style="width:' . $width . '%"></i></span>'
                 . '<span class="barchart__val">' . $bin['count'] . '</span></div>';
+
+            if ($hasDrinks) {
+                $items = '';
+
+                foreach ($bin['drinks'] as $drink) {
+                    $items .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                        . '<span>' . Html::gradeOfMax($drink['gesamt'], Html::GESAMT_MAX) . '</span></li>';
+                }
+
+                $rows .= '<ul class="barchart__detail" hidden>' . $items . '</ul>';
+            }
         }
 
         return $rows;

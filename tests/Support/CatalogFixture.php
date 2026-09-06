@@ -27,6 +27,7 @@ final class CatalogFixture
         ?string $manufacturer = null,
         ?string $region = null,
         ?string $price = null,
+        ?int $priceVolumeMl = 500,
         string $updatedAt = '2026-01-01 00:00:00',
     ): RatedDrink {
         $ratings = [];
@@ -57,6 +58,7 @@ final class CatalogFixture
             $result,
             null,
             $price,
+            $price === null ? null : $priceVolumeMl,
             null,
             '2026-01-01 00:00:00',
             null,
@@ -81,6 +83,7 @@ final class CatalogFixture
             $status,
             $hasImage,
             $updatedAt,
+            null,
             null,
             null,
             null,

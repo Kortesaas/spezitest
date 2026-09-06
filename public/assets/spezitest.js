@@ -377,4 +377,148 @@
     form.addEventListener('change', recompute);
     recompute();
   }
+
+  // Live "je 0,5 l" preview on the drink edit form's price field. Display
+  // only — the server always recomputes the real value from the stored price
+  // and volume.
+  var priceForm = document.querySelector('[data-price-form]');
+  var pricePreview = priceForm ? priceForm.querySelector('[data-price-preview]') : null;
+  if (priceForm && pricePreview) {
+    var recomputePrice = function () {
+      var priceField = priceForm.querySelector('[name="price"]');
+      var volumeField = priceForm.querySelector('[name="price_volume_ml"]');
+      var price = priceField ? parseFloat(String(priceField.value).replace(',', '.')) : NaN;
+      var volume = volumeField ? parseFloat(volumeField.value) : NaN;
+      if (isNaN(price) || isNaN(volume) || volume <= 0) {
+        pricePreview.textContent = '–';
+        return;
+      }
+      var perHalfLitre = (price * 500) / volume;
+      pricePreview.textContent = perHalfLitre.toFixed(2).replace('.', ',') + ' €';
+    };
+    priceForm.addEventListener('input', recomputePrice);
+    recomputePrice();
+  }
+
+  // Test-result reveal: one click un-blurs every spoiler in scope together.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-reveal-trigger]');
+    if (!trigger) {
+      return;
+    }
+    var scope = document.querySelector('[data-reveal-scope]');
+    if (scope) {
+      scope.classList.add('is-revealed');
+    }
+    trigger.setAttribute('hidden', '');
+  });
+
+  // Statistik: bar charts grow into place the first time they scroll into
+  // view, instead of just appearing. The server-rendered inline width is the
+  // real, correct value throughout — this only replays it as a transition.
+  (function () {
+    var tracks = Array.prototype.slice.call(document.querySelectorAll('.barchart__track i'));
+    if (tracks.length === 0) {
+      return;
+    }
+
+    if (!window.IntersectionObserver) {
+      return;
+    }
+
+    tracks.forEach(function (track) {
+      track.dataset.grownWidth = track.style.width;
+      track.style.width = '0%';
+    });
+
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) {
+            return;
+          }
+          entry.target.style.width = entry.target.dataset.grownWidth || '0%';
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.4 },
+    );
+
+    tracks.forEach(function (track) {
+      observer.observe(track);
+    });
+  })();
+
+  // Statistik: clicking a Gesamtwertung bar reveals which Spezis landed in
+  // that range. Keyboard-operable since the row is a real [role=button].
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-bin-trigger]');
+    if (!trigger) {
+      return;
+    }
+    toggleBin(trigger);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    var trigger = event.target.closest('[data-bin-trigger]');
+    if (!trigger) {
+      return;
+    }
+    event.preventDefault();
+    toggleBin(trigger);
+  });
+
+  function toggleBin(trigger) {
+    var detail = trigger.nextElementSibling;
+    if (!detail || !detail.classList.contains('barchart__detail')) {
+      return;
+    }
+    var willOpen = detail.hidden;
+    detail.hidden = !willOpen;
+    trigger.setAttribute('aria-expanded', String(willOpen));
+  }
+
+  // Statistik: hovering or focusing a Preis/Leistung scatter dot shows its
+  // details in the readout beneath the chart. Every dot is still a plain
+  // link to the Spezi, so clicking works with or without this.
+  (function () {
+    var scatter = document.querySelector('[data-scatter]');
+    var readout = scatter ? scatter.querySelector('[data-scatter-readout]') : null;
+    if (!scatter || !readout) {
+      return;
+    }
+
+    var show = function (dot) {
+      readout.innerHTML = '';
+
+      var name = document.createElement('strong');
+      name.textContent = dot.getAttribute('data-scatter-name') || '';
+
+      var price = document.createElement('span');
+      price.textContent = dot.getAttribute('data-scatter-price') || '';
+
+      var gesamt = document.createElement('span');
+      gesamt.textContent = dot.getAttribute('data-scatter-gesamt') || '';
+
+      var score = document.createElement('span');
+      score.textContent = 'Preis/Leistung: ' + (dot.getAttribute('data-scatter-score') || '');
+
+      readout.appendChild(name);
+      readout.appendChild(price);
+      readout.appendChild(gesamt);
+      readout.appendChild(score);
+      readout.hidden = false;
+    };
+
+    Array.prototype.slice.call(scatter.querySelectorAll('.scatter__dot')).forEach(function (dot) {
+      dot.addEventListener('mouseenter', function () {
+        show(dot);
+      });
+      dot.addEventListener('focus', function () {
+        show(dot);
+      });
+    });
+  })();
 })();

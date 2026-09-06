@@ -33,6 +33,7 @@ final readonly class RatedDrink
         public ?RatingResult $result,
         public ?int $rank,
         public ?string $priceAmount,
+        public ?int $priceVolumeMl,
         public ?string $testNotes,
         public ?string $testedAt,
         public ?PricePerformanceResult $pricePerformance,

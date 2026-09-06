@@ -25,6 +25,8 @@ use Spezitest\Application\AdminRuntime;
 use Spezitest\Domain\Rating\RatingCalculator;
 use Spezitest\Domain\Rating\TesterRatingFactory;
 use Spezitest\Media\ImageResponder;
+use Spezitest\Website\Catalog\CatalogRepository;
+use Spezitest\Website\Catalog\RatedDrink;
 
 final class AdminController
 {
@@ -138,6 +140,30 @@ final class AdminController
                 $this->repository()->search($search, $status),
                 $search,
                 $status,
+                $this->csrfTokens->token(),
+            ),
+        );
+    }
+
+    public function testQueue(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        try {
+            $search = $this->validator->validateSearch($request->getQueryParams()['q'] ?? null);
+        } catch (ValidationException $exception) {
+            return $this->html(
+                $response,
+                $this->renderer->testQueue([], '', $this->csrfTokens->token(), $exception->getMessage()),
+                422,
+            );
+        }
+
+        return $this->html(
+            $response,
+            $this->renderer->testQueue(
+                $this->repository()->search($search, 'acquired'),
+                $search,
                 $this->csrfTokens->token(),
             ),
         );
@@ -428,9 +454,89 @@ final class AdminController
             );
         }
 
-        $target = $complete ? '/admin/drinks/' . $drinkId . '/edit' : '/admin/drinks/' . $drinkId . '/test';
+        $target = $complete ? '/admin/drinks/' . $drinkId . '/test/result' : '/admin/drinks/' . $drinkId . '/test';
 
         return $this->redirect($response, $target);
+    }
+
+    /** @param array<string, string> $arguments */
+    public function testResult(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $drinkId = $this->drinkId($arguments);
+        $collection = (new CatalogRepository($this->connection()))->ratedDrinks();
+        $drink = $collection->find($drinkId);
+
+        if ($drink === null || !$drink->isTested()) {
+            return $this->html($response, $this->renderer->notFound($this->csrfTokens->token()), 404);
+        }
+
+        $ranked = $collection->ranked();
+        $gesamtTotal = count($ranked);
+        [$rankAbove, $rankBelow] = $this->neighbors($ranked, $drink);
+
+        $pricePosition = null;
+        $priceTotal = null;
+        $priceAbove = null;
+        $priceBelow = null;
+
+        if ($drink->pricePerformance !== null) {
+            $priceRanked = $collection->pricePerformanceRanked();
+            $priceTotal = count($priceRanked);
+            $index = $this->indexOf($priceRanked, $drink);
+
+            if ($index !== null) {
+                $pricePosition = $index + 1;
+                [$priceAbove, $priceBelow] = $this->neighbors($priceRanked, $drink);
+            }
+        }
+
+        return $this->html(
+            $response,
+            $this->renderer->testResult(
+                $drink,
+                $gesamtTotal,
+                $rankAbove,
+                $rankBelow,
+                $pricePosition,
+                $priceTotal,
+                $priceAbove,
+                $priceBelow,
+                $this->csrfTokens->token(),
+            ),
+        );
+    }
+
+    /**
+     * @param list<RatedDrink> $ranked
+     * @return array{0: ?RatedDrink, 1: ?RatedDrink}
+     */
+    private function neighbors(array $ranked, RatedDrink $drink): array
+    {
+        $index = $this->indexOf($ranked, $drink);
+
+        if ($index === null) {
+            return [null, null];
+        }
+
+        return [
+            $ranked[$index - 1] ?? null,
+            $ranked[$index + 1] ?? null,
+        ];
+    }
+
+    /** @param list<RatedDrink> $ranked */
+    private function indexOf(array $ranked, RatedDrink $drink): ?int
+    {
+        foreach ($ranked as $index => $candidate) {
+            if ($candidate->id === $drink->id) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     private function loadTestFormData(int $drinkId): TestFormData
@@ -447,7 +553,6 @@ final class AdminController
 
         return new TestFormData(
             $grades,
-            $test['price_amount'] !== null ? $this->priceForInput($test['price_amount']) : '',
             $test['notes'] ?? '',
             $test['status'],
             $result,
@@ -473,21 +578,14 @@ final class AdminController
             }
         }
 
-        $price = $body['price'] ?? '';
         $notes = $body['notes'] ?? '';
 
         return new TestFormData(
             $grades,
-            is_string($price) ? $price : '',
             is_string($notes) ? $notes : '',
             $status === 'tested' ? 'completed' : 'draft',
             null,
         );
-    }
-
-    private function priceForInput(string $decimal): string
-    {
-        return rtrim(rtrim(number_format((float) $decimal, 4, ',', ''), '0'), ',');
     }
 
     /**

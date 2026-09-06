@@ -39,6 +39,7 @@ final class DomainSchemaMigrationTest extends TestCase
             '20260904000000_create_domain_schema',
             '20260904000100_seed_canonical_testers',
             '20260904000200_prepare_legacy_import',
+            '20260905000000_add_drink_price_and_volume',
         ], $this->migrator->migrate());
         self::assertSame([], $this->migrator->migrate());
 
@@ -126,6 +127,10 @@ final class DomainSchemaMigrationTest extends TestCase
         self::assertSame(
             ['data_type' => 'decimal', 'numeric_precision' => 12, 'numeric_scale' => 5],
             $this->numericColumn('drink_tests', 'price_amount'),
+        );
+        self::assertSame(
+            ['data_type' => 'decimal', 'numeric_precision' => 12, 'numeric_scale' => 4],
+            $this->numericColumn('drinks', 'price_amount'),
         );
 
         $statement = $this->connection->query(

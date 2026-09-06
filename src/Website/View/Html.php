@@ -33,6 +33,16 @@ final class Html
         return $value === null ? 'k. A.' : self::grade($value, $decimals);
     }
 
+    /**
+     * A grade together with its scale maximum (e.g. "55,33/60"), so a bare
+     * score is never shown without the reader knowing what the best possible
+     * result is.
+     */
+    public static function gradeOfMax(float $value, float $max, int $decimals = 2): string
+    {
+        return self::grade($value, $decimals) . ' / ' . self::integer($max);
+    }
+
     public static function integer(int|float $value): string
     {
         return number_format((float) $value, 0, ',', '.');

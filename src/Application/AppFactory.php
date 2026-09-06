@@ -155,6 +155,7 @@ final class AppFactory
             static function (RouteCollectorProxy $group) use ($adminController, $csrfMiddleware): void {
                 $group->get('', [$adminController, 'dashboard']);
                 $group->post('/logout', [$adminController, 'logout'])->add($csrfMiddleware);
+                $group->get('/test', [$adminController, 'testQueue']);
                 $group->get('/drinks', [$adminController, 'drinks']);
                 $group->get('/drinks/new', [$adminController, 'createForm']);
                 $group->post('/drinks', [$adminController, 'create'])->add($csrfMiddleware);
@@ -167,6 +168,7 @@ final class AppFactory
                 $group->get('/drinks/{id:[1-9][0-9]*}/test', [$adminController, 'testForm']);
                 $group->post('/drinks/{id:[1-9][0-9]*}/test', [$adminController, 'saveTestDraft'])->add($csrfMiddleware);
                 $group->post('/drinks/{id:[1-9][0-9]*}/test/complete', [$adminController, 'completeTest'])->add($csrfMiddleware);
+                $group->get('/drinks/{id:[1-9][0-9]*}/test/result', [$adminController, 'testResult']);
             },
         )
             ->add(new AdminAuthenticationMiddleware($authenticator, $responseFactory))

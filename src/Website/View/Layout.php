@@ -30,14 +30,14 @@ final class Layout
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . Html::e($title) . ' · Spezitest</title>'
             . $descriptionMeta
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p16">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p21">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body>'
             . '<a class="skip-link" href="#main">Zum Inhalt springen</a>'
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p16" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p21" defer></script>'
             . '</body></html>';
     }
 

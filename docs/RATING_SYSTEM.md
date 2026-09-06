@@ -219,6 +219,25 @@ is optional even for a completed test. Negative prices are treated as
 unavailable because division can be performed safely only for a positive
 price; this is a safety policy, not a claim about workbook behavior.
 
+### Price basis — DECIDED (beta test-workflow revision)
+
+The remaining unresolved question — the unit/basis of `Preis` — is decided
+for the beta application: **price per 0.5 L**. A drink's `price_amount` /
+`price_volume_ml` (raw entered price + container volume, entered on the drink
+itself, before grading) are converted by
+`Spezitest\Domain\Rating\PriceNormalizer::perReferenceVolume()` into a €-per-
+0.5-L figure using the same exact rational arithmetic (`ExactNumber`) as the
+rest of the rating layer. That converted figure — not the raw entered price —
+is what `CatalogRepository` feeds into the unchanged
+`PricePerformanceCalculator::calculate()` as `$price`, both for a drink's own
+Preis/Leistung and for the comparison population. `PricePerformanceCalculator`
+itself is not modified; only what "price" means at its call site changes.
+
+This basis applies only to prices entered through the beta application.
+Legacy-imported `drink_tests.price_amount` values predate this decision, their
+unit/basis is still unknown, and they are therefore no longer read for
+Preis/Leistung (see `DATA_MODEL.md`).
+
 ## Other formula anomalies — HISTORICAL QUIRK
 
 Columns V (`Timestamp`) and W (`Dauer`) usually contain time-of-day and integer
@@ -275,7 +294,9 @@ not change the verified rating formulas above.
 - Public/current-test selection and historical rank presentation remain product
   decisions. Preis/Leistung itself is dynamically recalculated over all
   currently eligible completed/tested results with valid positive prices.
-- The business unit and basis of `Preis` are not stated in the workbook.
+- The business unit and basis of `Preis` are not stated in the workbook. This
+  is resolved for the beta application only (see "Price basis" below); the
+  workbook itself remains silent and legacy-imported prices are unaffected.
 
 ## Input scale — RE-VERIFIED (pre-deployment)
 

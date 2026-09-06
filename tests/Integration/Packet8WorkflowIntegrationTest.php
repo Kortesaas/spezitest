@@ -110,6 +110,31 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         );
     }
 
+    public function testDrinkPriceFeedsPublicPreisLeistung(): void
+    {
+        $this->login();
+        $id = $this->createDrink('Bepreister Spezi', 'acquired');
+
+        $update = $this->request('POST', "/admin/drinks/$id", [
+            '_csrf' => $this->csrfToken(),
+            'name' => 'Bepreister Spezi',
+            'lifecycle_status' => 'acquired',
+            'price' => '0,89',
+            'price_volume_ml' => '500',
+        ]);
+        self::assertSame(303, $update->getStatusCode());
+
+        $this->request('POST', "/admin/drinks/$id/test/complete", $this->goldenBody());
+        $this->logout();
+
+        $canonical = $this->request('GET', "/spezi/$id")->getHeaderLine('Location');
+        $detail = (string) $this->request('GET', $canonical)->getBody();
+
+        self::assertStringContainsString('0,89 €', $detail);
+        self::assertStringContainsString('/ 500 ml', $detail);
+        self::assertStringContainsString('Preis / Leistung', $detail);
+    }
+
     public function testIncompleteRatingCannotCompleteATest(): void
     {
         $this->login();

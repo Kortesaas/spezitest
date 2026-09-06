@@ -30,7 +30,17 @@ One row is one persistent Cola-Mix product. The minimum creation facts are
 | `origin_location` | `VARCHAR(255) NULL` | Raw locality/origin text when known |
 | `origin_region` | `VARCHAR(128) NULL` | Raw region text when known |
 | `notes` | `TEXT NULL` | Optional operational notes |
+| `price_amount` | `DECIMAL(12,4) NULL` | Raw entered price for `price_volume_ml` |
+| `price_volume_ml` | `SMALLINT UNSIGNED NULL` | Container volume the price was paid for |
 | `created_at`, `updated_at` | `DATETIME(6)` | Record timestamps |
+
+`price_amount` and `price_volume_ml` are always both present or both absent
+(database-enforced). They are entered on the drink itself — before a test, as
+part of the same edit form as manufacturer/Ort/Region/notes — because price is
+a property of the acquired product, not of one grading session. The
+application's decided Preis/Leistung basis is **price per 0.5 L**, derived
+from these two raw facts by `Spezitest\Domain\Rating\PriceNormalizer` at the
+`CatalogRepository` read boundary; see `RATING_SYSTEM.md`.
 
 MariaDB enforces both the nonblank name and allowed lifecycle values. There is
 intentionally no `UNIQUE(name)`: audited history contains same-name products
@@ -64,7 +74,10 @@ Nullable fields preserve useful audited test facts without claiming more than
 the workbooks establish:
 
 - `price_amount DECIMAL(12,5)` stores the price associated with the test when
-  its meaning is known;
+  its meaning is known. As of the beta test-workflow revision, new/edited
+  tests no longer write this column — price now lives on `drinks`
+  (`price_amount` / `price_volume_ml`, see above). It remains populated for
+  legacy-imported test records and is read only by the legacy importer;
 - `recorded_time TIME`, `duration_value INT UNSIGNED`, and
   `stream_reference SMALLINT UNSIGNED` retain the workbook-shaped values
   without assigning an unverified unit or business meaning;
@@ -149,9 +162,13 @@ editable truth.
   historical results are presented remain product decisions.
 - The valid rating input range and granularity remain unverified beyond the
   observed historical values.
-- Price unit and basis are unknown. Missing, zero, or otherwise unavailable
-  prices do not produce Preis/Leistung; the 58 untested legacy prices remain
-  deferred enrichment facts rather than invented tests.
+- Price unit and basis for the beta application are decided: price per 0.5 L,
+  entered as a raw price + container volume on the drink (see above). Legacy
+  imported `drink_tests.price_amount` values predate this decision and their
+  unit/basis remains unknown, which is why they are no longer consulted for
+  Preis/Leistung. Missing, zero, or otherwise unavailable prices do not
+  produce Preis/Leistung; the 58 untested legacy prices remain deferred
+  enrichment facts rather than invented tests.
 - Historical acquisition/inventory events are not modeled. Lifecycle remains
   the current state on the drink.
 - Duplicate matching and merge rules remain part of the controlled import;

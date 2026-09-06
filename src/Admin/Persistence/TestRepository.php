@@ -177,36 +177,33 @@ final readonly class TestRepository
         ]);
     }
 
-    public function updateDraftDetails(int $testId, ?string $priceAmount, ?string $notes): void
+    public function updateDraftDetails(int $testId, ?string $notes): void
     {
         $statement = $this->connection->prepare(
             <<<'SQL'
                 UPDATE drink_tests
-                SET price_amount = :price_amount, notes = :notes
+                SET notes = :notes
                 WHERE id = :id AND status = 'draft'
                 SQL,
         );
         $statement->execute([
-            'price_amount' => $priceAmount,
             'notes' => $notes,
             'id' => $testId,
         ]);
     }
 
-    public function markCompleted(int $testId, ?string $priceAmount, ?string $notes): void
+    public function markCompleted(int $testId, ?string $notes): void
     {
         $statement = $this->connection->prepare(
             <<<'SQL'
                 UPDATE drink_tests
                 SET status = 'completed',
                     completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP(6)),
-                    price_amount = :price_amount,
                     notes = :notes
                 WHERE id = :id
                 SQL,
         );
         $statement->execute([
-            'price_amount' => $priceAmount,
             'notes' => $notes,
             'id' => $testId,
         ]);

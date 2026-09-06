@@ -6,12 +6,15 @@ namespace Spezitest\Admin\Http;
 
 use Spezitest\Admin\Testing\TestFormData;
 use Spezitest\Domain\Rating\RatingResult;
+use Spezitest\Website\Catalog\RatedDrink;
 
 /**
  * Server-rendered admin HTML, styled with the Spezitest Design System admin
  * shell. The admin is deliberately more compact and functional than the public
- * site; the quick-add workflow stays a single short form (name + status +
- * optional picture).
+ * site. The dashboard's "Schnell erfassen" widget stays a single short form
+ * (name + status + optional picture); the dedicated `/admin/drinks/new` page
+ * additionally shows every optional enrichment field inline so a Spezi can be
+ * made test-ready in one step.
  *
  * All user-controlled values are escaped for their output context.
  */
@@ -74,7 +77,7 @@ final class HtmlRenderer
             . '</div>'
             . '<div class="split split--wide">'
             . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Warten auf den Test</h2>'
-            . '<a class="link-arrow" href="/admin/drinks?lifecycle_status=acquired">Alle ' . $counts['acquired'] . '</a></div>'
+            . '<a class="link-arrow" href="/admin/test">Alle ' . $counts['acquired'] . '</a></div>'
             . ($queue === ''
                 ? '<p class="meta">Nichts offen – alle erworbenen Spezis sind getestet.</p>'
                 : '<ul class="queue">' . $queue . '</ul>')
@@ -154,28 +157,56 @@ final class HtmlRenderer
     public function createForm(string $csrfToken, array $values = [], ?string $error = null): string
     {
         $body = $this->head('', 'Spezi hinzufügen')
-            . '<div style="max-width:var(--w-form)">'
-            . '<form class="panel panel--pad stack-lg" method="post" action="/admin/drinks" enctype="multipart/form-data">'
-            . $this->csrfField($csrfToken)
             . $this->error($error)
-            . '<div class="field"><label class="label" for="name">Name <span class="req">*</span></label>'
+            . '<form method="post" action="/admin/drinks" enctype="multipart/form-data">'
+            . $this->csrfField($csrfToken)
+            . '<div class="split split--sidebar" style="gap:var(--sp-5)"><div class="stack-lg">'
+            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Stammdaten</h2></div>'
+            . '<div class="form-row" style="grid-template-columns:1fr 1fr">'
+            . '<div class="field" style="grid-column:1/-1"><label class="label" for="name">Name <span class="req">*</span></label>'
             . '<input class="input" id="name" name="name" maxlength="255" required autofocus '
+            . 'placeholder="z.B. Talbach Cola-Mix" '
             . 'style="font-size:var(--fs-body-lg)" value="' . $this->value($values, 'name') . '"></div>'
-            . '<div class="field"><span class="label" id="stl">Status <span class="req">*</span></span>'
-            . $this->statusSegmented($this->stringValue($values, 'lifecycle_status') ?? 'identified', false) . '</div>'
-            . '<div class="field"><span class="label">Bild <span class="meta" style="letter-spacing:0;text-transform:none">optional</span></span>'
-            . '<label class="uploader"><input type="file" name="picture" accept="image/jpeg,image/png,image/webp" class="visually-hidden">'
-            . '<strong>Foto auswählen</strong><span class="meta">JPEG, PNG, WebP</span></label></div>'
-            . '<div class="form-actions" style="flex-direction:column;align-items:stretch">'
-            . '<button class="btn btn--accent btn--lg btn--block" type="submit">Hinzufügen</button>'
+            . '<div class="field"><label class="label" for="c2">Hersteller</label>'
+            . '<input class="input" id="c2" name="manufacturer" maxlength="255" placeholder="z.B. Talbach Brauerei" '
+            . 'value="' . $this->value($values, 'manufacturer') . '"></div>'
+            . '<div class="field"><label class="label" for="c3">Ort</label>'
+            . '<input class="input" id="c3" name="origin_location" maxlength="255" placeholder="z.B. 83022 Rosenheim" '
+            . 'value="' . $this->value($values, 'origin_location') . '">'
+            . '<span class="hint">Mit PLZ voranstellen, damit die Herkunftskarte den Ort platzieren kann.</span></div>'
+            . '<div class="field"><label class="label" for="c4">Region / Land</label>'
+            . '<input class="input" id="c4" name="origin_region" maxlength="128" placeholder="z.B. Bayern" '
+            . 'value="' . $this->value($values, 'origin_region') . '"></div>'
+            . '<div class="field" style="grid-column:1/-1"><label class="label" for="c5">Notizen</label>'
+            . '<textarea class="textarea" id="c5" name="notes" placeholder="z.B. Gefunden im Getränkemarkt, auffällige Flasche …">'
+            . $this->value($values, 'notes') . '</textarea></div>'
+            . '</div></section>'
+            . '<section class="panel panel--pad" data-price-form><div class="panel__head">'
+            . '<h2 class="panel__title">Preis</h2><span class="meta">optional</span></div>'
+            . '<div class="form-row" style="grid-template-columns:1fr 1fr">'
+            . '<div class="field"><label class="label" for="c6">Preis</label>'
+            . '<input class="input" id="c6" name="price" inputmode="decimal" placeholder="0,89" value="' . $this->value($values, 'price') . '"></div>'
+            . '<div class="field"><label class="label" for="c7">Menge (ml)</label>'
+            . '<input class="input" id="c7" name="price_volume_ml" inputmode="numeric" placeholder="500" value="' . $this->value($values, 'price_volume_ml') . '"></div>'
+            . '</div><p class="hint" style="margin-top:var(--sp-2)">Grundlage für Preis/Leistung: '
+            . '<strong data-price-preview>–</strong> je 0,5 l.</p></section>'
+            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Status</h2></div>'
+            . $this->statusSegmented($this->stringValue($values, 'lifecycle_status') ?? 'identified', false) . '</section>'
+            . '<div class="form-actions"><button class="btn btn--accent" type="submit">Hinzufügen</button>'
             . '<a class="btn btn--ghost" href="/admin/drinks">Abbrechen</a></div>'
-            . '</form></div>';
+            . '</div><aside class="stack-lg">'
+            . '<section class="panel"><div class="panel__head"><h2 class="panel__title">Bild</h2></div>'
+            . '<figure class="pimg pimg--square"><div class="pimg__ph"><span>Kein Bild</span></div></figure>'
+            . $this->pictureField('cpic', '', false)
+            . '</section>'
+            . '</aside></div>'
+            . '</form>';
 
         return $this->document('Spezi hinzufügen', $body, true, $csrfToken, 'create');
     }
 
     /**
-     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string} $drink
+     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int} $drink
      */
     public function editForm(array $drink, bool $hasImage, string $csrfToken, ?string $error = null): string
     {
@@ -190,6 +221,10 @@ final class HtmlRenderer
             ? '<a class="btn btn--secondary btn--sm" href="/admin/drinks/' . $id . '/test">'
                 . ($drink['lifecycle_status'] === 'tested' ? 'Test bearbeiten' : 'Test erfassen') . '</a>'
             : '';
+
+        if ($drink['lifecycle_status'] === 'tested') {
+            $testLink .= '<a class="btn btn--ghost btn--sm" href="/admin/drinks/' . $id . '/test/result">Ergebnis ansehen</a>';
+        }
 
         $body = '<div class="admin-head"><div><nav aria-label="Brotkrumen"><ol class="breadcrumb">'
             . '<li><a href="/admin/drinks">Spezis</a></li><li>' . $this->escape($drink['name']) . '</li></ol></nav>'
@@ -209,12 +244,25 @@ final class HtmlRenderer
             . '<div class="field"><label class="label" for="e2">Hersteller</label>'
             . '<input class="input" id="e2" name="manufacturer" maxlength="255" value="' . $this->escape($drink['manufacturer'] ?? '') . '"></div>'
             . '<div class="field"><label class="label" for="e3">Ort</label>'
-            . '<input class="input" id="e3" name="origin_location" maxlength="255" value="' . $this->escape($drink['origin_location'] ?? '') . '"></div>'
+            . '<input class="input" id="e3" name="origin_location" maxlength="255" placeholder="z.B. 83022 Rosenheim" '
+            . 'value="' . $this->escape($drink['origin_location'] ?? '') . '">'
+            . '<span class="hint">Mit PLZ voranstellen, damit die Herkunftskarte den Ort platzieren kann.</span></div>'
             . '<div class="field"><label class="label" for="e4">Region / Land</label>'
             . '<input class="input" id="e4" name="origin_region" maxlength="128" value="' . $this->escape($drink['origin_region'] ?? '') . '"></div>'
             . '<div class="field" style="grid-column:1/-1"><label class="label" for="e5">Notizen</label>'
             . '<textarea class="textarea" id="e5" name="notes">' . $this->escape($drink['notes'] ?? '') . '</textarea></div>'
             . '</div></section>'
+            . '<section class="panel panel--pad" data-price-form><div class="panel__head">'
+            . '<h2 class="panel__title">Preis</h2><span class="meta">optional</span></div>'
+            . '<div class="form-row" style="grid-template-columns:1fr 1fr">'
+            . '<div class="field"><label class="label" for="e6">Preis</label>'
+            . '<input class="input" id="e6" name="price" inputmode="decimal" placeholder="0,89" '
+            . 'value="' . $this->priceForDisplay($drink['price_amount']) . '"></div>'
+            . '<div class="field"><label class="label" for="e7">Menge (ml)</label>'
+            . '<input class="input" id="e7" name="price_volume_ml" inputmode="numeric" placeholder="500" '
+            . 'value="' . ($drink['price_volume_ml'] !== null ? (string) $drink['price_volume_ml'] : '') . '"></div>'
+            . '</div><p class="hint" style="margin-top:var(--sp-2)">Grundlage für Preis/Leistung: '
+            . '<strong data-price-preview>–</strong> je 0,5 l.</p></section>'
             . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Status</h2></div>'
             . $this->statusSegmented($drink['lifecycle_status'], $drink['lifecycle_status'] === 'tested')
             . '<p class="hint" style="margin-top:var(--sp-3)">„Getestet“ nur über die Testerfassung.</p></section>'
@@ -253,7 +301,7 @@ final class HtmlRenderer
     }
 
     /**
-     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string} $drink
+     * @param array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, price_amount: ?string, price_volume_ml: ?int} $drink
      */
     public function testForm(
         array $drink,
@@ -266,29 +314,33 @@ final class HtmlRenderer
 
         $panels = '';
 
-        foreach (self::TESTERS as $code => $label) {
-            $fields = '';
+        foreach (self::CATEGORIES as $category => $categoryLabel) {
+            $rows = '';
 
-            foreach (self::CATEGORIES as $category => $categoryLabel) {
-                $fields .= '<div class="field"><span class="label">' . $this->escape($categoryLabel) . '</span>'
+            foreach (self::TESTERS as $code => $label) {
+                $rows .= '<div class="field"><span class="label">' . $this->escape($label) . '</span>'
                     . $this->gradeScale($code . '_' . $category, $data->grade($code, $category)) . '</div>';
             }
 
             $panels .= '<section class="panel panel--pad"><div class="panel__head">'
-                . '<h2 class="panel__title">' . $this->escape($label) . '</h2></div>'
-                . '<div class="stack-lg">' . $fields . '</div></section>';
+                . '<h2 class="panel__title">' . $this->escape($categoryLabel) . '</h2></div>'
+                . '<div class="stack-lg">' . $rows . '</div></section>';
         }
+
+        $priceLine = $drink['price_amount'] !== null && $drink['price_volume_ml'] !== null
+            ? $this->priceForDisplay($drink['price_amount']) . ' € / ' . $drink['price_volume_ml'] . ' ml'
+            : 'kein Preis erfasst';
 
         $summary = '<div class="panel test-summary">'
             . $this->thumbnail($id, $hasImage)
             . '<div class="test-summary__body">'
             . '<a class="test-summary__name" href="/admin/drinks/' . $id . '/edit">' . $this->escape($drink['name']) . '</a>'
-            . '<span class="meta">Noten 0–10 · höher ist besser</span></div>'
+            . '<span class="meta">Noten 0–10 · höher ist besser · ' . $this->escape($priceLine)
+            . ' <a href="/admin/drinks/' . $id . '/edit">Preis bearbeiten</a></span></div>'
             . '<div class="score" style="align-items:flex-end"><span class="score__label">Gesamt</span>'
             . '<span class="score__num" style="font-size:2.25rem" data-gesamt-preview>'
             . ($data->result !== null ? $this->grade($data->result->gesamt()) : '–') . '</span></div></div>';
 
-        $priceValue = $this->escape($data->price);
         $notesValue = $this->escape($data->notes);
 
         $body = '<div class="admin-head"><div><nav aria-label="Brotkrumen"><ol class="breadcrumb">'
@@ -303,23 +355,126 @@ final class HtmlRenderer
             . '<form method="post" action="/admin/drinks/' . $id . '/test" class="stack-lg" data-test-form>'
             . $this->csrfField($csrfToken)
             . $panels
-            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Notiz &amp; Preis</h2>'
+            . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Testnotiz</h2>'
             . '<span class="meta">optional</span></div>'
-            . '<div class="form-row" style="grid-template-columns:2fr 1fr">'
-            . '<div class="field" style="grid-column:1/-1"><label class="label" for="tn">Testnotiz</label>'
+            . '<div class="field"><label class="visually-hidden" for="tn">Testnotiz</label>'
             . '<textarea class="textarea" id="tn" name="notes" placeholder="Farbe, Kohlensäure, Süße, Orangenanteil …">' . $notesValue . '</textarea></div>'
-            . '<div class="field"><label class="label" for="tp">Preis pro Gebinde</label>'
-            . '<input class="input" id="tp" name="price" inputmode="decimal" placeholder="0,89" value="' . $priceValue . '"></div>'
-            . '</div></section>'
+            . '</section>'
             . '<div class="sticky-actions">'
             . '<button class="btn btn--accent" type="submit" formaction="/admin/drinks/' . $id . '/test/complete">'
             . 'Abschließen</button>'
             . '<button class="btn btn--secondary" type="submit">Zwischenspeichern</button>'
-            . '<a class="btn btn--ghost" href="/admin/drinks/' . $id . '/edit">Abbrechen</a>'
+            . '<a class="btn btn--ghost" href="/admin/test">Abbrechen</a>'
             . '<span class="meta" style="align-self:center">Abschließen setzt „Getestet“ – alle 9 Noten nötig.</span></div>'
             . '</form>';
 
-        return $this->document('Test erfassen', $body, true, $csrfToken, 'drinks');
+        return $this->document('Test erfassen', $body, true, $csrfToken, 'test');
+    }
+
+    /**
+     * @param list<array{id: int, name: string, lifecycle_status: string, manufacturer: ?string, has_primary_image: bool}> $drinks
+     */
+    public function testQueue(array $drinks, string $search, string $csrfToken, ?string $error = null): string
+    {
+        $rows = '';
+
+        foreach ($drinks as $drink) {
+            $rows .= '<li class="queue__row">'
+                . $this->thumbnail($drink['id'], $drink['has_primary_image'])
+                . '<span class="queue__body"><a class="queue__name" href="/admin/drinks/' . $drink['id'] . '/test">'
+                . $this->escape($drink['name']) . '</a>'
+                . ($drink['manufacturer'] === null ? '' : '<span class="meta">' . $this->escape($drink['manufacturer']) . '</span>')
+                . '</span>'
+                . '<a class="btn btn--primary btn--sm" href="/admin/drinks/' . $drink['id'] . '/test">Testen</a></li>';
+        }
+
+        if ($rows === '') {
+            $rows = $search !== ''
+                ? '<p class="meta">Nichts gefunden.</p>'
+                : '<p class="meta">Nichts offen – alle erworbenen Spezis sind getestet.</p>'
+                    . '<p style="margin-top:var(--sp-3)"><a class="btn btn--secondary btn--sm" href="/admin/drinks/new">Spezi hinzufügen</a></p>';
+        } else {
+            $rows = '<ul class="queue">' . $rows . '</ul>';
+        }
+
+        $body = $this->head('Nächste Runde', 'Testen')
+            . $this->error($error)
+            . '<div class="panel panel--pad">'
+            . '<form class="toolbar" method="get" action="/admin/test" style="margin-bottom:var(--sp-4)">'
+            . '<div class="search" style="flex:1;min-width:220px;max-width:420px"><label class="visually-hidden" for="tq">Suchen</label>'
+            . '<input id="tq" name="q" type="search" placeholder="Name oder Hersteller" value="' . $this->escape($search) . '">'
+            . '<button type="submit">Suchen</button></div>'
+            . ($search !== '' ? '<a class="btn btn--ghost btn--sm" href="/admin/test">Zurücksetzen</a>' : '')
+            . '</form>'
+            . $rows
+            . '</div>';
+
+        return $this->document('Testen', $body, true, $csrfToken, 'test');
+    }
+
+    public function testResult(
+        RatedDrink $drink,
+        int $gesamtTotal,
+        ?RatedDrink $rankAbove,
+        ?RatedDrink $rankBelow,
+        ?int $pricePosition,
+        ?int $priceTotal,
+        ?RatedDrink $priceAbove,
+        ?RatedDrink $priceBelow,
+        string $csrfToken,
+    ): string {
+        $result = $drink->result;
+        $gesamt = $result !== null ? $this->grade($result->gesamt()) : '–';
+
+        $gesamtSpoiler = '<div class="panel panel--pad stack">'
+            . '<span class="eyebrow">Platz</span>'
+            . '<div class="score"><span class="score__num spoiler" style="font-size:2.5rem">'
+            . 'Platz ' . $drink->rank . ' von ' . $gesamtTotal . '</span></div>'
+            . $this->neighborRow($rankAbove, $rankBelow)
+            . '</div>';
+
+        $priceHtml = $drink->pricePerformance === null
+            ? '<div class="panel panel--pad"><span class="eyebrow">Preis / Leistung</span>'
+                . '<p class="meta" style="margin-top:var(--sp-2)">Kein Preis erfasst – '
+                . '<a href="/admin/drinks/' . $drink->id . '/edit">jetzt nachtragen</a>.</p></div>'
+            : '<div class="panel panel--pad stack">'
+                . '<span class="eyebrow">Preis / Leistung</span>'
+                . '<div class="score"><span class="score__num spoiler" style="font-size:2.5rem">'
+                . 'Platz ' . $pricePosition . ' von ' . $priceTotal . '</span></div>'
+                . $this->neighborRow($priceAbove, $priceBelow)
+                . '</div>';
+
+        $body = $this->head('', 'Testergebnis')
+            . '<div class="panel test-summary">'
+            . $this->thumbnail($drink->id, $drink->hasImage)
+            . '<div class="test-summary__body">'
+            . '<span class="test-summary__name">' . $this->escape($drink->name) . '</span>'
+            . '<span class="meta">Getestet</span></div>'
+            . '<div class="score" style="align-items:flex-end"><span class="score__label">Gesamt</span>'
+            . '<span class="score__num" style="font-size:2.25rem">' . $gesamt . '</span></div></div>'
+            . '<div class="grid grid--2" data-reveal-scope style="margin-top:var(--sp-4);gap:var(--sp-4)">'
+            . $gesamtSpoiler . $priceHtml . '</div>'
+            . '<div class="form-actions">'
+            . '<button type="button" class="btn btn--secondary" data-reveal-trigger>Aufdecken</button>'
+            . '<a class="btn btn--accent" href="/admin/test">Weiter zur nächsten Spezi</a>'
+            . '</div>';
+
+        return $this->document('Testergebnis', $body, true, $csrfToken, 'test');
+    }
+
+    private function neighborRow(?RatedDrink $above, ?RatedDrink $below): string
+    {
+        $cell = fn (?RatedDrink $drink, string $label): string => $drink === null
+            ? ''
+            : '<div class="spoiler"><span class="meta">' . $label . '</span><br>'
+                . '<strong>' . $this->escape($drink->name) . '</strong></div>';
+
+        if ($above === null && $below === null) {
+            return '';
+        }
+
+        return '<div class="cluster" style="gap:var(--sp-6);margin-top:var(--sp-3)">'
+            . $cell($above, 'Platz davor') . $cell($below, 'Platz danach') . '</div>';
     }
 
     public function notFound(string $csrfToken): string
@@ -360,10 +515,10 @@ final class HtmlRenderer
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . $this->escape($title) . ' · Spezitest Verwaltung</title>'
             . '<meta name="robots" content="noindex, nofollow">'
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p16">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p21">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shellOpen
-            . '<script src="/assets/spezitest.js?v=p16" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p21" defer></script>'
             . '</body></html>';
     }
 
@@ -373,6 +528,7 @@ final class HtmlRenderer
             'dashboard' => ['/admin', 'Übersicht'],
             'drinks' => ['/admin/drinks', 'Spezis'],
             'create' => ['/admin/drinks/new', 'Spezi hinzufügen'],
+            'test' => ['/admin/test', 'Testen'],
         ];
         $links = '<span class="admin-side__group">Katalog</span>';
 
@@ -405,7 +561,7 @@ final class HtmlRenderer
         return '<form class="stack-lg" method="post" action="/admin/drinks" enctype="multipart/form-data">'
             . $this->csrfField($csrfToken)
             . '<div class="field"><label class="label" for="qn">Name <span class="req">*</span></label>'
-            . '<input class="input" id="qn" name="name" maxlength="255" required placeholder="z. B. Talbach Cola-Mix"></div>'
+            . '<input class="input" id="qn" name="name" maxlength="255" required placeholder="z.B. Talbach Cola-Mix"></div>'
             . '<div class="field"><span class="label">Status <span class="req">*</span></span>'
             . $this->statusSegmented('identified', false) . '</div>'
             . $this->pictureField('qp', 'Bild')
@@ -416,10 +572,12 @@ final class HtmlRenderer
      * The branded upload control, used everywhere a picture is chosen so the
      * admin never falls back to the unstyled browser file input.
      */
-    private function pictureField(string $id, string $label): string
+    private function pictureField(string $id, string $label, bool $showOptionalTag = true): string
     {
-        return '<div class="field"><span class="label">' . $this->escape($label)
-            . ' <span class="label__opt">optional</span></span>'
+        $optionalTag = $showOptionalTag ? ' <span class="label__opt">optional</span>' : '';
+        $labelHtml = $label === '' ? '' : '<span class="label">' . $this->escape($label) . $optionalTag . '</span>';
+
+        return '<div class="field">' . $labelHtml
             . '<label class="uploader uploader--sm" for="' . $this->escape($id) . '">'
             . '<input type="file" id="' . $this->escape($id) . '" name="picture" '
             . 'accept="image/jpeg,image/png,image/webp" class="visually-hidden" data-uploader>'
@@ -524,6 +682,15 @@ final class HtmlRenderer
     private function grade(float $value): string
     {
         return number_format($value, 2, ',', '');
+    }
+
+    private function priceForDisplay(?string $decimal): string
+    {
+        if ($decimal === null) {
+            return '';
+        }
+
+        return $this->escape(rtrim(rtrim(number_format((float) $decimal, 4, ',', ''), '0'), ','));
     }
 
     /** @param array<array-key, mixed> $values */

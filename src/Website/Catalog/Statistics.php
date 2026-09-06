@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Spezitest\Website\Catalog;
 
+use Spezitest\Domain\Rating\PriceNormalizer;
+
 /**
  * Figures that can be derived reliably from the current database contents.
  *
@@ -18,9 +20,11 @@ final readonly class Statistics
      * @param array{optik: ?float, sueffigkeit: ?float, geschmack: ?float} $averageByCategory
      * @param array{optik: ?array{name: string, value: float}, sueffigkeit: ?array{name: string, value: float}, geschmack: ?array{name: string, value: float}} $bestByCategory
      * @param array<string, ?float> $testerAverages Keyed by tester code.
-     * @param list<array{label: string, count: int}> $gesamtDistribution
+     * @param list<array{label: string, count: int, drinks: list<array{name: string, slug: string, gesamt: float}>}> $gesamtDistribution
      * @param list<array{region: string, count: int}> $regionCounts
      * @param list<array{name: string, count: int, averageGesamt: ?float, best: ?array{name: string, gesamt: float}}> $manufacturers
+     * @param ?array{name: string, slug: string, score: float, gesamt: float, price: float} $bestValue
+     * @param list<array{name: string, slug: string, price: float, gesamt: float, score: ?float}> $priceScatter
      */
     public function __construct(
         public int $total,
@@ -33,6 +37,10 @@ final readonly class Statistics
         public array $gesamtDistribution,
         public array $regionCounts,
         public array $manufacturers,
+        public int $pricedCount,
+        public ?float $averagePriceHalfLiter,
+        public ?array $bestValue,
+        public array $priceScatter,
     ) {
     }
 
@@ -46,6 +54,13 @@ final readonly class Statistics
         $bestByCategory = ['optik' => null, 'sueffigkeit' => null, 'geschmack' => null];
         $testerTotals = [];
         $distribution = array_fill(0, 6, 0);
+        /** @var list<list<array{name: string, slug: string, gesamt: float}>> $distributionDrinks */
+        $distributionDrinks = array_fill(0, 6, []);
+        $priceNormalizer = new PriceNormalizer();
+        $priceScatter = [];
+        $priceValues = [];
+        /** @var ?array{name: string, slug: string, score: float, gesamt: float, price: float} $bestValue */
+        $bestValue = null;
 
         foreach ($tested as $drink) {
             $result = $drink->result;
@@ -73,11 +88,36 @@ final readonly class Statistics
 
             $bin = min(5, (int) ($result->gesamt() / 10));
             ++$distribution[$bin];
+            $distributionDrinks[$bin][] = ['name' => $drink->name, 'slug' => $drink->slug(), 'gesamt' => $result->gesamt()];
 
             foreach ($drink->testerGrades as $code => $grades) {
                 $testerTotals[$code] ??= ['sum' => 0.0, 'count' => 0];
                 $testerTotals[$code]['sum'] += (float) $grades['optik'] + (float) $grades['sueffigkeit'] + (float) $grades['geschmack'];
                 $testerTotals[$code]['count'] += 3;
+            }
+
+            if ($drink->priceAmount !== null && $drink->priceVolumeMl !== null) {
+                $pricePerHalfLiter = $priceNormalizer->perReferenceVolume($drink->priceAmount, $drink->priceVolumeMl);
+                $priceValues[] = $pricePerHalfLiter;
+                $score = $drink->pricePerformance?->normalized();
+
+                $priceScatter[] = [
+                    'name' => $drink->name,
+                    'slug' => $drink->slug(),
+                    'price' => $pricePerHalfLiter,
+                    'gesamt' => $result->gesamt(),
+                    'score' => $score,
+                ];
+
+                if ($score !== null && ($bestValue === null || $score > $bestValue['score'])) {
+                    $bestValue = [
+                        'name' => $drink->name,
+                        'slug' => $drink->slug(),
+                        'score' => $score,
+                        'gesamt' => $result->gesamt(),
+                        'price' => $pricePerHalfLiter,
+                    ];
+                }
             }
         }
 
@@ -93,9 +133,12 @@ final readonly class Statistics
         $gesamtDistribution = [];
 
         foreach ($distribution as $index => $count) {
+            $binDrinks = $distributionDrinks[$index];
+            usort($binDrinks, static fn (array $a, array $b): int => $b['gesamt'] <=> $a['gesamt']);
             $gesamtDistribution[] = [
                 'label' => sprintf('%d–%d', $index * 10, ($index + 1) * 10),
                 'count' => $count,
+                'drinks' => $binDrinks,
             ];
         }
 
@@ -114,6 +157,10 @@ final readonly class Statistics
             $gesamtDistribution,
             self::regionCounts($collection),
             self::manufacturers($collection),
+            count($priceScatter),
+            self::mean($priceValues),
+            $bestValue,
+            $priceScatter,
         );
     }
 

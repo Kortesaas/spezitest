@@ -56,9 +56,11 @@ is still CSRF-protected.
 | GET | `/admin/drinks/{id}/delete` | Explicit delete confirmation |
 | POST | `/admin/drinks/{id}/delete` | Delete when no restrictive dependencies exist |
 | GET | `/admin/drinks/{id}/image` | Authenticated primary-image response |
+| GET | `/admin/test` | Queue of acquired Spezis waiting for a test |
 | GET | `/admin/drinks/{id}/test` | Nine-grade test-entry form (draft or completed) |
 | POST | `/admin/drinks/{id}/test` | Save a draft test (partial grades allowed) |
 | POST | `/admin/drinks/{id}/test/complete` | Validate all nine grades, run the engine, set `tested` |
+| GET | `/admin/drinks/{id}/test/result` | Ranking result, place blurred until revealed |
 
 All state changes use POST and require a session-bound random CSRF token.
 Unauthenticated protected requests redirect to `/admin/login`. Production
@@ -80,13 +82,17 @@ provides debugging/database administration.
 
 ## Drink validation and persistence
 
-Quick creation requires only a nonblank name of at most 255 bytes and a status.
-Because this packet does not implement test/rating entry, a new record may be
-created as `identified` or `acquired`; `tested` requires an existing completed
-test and cannot be fabricated by a status-only action. Imported/existing tested
-records remain editable. A picture is optional. Manufacturer, location,
-region, and notes remain optional and are available only on the edit form.
-Every value is validated server-side and escaped when rendered.
+Creation requires only a nonblank name of at most 255 bytes and a status; a
+new record may be created as `identified` or `acquired` — `tested` requires an
+existing completed test and cannot be fabricated by a status-only action.
+Imported/existing tested records remain editable. Every other field (picture,
+Hersteller, Ort, Region/Land, Notizen, Preis/Menge) is optional and never a
+prerequisite for creating the record, but the dedicated `/admin/drinks/new`
+page shows all of them inline (product-owner decision) so a newly added Spezi
+can be made theoretically test-ready — acquired, priced, with a picture and
+notes — in one step. The dashboard's separate "Schnell erfassen" widget still
+posts to the same endpoint with only name + status + optional picture, for
+fast logging. Every value is validated server-side and escaped when rendered.
 
 Names are intentionally not unique. Creating two records with the same name is
 valid and never triggers an automatic merge. Lifecycle changes update the same
@@ -119,16 +125,21 @@ upload from becoming executable application code.
 
 ## Test / rating entry
 
-`/admin/drinks/{id}/test` is available for a drink that is `acquired` (or
-already `tested`, for corrections). An `identified` drink must be moved to
-`acquired` first.
+`/admin/test` lists every `acquired` drink as a picker for "which Spezi do we
+test next" — the same query the dashboard's waiting queue uses, without its
+6-row cap. Selecting one opens `/admin/drinks/{id}/test`, available for a
+drink that is `acquired` (or already `tested`, for corrections). An
+`identified` drink must be moved to `acquired` first.
 
-Each of the three canonical testers (Manu, Fabi, Schorsch) grades Optik,
-Süffigkeit and Geschmack as an integer 0–10, higher is better. A tester's three
-grades are entered together or not at all, so every saved row maps cleanly onto
-the `ratings` table. An optional test price is parsed from German or plain
-decimal notation and stored on `drink_tests.price_amount`; an optional note is
-stored on `drink_tests.notes`.
+Grading is grouped **by category**, not by tester: one panel each for Optik,
+Süffigkeit and Geschmack, each containing all three testers' grade scales side
+by side, in that order. Each of the three canonical testers (Manu, Fabi,
+Schorsch) still grades every category as an integer 0–10, higher is better,
+and a tester's three grades are entered together or not at all, so every saved
+row maps cleanly onto the `ratings` table. An optional tasting note is stored
+on `drink_tests.notes`. The test price is not entered here — it lives on the
+drink itself (see below) and is shown read-only in the summary panel with a
+link to the edit form.
 
 "Zwischenspeichern" persists a partial draft and leaves the drink on `acquired`.
 "Test abschließen" requires all nine grades: the raw grades are stored, the
@@ -136,6 +147,26 @@ verified `RatingCalculator` is asked for an official result, and in one
 database transaction the test becomes `completed` and the drink becomes
 `tested`. An incomplete rating set returns 422 and changes nothing. Category
 averages, Gesamt and rank are always derived on read and never written.
+
+Completing a test redirects to `/admin/drinks/{id}/test/result`, which shows
+the Gesamtwertung immediately but blurs the Gesamt rank/place, its price-
+performance rank/place, and both drinks' neighbors above/below until a single
+"Aufdecken" click reveals them together (a spoiler, so the group can guess
+first — see `public/assets/spezitest.css`'s `[data-reveal-scope]`/`.spoiler`
+rule and the matching click handler in `spezitest.js`). A drink with no price
+set shows "Kein Preis erfasst" for that half, never blurred. The page's
+primary action returns to `/admin/test` for the next Spezi.
+
+## Drink price (Preis/Leistung basis)
+
+`price_amount` / `price_volume_ml` are entered on the drink's own edit form,
+alongside Hersteller/Ort/Region/Notizen — not on the grading form — because
+price is a fact about the acquired product, entered once before tasting. Both
+are optional but must be given together (enforced by validation and a
+database `CHECK`). The edit form shows a live client-side preview of the
+resulting price per 0.5 L (`spezitest.js`); the server always recomputes the
+authoritative value via `Spezitest\Domain\Rating\PriceNormalizer`. See
+`docs/RATING_SYSTEM.md` for how this feeds Preis/Leistung.
 
 ## Current limitations
 

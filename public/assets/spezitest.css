@@ -371,6 +371,17 @@ table{border-collapse:collapse;width:100%}
 .rank__row--podium{border-bottom:var(--bw-strong) solid var(--line-strong);padding-block:var(--sp-4)}
 .rank__row--podium .rank__pos{font-size:2.5rem;color:var(--red)}
 .rank__row--podium .rank__name{font-size:var(--fs-h2)}
+
+/* Previous/next Spezi pager on the detail page: a plain, slim link — no card
+   chrome — with the score folded into the same line as the manufacturer so
+   it sits right next to the name instead of pinned to a far edge. */
+.neighbour{display:flex;align-items:center;gap:var(--sp-3);padding-block:var(--sp-2);text-decoration:none;color:inherit}
+.neighbour .pimg--thumb{width:40px;flex:none}
+.neighbour__text{display:grid;gap:1px;min-width:0}
+.neighbour__label{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-muted)}
+.neighbour__name{font-size:var(--fs-body);font-weight:var(--fw-bold);color:var(--text-strong);overflow-wrap:anywhere}
+.neighbour__sub{font-size:var(--fs-xs);color:var(--text-muted);overflow-wrap:anywhere}
+.neighbour:hover .neighbour__name{color:var(--red);text-decoration:underline;text-decoration-thickness:2px}
 .podium{display:grid;gap:var(--sp-4)}
 .podium__item{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-4);align-items:end;background:var(--surface-tint);border-radius:var(--radius-2);padding:var(--sp-5)}
 .podium__item--1{background:var(--surface-accent);color:var(--text-on-red)}
@@ -480,10 +491,29 @@ table{border-collapse:collapse;width:100%}
 .barchart__row{display:grid;grid-template-columns:minmax(88px,auto) 1fr auto;gap:var(--sp-3);align-items:center;font-size:var(--fs-sm)}
 .barchart__label{font-weight:var(--fw-bold);color:var(--text-strong)}
 .barchart__track{height:16px;background:var(--gray-075);border-radius:var(--radius-pill);overflow:hidden}
-.barchart__track i{display:block;height:100%;background:var(--navy)}
+.barchart__track i{display:block;height:100%;background:var(--navy);transition:width 700ms var(--ease-out)}
+@media (prefers-reduced-motion:reduce){.barchart__track i{transition:none}}
 .barchart__row--accent .barchart__track i{background:var(--red)}
 .barchart__val{font-variant-numeric:tabular-nums;font-weight:var(--fw-bold);color:var(--text-strong)}
+.barchart__row[data-bin-trigger]{cursor:pointer;border-radius:var(--radius-1);transition:var(--motion-hover)}
+.barchart__row[data-bin-trigger]:hover,.barchart__row[data-bin-trigger]:focus-visible{background:var(--surface-subtle)}
+.barchart__row[data-bin-trigger]:focus-visible{outline:var(--bw-rule) solid var(--focus-ring);outline-offset:2px}
+.barchart__detail{display:grid;gap:var(--sp-2);margin:0 0 var(--sp-2);padding:var(--sp-3) var(--sp-3) var(--sp-1);border-left:var(--bw-rule) solid var(--line-accent);font-size:var(--fs-sm)}
+.barchart__detail li{display:flex;justify-content:space-between;gap:var(--sp-3)}
+.barchart__detail a{color:var(--text-strong)}
+.barchart__detail span{font-variant-numeric:tabular-nums;color:var(--text-muted)}
 @media (min-width:768px){.figure-row{grid-template-columns:repeat(4,1fr)}}
+
+/* Preis/Leistung scatter chart: one dot per priced test, price against
+   Gesamtwertung. Reuses the origin map's .map__halo/.map__pin hover motion so
+   the same "hover to preview, click to open" idiom appears twice in one
+   consistent visual language. */
+.scatter{margin:0}
+.scatter__plot{width:100%;height:auto;max-height:360px;overflow:visible}
+.scatter__caption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--sp-2);margin-top:var(--sp-3);font-size:var(--fs-xs);color:var(--text-muted)}
+.scatter__readout{min-height:1.6em;margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:var(--bw-hair) solid var(--line-hairline);display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-5);font-size:var(--fs-sm)}
+.scatter__readout strong{color:var(--text-strong);font-size:var(--fs-body-lg)}
+.scatter__readout span{color:var(--text-muted)}
 
 .notice{display:flex;gap:var(--sp-3);padding:14px var(--sp-5);background:var(--feedback-info-bg);border-left:var(--bw-block) solid var(--navy);border-radius:var(--radius-1);font-size:var(--fs-sm)}
 .notice--sample{background:var(--surface-subtle);border-left-color:var(--gray)}
@@ -796,6 +826,11 @@ a.panel:hover{border-color:var(--navy);color:inherit}
 .test-summary__body{display:grid;gap:2px;min-width:0}
 .test-summary__name{font-size:var(--fs-h3);font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;overflow-wrap:anywhere}
 .test-summary__name:hover{color:var(--red)}
+
+/* Test result reveal: the placement stays blurred until the group has
+   guessed, then a single click un-blurs everything in scope at once. */
+[data-reveal-scope] .spoiler{filter:blur(10px);user-select:none;transition:filter .25s ease}
+[data-reveal-scope].is-revealed .spoiler{filter:none}
 
 .btn--danger{color:var(--red-900)}
 .btn--danger:hover{color:#fff;background:var(--red)}

@@ -102,21 +102,4 @@ final class TestEntryValidatorTest extends TestCase
         (new TestEntryValidator())->validate($body, true);
     }
 
-    public function testParsesGermanAndPlainPriceNotation(): void
-    {
-        $withGerman = (new TestEntryValidator())->validate($this->fullBody() + ['price' => '0,89 €'], true);
-        self::assertSame('0.8900', $withGerman->priceAmount);
-
-        $withThousands = (new TestEntryValidator())->validate($this->fullBody() + ['price' => '1.234,50'], true);
-        self::assertSame('1234.5000', $withThousands->priceAmount);
-
-        $withPlain = (new TestEntryValidator())->validate($this->fullBody() + ['price' => '1.5'], true);
-        self::assertSame('1.5000', $withPlain->priceAmount);
-    }
-
-    public function testRejectsNegativePrice(): void
-    {
-        $this->expectException(ValidationException::class);
-        (new TestEntryValidator())->validate($this->fullBody() + ['price' => '-1'], true);
-    }
 }

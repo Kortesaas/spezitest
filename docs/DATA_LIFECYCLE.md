@@ -66,4 +66,13 @@ A future user should be able to record an identified drink quickly from a
 phone—for example, while standing in a Getränkemarkt—without completing a large
 metadata form. Conceptually, basic creation needs only a name, a lifecycle
 status, and an optional picture. Optional metadata must not become a database
-or application prerequisite for creating the drink record.
+or application prerequisite for creating the drink record: the dashboard's
+"Schnell erfassen" shortcut still asks for nothing more than that.
+
+The dedicated `/admin/drinks/new` page is a deliberate exception to "large
+metadata form later": by product-owner decision, it shows every optional
+enrichment field (Hersteller, Ort, Region/Land, Notizen, Preis/Menge) inline,
+so a Spezi can be made theoretically test-ready in the same step it is
+created — none of those fields become required, they are simply no longer
+deferred to a separate edit step for whoever chooses to use that page instead
+of the quick shortcut.

@@ -20,11 +20,9 @@ final readonly class TestEntryInput
     /**
      * @param array<string, array{optik: int, sueffigkeit: int, geschmack: int}> $ratings
      *        Keyed by tester code; only fully supplied testers appear.
-     * @param string|null $priceAmount Normalised decimal string (e.g. "0.8900") or null.
      */
     public function __construct(
         public array $ratings,
-        public ?string $priceAmount,
         public ?string $notes,
     ) {
     }

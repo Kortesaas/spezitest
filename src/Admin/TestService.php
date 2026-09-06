@@ -50,7 +50,7 @@ final readonly class TestService
 
             $testId = $test['id'] ?? $this->tests->createDraft($drinkId);
             $this->replaceRatings($testId, $input);
-            $this->tests->updateDraftDetails($testId, $input->priceAmount, $input->notes);
+            $this->tests->updateDraftDetails($testId, $input->notes);
 
             unset($drink);
 
@@ -83,7 +83,7 @@ final readonly class TestService
                 throw new ValidationException('Es liegen nicht für alle drei Tester vollständige Noten vor.');
             }
 
-            $this->tests->markCompleted($testId, $input->priceAmount, $input->notes);
+            $this->tests->markCompleted($testId, $input->notes);
 
             if ($drink['lifecycle_status'] !== 'tested') {
                 $this->drinks->updateStatus($drinkId, 'tested');

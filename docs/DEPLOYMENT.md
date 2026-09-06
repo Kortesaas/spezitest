@@ -285,7 +285,7 @@ it will show empty-state pages until the data is imported, which is expected.
 > skip D. Run migrations instead as a one-off **Plesk → Scheduled Tasks** job:
 > command `/opt/plesk/php/8.3/bin/php /var/www/vhosts/<domain>/httpdocs/bin/migrate.php`
 > (adjust paths to your subscription). Run it once, confirm the output
-> "Applied 3 migration(s).", then delete or disable the task. Add drinks and
+> "Applied 4 migration(s).", then delete or disable the task. Add drinks and
 > tests through `/admin`.
 
 ---

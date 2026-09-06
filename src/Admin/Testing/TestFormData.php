@@ -8,8 +8,9 @@ use Spezitest\Domain\Rating\RatingResult;
 
 /**
  * Everything the admin test-entry form needs to render: the current grades
- * (persisted or resubmitted), the optional price and note, the test status and
+ * (persisted or resubmitted), the optional tasting note, the test status and
  * — when a full set is present — the official result from the verified engine.
+ * The test price lives on the drink, not here — see {@see \Spezitest\Admin\Validation\DrinkInput}.
  */
 final readonly class TestFormData
 {
@@ -19,7 +20,6 @@ final readonly class TestFormData
      */
     public function __construct(
         public array $grades,
-        public string $price,
         public string $notes,
         public string $status,
         public ?RatingResult $result,
@@ -28,7 +28,7 @@ final readonly class TestFormData
 
     public static function empty(): self
     {
-        return new self([], '', '', 'none', null);
+        return new self([], '', 'none', null);
     }
 
     public function grade(string $testerCode, string $category): string

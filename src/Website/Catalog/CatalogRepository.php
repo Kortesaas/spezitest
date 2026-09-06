@@ -8,6 +8,7 @@ use PDO;
 use RuntimeException;
 use Spezitest\Domain\Rating\CompetitionRanking;
 use Spezitest\Domain\Rating\ExactNumber;
+use Spezitest\Domain\Rating\PriceNormalizer;
 use Spezitest\Domain\Rating\PricePerformanceCalculator;
 use Spezitest\Domain\Rating\RatingCalculator;
 use Spezitest\Domain\Rating\RatingResult;
@@ -34,6 +35,7 @@ final readonly class CatalogRepository
         private RatingCalculator $calculator = new RatingCalculator(),
         private CompetitionRanking $ranking = new CompetitionRanking(),
         private PricePerformanceCalculator $pricePerformance = new PricePerformanceCalculator(),
+        private PriceNormalizer $priceNormalizer = new PriceNormalizer(),
     ) {
     }
 
@@ -45,7 +47,7 @@ final readonly class CatalogRepository
 
         /** @var array<int, RatingResult> $resultsByDrink */
         $resultsByDrink = [];
-        /** @var array<int, array{price: ?string, notes: ?string, tested_at: ?string, grades: array<string, array{optik: string, sueffigkeit: string, geschmack: string}>}> $testMetaByDrink */
+        /** @var array<int, array{notes: ?string, tested_at: ?string, grades: array<string, array{optik: string, sueffigkeit: string, geschmack: string}>}> $testMetaByDrink */
         $testMetaByDrink = [];
 
         foreach ($completedTests as $test) {
@@ -53,7 +55,6 @@ final readonly class CatalogRepository
             $result = $this->calculator->calculate(TesterRatingFactory::fromMap($grades));
 
             $testMetaByDrink[$test['drink_id']] = [
-                'price' => $test['price_amount'],
                 'notes' => $test['notes'],
                 'tested_at' => $test['completed_at'],
                 'grades' => $grades,
@@ -69,7 +70,8 @@ final readonly class CatalogRepository
             $resultsByDrink,
         ));
 
-        $population = $this->pricePerformancePopulation($resultsByDrink, $testMetaByDrink);
+        $normalizedPriceByDrink = $this->normalizedPricesByDrink($drinkRows);
+        $population = $this->pricePerformancePopulation($resultsByDrink, $normalizedPriceByDrink);
 
         $drinks = [];
 
@@ -77,12 +79,12 @@ final readonly class CatalogRepository
             $id = $row['id'];
             $result = $resultsByDrink[$id] ?? null;
             $meta = $testMetaByDrink[$id] ?? null;
-            $price = $meta['price'] ?? null;
+            $normalizedPrice = $normalizedPriceByDrink[$id] ?? null;
 
             $pricePerformance = null;
 
-            if ($result !== null && $price !== null) {
-                $pricePerformance = $this->pricePerformance->calculate($result->gesamt(), $price, $population);
+            if ($result !== null && $normalizedPrice !== null) {
+                $pricePerformance = $this->pricePerformance->calculate($result->gesamt(), $normalizedPrice, $population);
             }
 
             $drinks[] = new RatedDrink(
@@ -97,7 +99,8 @@ final readonly class CatalogRepository
                 $row['updated_at'],
                 $result,
                 $result !== null ? ($ranks[$id] ?? null) : null,
-                $price,
+                $row['price_amount'],
+                $row['price_volume_ml'],
                 $meta['notes'] ?? null,
                 $meta['tested_at'] ?? null,
                 $pricePerformance,
@@ -109,35 +112,60 @@ final readonly class CatalogRepository
     }
 
     /**
+     * The application's Preis/Leistung basis is €-per-0.5 L, derived from the
+     * drink's own raw entered price and container volume (see
+     * {@see PriceNormalizer}). This only decides what "price" is fed into the
+     * unmodified {@see PricePerformanceCalculator} formula below.
+     *
+     * @param list<array{id: int, price_amount: ?string, price_volume_ml: ?int}> $drinkRows
+     * @return array<int, float>
+     */
+    private function normalizedPricesByDrink(array $drinkRows): array
+    {
+        $prices = [];
+
+        foreach ($drinkRows as $row) {
+            if ($row['price_amount'] === null || $row['price_volume_ml'] === null) {
+                continue;
+            }
+
+            if (!ExactNumber::from($row['price_amount'])->isPositive()) {
+                continue;
+            }
+
+            $prices[$row['id']] = $this->priceNormalizer->perReferenceVolume(
+                $row['price_amount'],
+                $row['price_volume_ml'],
+            );
+        }
+
+        return $prices;
+    }
+
+    /**
      * @param array<int, RatingResult> $resultsByDrink
-     * @param array<int, array{price: ?string, notes: ?string, tested_at: ?string, grades: array<string, array{optik: string, sueffigkeit: string, geschmack: string}>}> $testMetaByDrink
+     * @param array<int, float> $normalizedPriceByDrink
      * @return list<float>
      */
-    private function pricePerformancePopulation(array $resultsByDrink, array $testMetaByDrink): array
+    private function pricePerformancePopulation(array $resultsByDrink, array $normalizedPriceByDrink): array
     {
         $population = [];
 
         foreach ($resultsByDrink as $drinkId => $result) {
-            $price = $testMetaByDrink[$drinkId]['price'] ?? null;
+            $price = $normalizedPriceByDrink[$drinkId] ?? null;
 
             if ($price === null) {
                 continue;
             }
 
-            $exactPrice = ExactNumber::from($price);
-
-            if (!$exactPrice->isPositive()) {
-                continue;
-            }
-
-            $population[] = $result->exactGesamt()->divideBy($exactPrice)->toFloat();
+            $population[] = $result->exactGesamt()->divideBy(ExactNumber::from($price))->toFloat();
         }
 
         return $population;
     }
 
     /**
-     * @return list<array{id: int, name: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, lifecycle_status: string, has_image: bool, updated_at: string}>
+     * @return list<array{id: int, name: string, manufacturer: ?string, origin_location: ?string, origin_region: ?string, notes: ?string, lifecycle_status: string, has_image: bool, updated_at: string, price_amount: ?string, price_volume_ml: ?int}>
      */
     private function drinkRows(): array
     {
@@ -152,6 +180,8 @@ final readonly class CatalogRepository
                     d.notes,
                     d.lifecycle_status,
                     d.updated_at,
+                    d.price_amount,
+                    d.price_volume_ml,
                     CASE WHEN di.id IS NULL THEN 0 ELSE 1 END AS has_image
                 FROM drinks d
                 LEFT JOIN drink_images di ON di.drink_id = d.id AND di.display_order = 0
@@ -196,6 +226,8 @@ final readonly class CatalogRepository
                 'lifecycle_status' => $status,
                 'has_image' => (int) $hasImage === 1,
                 'updated_at' => $updatedAt,
+                'price_amount' => $this->nullablePositiveDecimal($row, 'price_amount'),
+                'price_volume_ml' => $this->nullableInt($row, 'price_volume_ml'),
             ];
         }
 
@@ -203,13 +235,13 @@ final readonly class CatalogRepository
     }
 
     /**
-     * @return list<array{id: int, drink_id: int, price_amount: ?string, notes: ?string, completed_at: ?string}>
+     * @return list<array{id: int, drink_id: int, notes: ?string, completed_at: ?string}>
      */
     private function completedTestRows(): array
     {
         $statement = $this->connection->query(
             <<<'SQL'
-                SELECT id, drink_id, price_amount, notes, completed_at
+                SELECT id, drink_id, notes, completed_at
                 FROM drink_tests
                 WHERE status = 'completed'
                 ORDER BY drink_id, id DESC
@@ -245,7 +277,6 @@ final readonly class CatalogRepository
             $rows[] = [
                 'id' => (int) $id,
                 'drink_id' => $drinkId,
-                'price_amount' => $this->nullablePositiveDecimal($row, 'price_amount'),
                 'notes' => $this->nullableString($row, 'notes'),
                 'completed_at' => $this->nullableString($row, 'completed_at'),
             ];
@@ -331,6 +362,22 @@ final readonly class CatalogRepository
         }
 
         return ExactNumber::from($value)->isPositive() ? $value : null;
+    }
+
+    /** @param array<array-key, mixed> $row */
+    private function nullableInt(array $row, string $key): ?int
+    {
+        $value = $row[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_int($value) && !is_string($value)) {
+            throw new RuntimeException('A catalog query returned invalid numeric data.');
+        }
+
+        return (int) $value;
     }
 
     /** @param array<array-key, mixed> $row */

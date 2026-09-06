@@ -146,11 +146,17 @@ be lowered with `ADMIN_IMAGE_MAX_BYTES`.
 
 The admin (styled with the Spezitest Design System admin shell, deliberately
 more compact than the public site) begins at `/admin/login`. It provides
-lifecycle counts, drink listing / search / status filtering, quick creation
-(name + status + optional picture), full metadata editing, explicit delete
-confirmation, status changes, a single optional primary picture, and
-**test / rating entry** (`/admin/drinks/{id}/test`). All admin pages except
-login require session authentication. Every POST is CSRF-protected.
+lifecycle counts, drink listing / search / status filtering, a full drink
+creation page (`/admin/drinks/new` — name and status are the only required
+fields, but Hersteller, Ort, Region/Land, Notizen, picture, and Preis/Menge are
+all available inline so a new Spezi can be made test-ready in one step; the
+dashboard's separate "Schnell erfassen" widget stays name + status + optional
+picture only), full metadata editing, explicit delete confirmation, status
+changes, a single optional primary picture, a `/admin/test` queue for picking
+the next acquired Spezi, and **test / rating entry**
+(`/admin/drinks/{id}/test`), grouped by category with a blurred result reveal
+after completion. All admin pages except login require session
+authentication. Every POST is CSRF-protected.
 
 The quick-add workflow stays a single short form so a Spezi can be recorded
 quickly from a phone. `tested` is reachable only by completing a test; a

@@ -71,6 +71,30 @@ final readonly class RatedDrinkCollection
         return $ranked;
     }
 
+    /**
+     * Tested drinks with a Preis/Leistung value, best value first (ties keep a
+     * stable order by name). Position in this list is a plain ordinal — unlike
+     * {@see self::ranked()} it is intentionally not routed through the
+     * verified {@see \Spezitest\Domain\Rating\CompetitionRanking}, which is
+     * reserved for the Gesamt rank.
+     *
+     * @return list<RatedDrink>
+     */
+    public function pricePerformanceRanked(): array
+    {
+        $withPrice = array_values(array_filter(
+            $this->tested(),
+            static fn (RatedDrink $drink): bool => $drink->pricePerformance !== null,
+        ));
+
+        usort($withPrice, static function (RatedDrink $a, RatedDrink $b): int {
+            return [-($a->pricePerformance?->normalized() ?? 0.0), mb_strtolower($a->name)]
+                <=> [-($b->pricePerformance?->normalized() ?? 0.0), mb_strtolower($b->name)];
+        });
+
+        return $withPrice;
+    }
+
     /** @return array{identified: int, acquired: int, tested: int} */
     public function lifecycleCounts(): array
     {
