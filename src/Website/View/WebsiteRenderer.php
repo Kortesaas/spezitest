@@ -203,7 +203,7 @@ final class WebsiteRenderer
                 . $this->streamLink($drink)
                 . $this->ratingBreakdown($drink);
         } else {
-            $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Testabend.</span></div>';
+            $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Spezistream.</span></div>';
         }
 
         $hero .= '</div></div></section>';
@@ -306,7 +306,7 @@ final class WebsiteRenderer
             $intro . $this->originMapSection($map) . $distribution
                 . $this->priceLeistungSection($stats),
             'statistik',
-            'Auswertung der Spezitest-Testabende: Herkunftskarte, Verteilung, Tester und Preis/Leistung.',
+            'Auswertung der Spezistreams: Herkunftskarte, Verteilung, Tester und Preis/Leistung.',
             '/statistik',
         );
     }
@@ -459,7 +459,7 @@ final class WebsiteRenderer
     }
 
     /**
-     * The streams overview: one card per Testabend, newest first. The card
+     * The streams overview: one card per Spezistream, newest first. The card
      * opens that evening's own page; a second link opens the recording.
      *
      * @param array<int, ?string> $recordedOn recording dates keyed by episode number
@@ -471,7 +471,7 @@ final class WebsiteRenderer
         $head = '<div class="wrap section" style="padding-bottom:var(--sp-6)">'
             . '<nav aria-label="Brotkrumen"><ol class="breadcrumb"><li><a href="/">Start</a></li><li>Streams</li></ol></nav>'
             . '<div class="stack" style="margin-top:var(--sp-3)"><h1 class="display-2">Streams</h1>'
-            . '<p class="lede">Jeder Testabend ist als Aufzeichnung online. Ein Klick auf einen Abend zeigt, '
+            . '<p class="lede">Jeder Spezistream ist als Aufzeichnung online. Ein Klick auf einen Abend zeigt, '
             . 'was dort verkostet wurde. Jede Zeile springt direkt an die passende Stelle im Video.</p></div></div>';
 
         if ($episodes === []) {
@@ -479,7 +479,7 @@ final class WebsiteRenderer
                 'Streams',
                 $head . '<div class="wrap" style="padding-bottom:var(--sp-9)"><div class="empty">'
                     . '<p class="empty__title">Noch keine Aufzeichnung</p>'
-                    . '<p>Hier erscheinen die Testabende, sobald sie gestreamt wurden.</p></div></div>',
+                    . '<p>Hier erscheinen die Spezistreams, sobald sie gestreamt wurden.</p></div></div>',
                 'streams',
                 null,
                 '/streams',
@@ -495,7 +495,7 @@ final class WebsiteRenderer
         }
 
         $figures = '<div class="figure-row" style="margin-bottom:var(--sp-7)">'
-            . $this->figure((string) count($episodes), count($episodes) === 1 ? 'Testabend' : 'Testabende')
+            . $this->figure((string) count($episodes), count($episodes) === 1 ? 'Spezistream' : 'Spezistreams')
             . $this->figure((string) $tasted, 'Spezis verkostet')
             . $this->figure($seconds === 0 ? '–' : (string) (int) round($seconds / 3600) . ' h', 'reine Verkostungszeit')
             . $this->figure(
@@ -515,13 +515,13 @@ final class WebsiteRenderer
             $head . '<div class="wrap" style="padding-bottom:var(--sp-9)">'
                 . $figures . '<div class="grid grid--2">' . $cards . '</div></div>',
             'streams',
-            'Alle Spezitest-Testabende als Aufzeichnung, mit Sprungmarke zu jeder verkosteten Spezi.',
+            'Alle Spezistreams von Spezitest als Aufzeichnung, mit Sprungmarke zu jeder verkosteten Spezi.',
             '/streams',
         );
     }
 
     /**
-     * One Testabend in full: the evening in numbers, then what was tasted in
+     * One Spezistream in full: the evening in numbers, then what was tasted in
      * the order it happened, each row jumping into the recording.
      *
      * @param array<int, ?string> $recordedOn
@@ -557,9 +557,9 @@ final class WebsiteRenderer
 
         $body = '<div class="wrap section" style="padding-bottom:var(--sp-5)">'
             . '<nav aria-label="Brotkrumen"><ol class="breadcrumb"><li><a href="/">Start</a></li>'
-            . '<li><a href="/streams">Streams</a></li><li>Testabend ' . $episode->number . '</li></ol></nav>'
+            . '<li><a href="/streams">Streams</a></li><li>Spezistream ' . $episode->number . '</li></ol></nav>'
             . '<div class="stack" style="margin-top:var(--sp-3)">'
-            . '<span class="eyebrow eyebrow--accent">Testabend ' . $episode->number . '</span>'
+            . '<span class="eyebrow eyebrow--accent">Spezistream ' . $episode->number . '</span>'
             . '<h1 class="display-2">' . Html::e($episode->title) . '</h1>'
             . '<p class="meta">' . $episode->count() . ' Spezis verkostet'
             . ($episode->recordedOn === null
@@ -580,7 +580,7 @@ final class WebsiteRenderer
             . $this->episodePager($newer, $older);
 
         return $this->shell(
-            'Testabend ' . $episode->number,
+            'Spezistream ' . $episode->number,
             $body,
             'streams',
             $episode->title . ': ' . $episode->count() . ' Spezis im Test, mit Sprungmarken ins Video.',
@@ -589,7 +589,7 @@ final class WebsiteRenderer
                 $this->schema->breadcrumb([
                     ['name' => 'Start', 'path' => '/'],
                     ['name' => 'Streams', 'path' => '/streams'],
-                    ['name' => 'Testabend ' . $episode->number, 'path' => null],
+                    ['name' => 'Spezistream ' . $episode->number, 'path' => null],
                 ]),
                 $this->schema->streamEpisode($episode),
             ],
@@ -693,7 +693,7 @@ final class WebsiteRenderer
         return '<article class="card episode-card">'
             . '<div class="episode-card__strip">' . $strip . '</div>'
             . '<div class="card__body">'
-            . '<span class="eyebrow eyebrow--accent">Testabend ' . $episode->number
+            . '<span class="eyebrow eyebrow--accent">Spezistream ' . $episode->number
             . ($episode->recordedOn === null
                 ? ''
                 : ' · ' . Html::e(Html::isoToGermanDate($episode->recordedOn) ?? $episode->recordedOn))
@@ -760,9 +760,9 @@ final class WebsiteRenderer
         };
 
         return '<section class="wrap section" style="padding-top:0">'
-            . '<nav class="pager-nav" aria-label="Weitere Testabende">'
-            . $link($older, 'prev', 'Früherer Testabend')
-            . $link($newer, 'next', 'Späterer Testabend')
+            . '<nav class="pager-nav" aria-label="Weitere Spezistreams">'
+            . $link($older, 'prev', 'Früherer Spezistream')
+            . $link($newer, 'next', 'Späterer Spezistream')
             . '</nav></section>';
     }
     public function ueber(RatedDrinkCollection $collection): string
@@ -1673,7 +1673,7 @@ final class WebsiteRenderer
         // always exists, and the recording, which only appears once an address
         // is on file. Both stay understated — the verdict above is the headline.
         $links = '<a class="btn btn--quiet" href="/streams/' . $segment->runNumber . '">'
-            . 'Zum Testabend ' . $segment->runNumber . '</a>';
+            . 'Zum Spezistream ' . $segment->runNumber . '</a>';
 
         $url = $segment->watchUrl();
         $offset = $segment->formattedOffset();

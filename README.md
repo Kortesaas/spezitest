@@ -20,11 +20,11 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   `/` (home), `/spezis` (search / filter / sort browser with an incremental
   `Mehr laden` and a first/window/last pager), `/spezi/{id-or-slug}`
   (detail with tester and category scores), `/ranking`, `/statistik`,
-  `/streams` (every Testabend with a jump mark per Spezi) and `/ueber`, plus
+  `/streams` (every Spezistream with a jump mark per Spezi) and `/ueber`, plus
   a branded 404. Product images are served through a controlled
   read-only route (`/spezi/{id}/bild`); missing images get a branded
   placeholder.
-- **Testabende**: each livestream episode is a record with its own number,
+- **Spezistreams**: each livestream episode is a record with its own number,
   date and video address; every test knows which evening it was tasted in and
   at which point in the recording, so the public detail page can link straight
   into the video at that timestamp. Closing an evening produces its report.

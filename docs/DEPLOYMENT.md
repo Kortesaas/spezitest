@@ -21,7 +21,7 @@ Build both artifacts locally with `composer build:full-release`. You upload:
 | `dist/spezitest-initial-data-<version>.tar.gz` | Data-only `spezitest-data.sql`, reviewed refresh plan, manifests, manuals, and all 195 private product images arranged beneath `var/`. | SQL → phpMyAdmin after migrations · `var/` → private application storage |
 
 The reviewed catalogue is 196 drinks (54 identified, 17 acquired, 125 tested),
-125 completed tests, 375 raw ratings, 5 Testabende (livestream episodes with
+125 completed tests, 375 raw ratings, 5 Spezistreams (livestream episodes with
 their video URLs), 195 images. Of those images, 186 are
 optimized 640×1024 WebPs and nine are retained older fallbacks; ten products
 are marked as needing a new photograph. All five fuzzy duplicate
@@ -252,7 +252,7 @@ it will show empty-state pages until the data is imported, which is expected.
 2. **Rows:** phpMyAdmin → select the Spezitest database → **Import** → choose
    `spezitest-data.sql` from the initial-data archive → Go. The data-only seed
    requires the migrated tables to be empty, never drops tables, and loads 196
-   drinks, 125 tests, 375 ratings, 5 Testabende, 195 image rows, and one
+   drinks, 125 tests, 375 ratings, 5 Spezistreams, 195 image rows, and one
    provenance row. The three canonical testers already come from the migrations.
    - If the file is over phpMyAdmin's upload limit, gzip it
      (`spezitest-data.sql.gz`) — phpMyAdmin imports `.gz` directly — or
@@ -318,10 +318,10 @@ every ordinary public page is indexable.
 
 | URL | What it is |
 | --- | --- |
-| `/sitemap.xml` | Every public page plus one entry per Spezi and Testabend, with `lastmod`. |
+| `/sitemap.xml` | Every public page plus one entry per Spezi and Spezistream, with `lastmod`. |
 | `/feed.xml` | Atom feed of the most recently tested Spezis. Linked from every page's `<head>`. |
 | `/site.webmanifest`, `/favicon.ico`, `/assets/icon-*.png`, `/assets/apple-touch-icon.png` | Icons + PWA manifest. Regenerate from the source SVG with `python3 tools/icons/build.py` (needs Chrome + Pillow locally; never on the server). |
-| JSON-LD in each page `<head>` | `Organization`/`WebSite` everywhere; `Product` + `Review` on Spezi pages; `BreadcrumbList`; `VideoObject` on Testabend pages that have a recording URL. |
+| JSON-LD in each page `<head>` | `Organization`/`WebSite` everywhere; `Product` + `Review` on Spezi pages; `BreadcrumbList`; `VideoObject` on Spezistream pages that have a recording URL. |
 
 After launch: submit `https://www.spezitest.de/sitemap.xml` in **Google Search
 Console** and **Bing Webmaster Tools**. If the canonical host is ever not

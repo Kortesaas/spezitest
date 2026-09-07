@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use Spezitest\Admin\Validation\ValidationException;
 
 /**
- * Validation for Testabend metadata and the per-test stream position.
+ * Validation for Spezistream metadata and the per-test stream position.
  *
  * Every value comes from an admin form and is therefore untrusted. The stream
  * URL in particular is rendered as a link, so only absolute http(s) URLs are
@@ -36,13 +36,13 @@ final class TestRunValidator
         }
 
         if (!is_string($number) || !ctype_digit(trim($number))) {
-            throw new ValidationException('Die Testabend-Nummer muss eine Zahl sein.');
+            throw new ValidationException('Die Spezistream-Nummer muss eine Zahl sein.');
         }
 
         $value = (int) trim($number);
 
         if ($value < 1 || $value > self::MAX_NUMBER) {
-            throw new ValidationException('Die Testabend-Nummer liegt außerhalb des gültigen Bereichs.');
+            throw new ValidationException('Die Spezistream-Nummer liegt außerhalb des gültigen Bereichs.');
         }
 
         return $value;

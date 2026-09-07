@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Spezitest\Website\Catalog;
 
 /**
- * Where a tested Spezi can be watched: the Testabend it was tasted in and,
+ * Where a tested Spezi can be watched: the Spezistream it was tasted in and,
  * when the recording has been indexed, the exact point its segment starts.
  *
  * A segment always knows its run number, because that is what the test itself
@@ -44,7 +44,7 @@ final readonly class StreamSegment
 
     public function title(): string
     {
-        return $this->runTitle ?? 'Testabend #' . $this->runNumber;
+        return $this->runTitle ?? 'Spezistream #' . $this->runNumber;
     }
 
     /** `1:23:45` / `4:05`, or null when the segment has no timestamp. */

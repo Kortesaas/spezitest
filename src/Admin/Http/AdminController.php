@@ -690,7 +690,7 @@ final class AdminController
         );
     }
 
-    /** Start the next Testabend, so tonight's completed tests are filed under it. */
+    /** Start the next Spezistream, so tonight's completed tests are filed under it. */
     public function startTestRun(
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -723,7 +723,7 @@ final class AdminController
                     $repository->nextNumber(),
                     $this->counts(),
                     $this->csrfTokens->token(),
-                    'Testabend #' . $open->number . ' läuft noch. Bitte zuerst abschließen.',
+                    'Spezistream #' . $open->number . ' läuft noch. Bitte zuerst abschließen.',
                 ),
                 422,
             );

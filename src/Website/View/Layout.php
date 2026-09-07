@@ -52,7 +52,7 @@ final class Layout
      * @param ?string $imagePath a page-specific share image (absolute path on
      *        this site); null uses the default Spezitest card
      * @param string $ogType the Open Graph object type, e.g. `article` for a
-     *        single Spezi or Testabend
+     *        single Spezi or Spezistream
      */
     public static function page(
         string $title,

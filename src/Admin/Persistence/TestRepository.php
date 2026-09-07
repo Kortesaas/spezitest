@@ -182,7 +182,7 @@ final readonly class TestRepository
     }
 
     /**
-     * Where this test sits in its Testabend's recording: which stream, the
+     * Where this test sits in its Spezistream's recording: which stream, the
      * segment's start offset and how long it ran. All three are optional —
      * a test evening can be recorded long before the video is cut.
      */

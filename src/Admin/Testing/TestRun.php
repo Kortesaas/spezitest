@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Spezitest\Admin\Testing;
 
 /**
- * One Testabend: a livestream episode in which a batch of Spezis was tested.
+ * One Spezistream: a livestream episode in which a batch of Spezis was tested.
  *
  * A run always has a number — the same value {@see \Spezitest\Admin\Persistence\TestRepository}
  * stores per test in `drink_tests.stream_reference`. Everything else is
@@ -38,7 +38,7 @@ final readonly class TestRun
 
     public function displayTitle(): string
     {
-        return $this->title ?? 'Testabend #' . $this->number;
+        return $this->title ?? 'Spezistream #' . $this->number;
     }
 
     /**

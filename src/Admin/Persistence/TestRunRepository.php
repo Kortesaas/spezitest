@@ -9,7 +9,7 @@ use RuntimeException;
 use Spezitest\Admin\Testing\TestRun;
 
 /**
- * Persistence for Testabende (livestream episodes) and their per-episode
+ * Persistence for Spezistreams (livestream episodes) and their per-episode
  * details.
  *
  * A run is identified by its number, which is the same value each test stores
@@ -91,7 +91,7 @@ final readonly class TestRunRepository
     }
 
     /**
-     * The Testabend currently in progress. At most one run is open at a time;
+     * The Spezistream currently in progress. At most one run is open at a time;
      * if several ever were, the highest number wins so the newest evening is
      * the one being recorded into.
      */
@@ -106,7 +106,7 @@ final readonly class TestRunRepository
         return null;
     }
 
-    /** The number a brand-new Testabend would get. */
+    /** The number a brand-new Spezistream would get. */
     public function nextNumber(): int
     {
         $highest = 0;
@@ -123,7 +123,7 @@ final readonly class TestRunRepository
      * written here; which tests belong to the run stays in `drink_tests`.
      *
      * A row created by this method is `completed`: documenting an evening is
-     * not the same as running one. Starting a Testabend is the separate,
+     * not the same as running one. Starting a Spezistream is the separate,
      * explicit {@see self::open()}, and editing an evening already in progress
      * leaves its status alone.
      */
@@ -154,7 +154,7 @@ final readonly class TestRunRepository
         ]);
     }
 
-    /** Start a Testabend: create the row in `open` state if it does not exist. */
+    /** Start a Spezistream: create the row in `open` state if it does not exist. */
     public function open(int $number): void
     {
         $statement = $this->connection->prepare(
@@ -168,7 +168,7 @@ final readonly class TestRunRepository
     }
 
     /**
-     * Close a Testabend. The row is created first when the run only existed as
+     * Close a Spezistream. The row is created first when the run only existed as
      * a number on imported tests, so historical evenings can be closed too.
      */
     public function complete(int $number): void

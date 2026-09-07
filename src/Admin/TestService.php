@@ -97,10 +97,10 @@ final readonly class TestService
     }
 
     /**
-     * File the test under a Testabend and record where its segment sits in the
+     * File the test under a Spezistream and record where its segment sits in the
      * recording.
      *
-     * With no explicit position from the form, a test that has no Testabend yet
+     * With no explicit position from the form, a test that has no Spezistream yet
      * joins the evening currently in progress — that is the whole point of
      * having one open: whatever is tasted tonight belongs to tonight. A test
      * that already carries a number keeps it, so re-saving an old test never

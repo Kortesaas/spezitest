@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Spezitest\Admin\Testing;
 
 /**
- * Where one test sits in its Testabend's recording: the run it belongs to, the
+ * Where one test sits in its Spezistream's recording: the run it belongs to, the
  * offset at which its segment starts, and how long that segment ran.
  *
  * All three parts are independently optional. A test can be filed under an

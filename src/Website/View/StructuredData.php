@@ -152,7 +152,7 @@ final class StructuredData
     }
 
     /**
-     * The recording of a Testabend, when its video address is on file.
+     * The recording of a Spezistream, when its video address is on file.
      *
      * @return array<string, mixed>
      */

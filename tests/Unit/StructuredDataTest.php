@@ -112,7 +112,7 @@ final class StructuredDataTest extends TestCase
             $drink->testedAt,
             $drink->pricePerformance,
             $drink->testerGrades,
-            new StreamSegment(3, 'Testabend 3', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', null),
+            new StreamSegment(3, 'Spezistream 3', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', null),
         );
 
         $episode = StreamEpisode::fromCollection(new RatedDrinkCollection([$drink]))[0];

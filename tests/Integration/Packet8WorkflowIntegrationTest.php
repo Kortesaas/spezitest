@@ -190,7 +190,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         return $id;
     }
 
-    public function testTestabendCollectsItsTestsAndDeepLinksIntoTheStream(): void
+    public function testSpezistreamCollectsItsTestsAndDeepLinksIntoTheStream(): void
     {
         $this->login();
 
@@ -243,7 +243,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $complete = $this->request('POST', '/admin/testabende/1/complete', ['_csrf' => $this->csrfToken()]);
         self::assertSame(303, $complete->getStatusCode());
 
-        $second = $this->createDrink('Nach dem Testabend', 'acquired');
+        $second = $this->createDrink('Nach dem Spezistream', 'acquired');
         $this->request('POST', "/admin/drinks/$second/test/complete", $this->goldenBody());
         self::assertNull($this->streamReference($second));
 

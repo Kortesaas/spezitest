@@ -1,6 +1,6 @@
 # Spezitest livestream index — supplied by the product owner on 2026-09-06.
 #
-# One block per Testabend. `url:` is the episode's YouTube address, `title:`
+# One block per Spezistream. `url:` is the episode's YouTube address, `title:`
 # its video title and `date:` the recording date as YYYY-MM-DD (leave empty
 # when unknown). Every following line is a chapter marker as it appears on
 # the video: a timestamp followed by its label. Labels that are not a tested

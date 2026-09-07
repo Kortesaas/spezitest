@@ -119,7 +119,7 @@ final class HtmlRenderer
                 ? 'Noch keine Spezi erfasst. Der erste Eintrag startet den Katalog.'
                 : '<strong>' . $counts['tested'] . '</strong> von ' . $total . ' Spezis getestet · '
                     . '<strong>' . $counts['acquired'] . '</strong> ' . ($counts['acquired'] === 1 ? 'wartet' : 'warten')
-                    . ' auf den Testabend.',
+                    . ' auf den Spezistream.',
             '<a class="btn btn--accent" href="/admin/drinks/new">+ Spezi hinzufügen</a>',
         )
             . '<div class="grid grid--4" style="margin-bottom:var(--sp-5)">'
@@ -486,7 +486,7 @@ final class HtmlRenderer
             );
 
         $body = $this->head(
-            'Testabend',
+            'Spezistream',
             $counts['acquired'] === 0
                 ? 'Keine erworbenen Spezis in der Warteschlange.'
                 : '<strong>' . $counts['acquired'] . '</strong> '
@@ -554,7 +554,7 @@ final class HtmlRenderer
     }
 
     /**
-     * Every Testabend, newest first: how many Spezis it holds, whether its
+     * Every Spezistream, newest first: how many Spezis it holds, whether its
      * video address is on file, and which evening is currently being recorded.
      *
      * @param list<TestRun> $runs
@@ -580,10 +580,10 @@ final class HtmlRenderer
         $rows = '';
 
         foreach ($runs as $run) {
-            $rows .= '<tr><td data-label="Testabend">'
+            $rows .= '<tr><td data-label="Spezistream">'
                 . '<a class="dt__name" href="/admin/testabende/' . $run->number . '">'
                 . '<strong>' . $this->escape($run->displayTitle()) . '</strong></a>'
-                . ($run->title === null ? '' : '<span class="dt__sub">Testabend #' . $run->number . '</span>')
+                . ($run->title === null ? '' : '<span class="dt__sub">Spezistream #' . $run->number . '</span>')
                 . ($run->recordedOn === null
                     ? ''
                     : '<span class="dt__sub">' . $this->escape($this->germanDate($run->recordedOn)) . '</span>')
@@ -603,36 +603,36 @@ final class HtmlRenderer
             ? '<form method="post" action="/admin/testabende" class="cluster cluster--tight">'
                 . $this->csrfField($csrfToken)
                 . '<input type="hidden" name="number" value="' . $nextNumber . '">'
-                . '<button class="btn btn--accent" type="submit">Testabend #' . $nextNumber . ' starten</button></form>'
+                . '<button class="btn btn--accent" type="submit">Spezistream #' . $nextNumber . ' starten</button></form>'
             : '<a class="btn btn--primary" href="/admin/testabende/' . $open->number . '">'
-                . 'Testabend #' . $open->number . ' öffnen</a>';
+                . 'Spezistream #' . $open->number . ' öffnen</a>';
 
         $body = $this->head(
-            'Testabende',
+            'Spezistreams',
             $open === null
-                ? 'Kein Testabend läuft. Der nächste bekommt die Nummer <strong>' . $nextNumber . '</strong>.'
-                : 'Testabend <strong>#' . $open->number . '</strong> läuft. Abgeschlossene Tests werden '
+                ? 'Kein Spezistream läuft. Der nächste bekommt die Nummer <strong>' . $nextNumber . '</strong>.'
+                : 'Spezistream <strong>#' . $open->number . '</strong> läuft. Abgeschlossene Tests werden '
                     . 'ihm zugeordnet.',
             $start,
         )
             . $this->error($error)
             . ($runs === []
                 ? $this->emptyState(
-                    'Noch kein Testabend',
-                    'Der erste Testabend entsteht, sobald ihr einen startet.',
+                    'Noch kein Spezistream',
+                    'Der erste Spezistream entsteht, sobald ihr einen startet.',
                 )
                 : '<section class="panel panel--flush"><div class="table-scroll">'
                     . '<table class="table table--drinks"><thead><tr>'
-                    . '<th><span>Testabend</span></th><th class="table__num"><span>Spezis</span></th>'
+                    . '<th><span>Spezistream</span></th><th class="table__num"><span>Spezis</span></th>'
                     . '<th><span>Zeitstempel</span></th><th><span>Stream</span></th>'
                     . '<th><span>Status</span></th><th class="table__actions">Aktionen</th>'
                     . '</tr></thead><tbody>' . $rows . '</tbody></table></div></section>');
 
-        return $this->document('Testabende', $body, $counts, $csrfToken, 'runs');
+        return $this->document('Spezistreams', $body, $counts, $csrfToken, 'runs');
     }
 
     /**
-     * One Testabend in full: its details form and the report of what was
+     * One Spezistream in full: its details form and the report of what was
      * tasted that evening, in the order the segments appear in the stream.
      *
      * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, status: string, recorded_time: ?string, duration_value: ?int, notes: ?string, completed_at: ?string}> $tests
@@ -649,15 +649,15 @@ final class HtmlRenderer
         $body = $this->head(
             $this->escape($run->displayTitle()),
             $run->isOpen()
-                ? 'Dieser Testabend läuft. Jeder abgeschlossene Test wird ihm automatisch zugeordnet.'
-                : 'Abgeschlossener Testabend.',
+                ? 'Dieser Spezistream läuft. Jeder abgeschlossene Test wird ihm automatisch zugeordnet.'
+                : 'Abgeschlossener Spezistream.',
             $run->isOpen()
                 ? '<form method="post" action="/admin/testabende/' . $run->number . '/complete" style="display:inline">'
                     . $this->csrfField($csrfToken)
-                    . '<button class="btn btn--accent" type="submit">Testabend abschließen</button></form>'
+                    . '<button class="btn btn--accent" type="submit">Spezistream abschließen</button></form>'
                     . '<a class="btn btn--ghost btn--sm" href="/admin/test">Zur Warteschlange</a>'
-                : '<a class="btn btn--ghost btn--sm" href="/admin/testabende">Alle Testabende</a>',
-            $this->breadcrumb([['/admin/testabende', 'Testabende'], [null, '#' . $run->number]]),
+                : '<a class="btn btn--ghost btn--sm" href="/admin/testabende">Alle Spezistreams</a>',
+            $this->breadcrumb([['/admin/testabende', 'Spezistreams'], [null, '#' . $run->number]]),
             $this->runBadge($run),
         )
             . $this->error($error)
@@ -667,7 +667,7 @@ final class HtmlRenderer
             . $this->runDetailsForm($run, $csrfToken)
             . '</aside></div>';
 
-        return $this->document('Testabend #' . $run->number, $body, $counts, $csrfToken, 'runs');
+        return $this->document('Spezistream #' . $run->number, $body, $counts, $csrfToken, 'runs');
     }
 
     /** @param array{identified: int, acquired: int, tested: int} $counts */
@@ -985,7 +985,7 @@ final class HtmlRenderer
             . $this->statusSegmented($status, $includeTested)
             . ($includeTested
                 ? '<span class="hint">„Getestet“ wird nur über die Testerfassung gesetzt.</span>'
-                : '<span class="hint">„Erworben“ heißt: steht hier und wartet auf den Testabend.</span>')
+                : '<span class="hint">„Erworben“ heißt: steht hier und wartet auf den Spezistream.</span>')
             . '</div>'
             . '<div class="field"><label class="label" for="' . $prefix . 'man">Hersteller '
             . '<span class="label__opt">optional</span></label>'
@@ -1167,7 +1167,7 @@ final class HtmlRenderer
     }
 
     /**
-     * Which Testabend this test belongs to and where its segment sits in the
+     * Which Spezistream this test belongs to and where its segment sits in the
      * recording. Everything here is optional and can be filled in later, once
      * the video has been cut.
      *
@@ -1175,7 +1175,7 @@ final class HtmlRenderer
      */
     private function streamPanel(TestFormData $data, array $runs): string
     {
-        $options = '<option value="">– keinem Testabend zugeordnet –</option>';
+        $options = '<option value="">– keinem Spezistream zugeordnet –</option>';
 
         foreach ($runs as $run) {
             $options .= '<option value="' . $run->number . '"'
@@ -1187,9 +1187,9 @@ final class HtmlRenderer
         return '<section class="panel panel--pad"><div class="panel__head">'
             . '<h2 class="panel__title">Stream</h2><span class="meta">optional</span></div>'
             . '<div class="form-row form-row--2">'
-            . '<div class="field form-row--wide"><label class="label" for="sr">Testabend</label>'
+            . '<div class="field form-row--wide"><label class="label" for="sr">Spezistream</label>'
             . '<select class="select" id="sr" name="stream_reference">' . $options . '</select>'
-            . '<span class="hint">Ohne Auswahl übernimmt der Abschluss den laufenden Testabend.</span></div>'
+            . '<span class="hint">Ohne Auswahl übernimmt der Abschluss den laufenden Spezistream.</span></div>'
             . '<div class="field"><label class="label" for="rt">Zeitstempel im Stream</label>'
             . '<input class="input" id="rt" name="recorded_time" inputmode="numeric" placeholder="1:23:45" '
             . 'value="' . $this->escape(TestStreamPosition::formatOffset($data->recordedTime) ?? '') . '">'
@@ -1248,7 +1248,7 @@ final class HtmlRenderer
                     'Noch nichts getestet',
                     $run->isOpen()
                         ? 'Sobald ein Test abgeschlossen wird, erscheint er hier.'
-                        : 'Diesem Testabend ist kein Test zugeordnet.',
+                        : 'Diesem Spezistream ist kein Test zugeordnet.',
                     $run->isOpen() ? '<a class="btn btn--accent btn--sm" href="/admin/test">Zur Warteschlange</a>' : '',
                     true,
                 ) . '</section>';
@@ -1574,9 +1574,9 @@ final class HtmlRenderer
                 'drinks' => ['/admin/drinks', 'Spezis', $total],
                 'create' => ['/admin/drinks/new', 'Spezi hinzufügen', null],
             ],
-            'Testabend' => [
+            'Spezistream' => [
                 'test' => ['/admin/test', 'Warteschlange', $counts['acquired']],
-                'runs' => ['/admin/testabende', 'Testabende', null],
+                'runs' => ['/admin/testabende', 'Spezistreams', null],
             ],
         ];
         $links = '';

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Spezitest\Website\Catalog;
 
 /**
- * One Testabend as the public site shows it: the episode plus everything worth
+ * One Spezistream as the public site shows it: the episode plus everything worth
  * saying about the evening, derived from the Spezis tasted in it.
  *
  * Every figure here is computed from the tests themselves — nothing is stored
@@ -36,7 +36,7 @@ final readonly class StreamEpisode
     }
 
     /**
-     * Groups a catalog into its Testabende, newest episode first, each evening
+     * Groups a catalog into its Spezistreams, newest episode first, each evening
      * in tasting order.
      *
      * @return list<self>

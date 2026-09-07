@@ -86,7 +86,7 @@ the workbooks establish:
 - `recorded_time TIME`, `duration_value INT UNSIGNED`, and
   `stream_reference SMALLINT UNSIGNED` retain the workbook-shaped values
   without assigning an unverified unit or business meaning. `stream_reference`
-  is the Testabend number: the matching row in `test_runs` (title, recording
+  is the Spezistream number: the matching row in `test_runs` (title, recording
   date, video URL) is looked up by it, with no foreign key so the data-only
   seed can load `drink_tests` before any `test_runs` row exists;
 - `completed_at` and `notes` are optional; and

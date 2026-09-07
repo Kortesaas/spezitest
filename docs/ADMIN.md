@@ -61,11 +61,11 @@ is still CSRF-protected.
 | POST | `/admin/drinks/{id}/test` | Save a draft test (partial grades allowed) |
 | POST | `/admin/drinks/{id}/test/complete` | Validate all nine grades, run the engine, set `tested` |
 | GET | `/admin/drinks/{id}/test/result` | Full test result: per-tester grade matrix and averages, plus the blurred ranking places |
-| GET | `/admin/testabende` | Testabende (livestream episodes) with their Spezi and timestamp counts |
-| POST | `/admin/testabende` | Start the next Testabend; refuses while another one is open |
-| GET | `/admin/testabende/{number}` | One Testabend: its details form and the report of that evening |
+| GET | `/admin/testabende` | Spezistreams (livestream episodes) with their Spezi and timestamp counts |
+| POST | `/admin/testabende` | Start the next Spezistream; refuses while another one is open |
+| GET | `/admin/testabende/{number}` | One Spezistream: its details form and the report of that evening |
 | POST | `/admin/testabende/{number}` | Save title, recording date, stream address and note |
-| POST | `/admin/testabende/{number}/complete` | Mark the Testabend finished |
+| POST | `/admin/testabende/{number}/complete` | Mark the Spezistream finished |
 
 ### List controls
 
@@ -202,9 +202,9 @@ bearbeiten" link back to `/admin/drinks/{id}/test`. The Spezi overview lists an
 existing result still goes through the same grade form and the verified engine;
 category averages and Gesamt are re-derived, never stored.
 
-## Testabende and stream positions
+## Spezistreams and stream positions
 
-A Testabend is one livestream episode. `drink_tests` already carried the three
+A Spezistream is one livestream episode. `drink_tests` already carried the three
 columns the Primärliste import fills — `stream_reference` (which stream),
 `recorded_time` (where the segment starts) and `duration_value` (how long it
 ran) — so the episode itself was the only missing piece. `test_runs` adds it:
@@ -216,17 +216,17 @@ status.
   the reviewed data-only seed during a fresh install, so a constraint would
   reject the seed's `drink_tests` rows. Episode details are therefore optional
   per number, and a run known only from `drink_tests` lists as "no details yet".
-- At most one Testabend is `open`. While one is, completing a test files it
+- At most one Spezistream is `open`. While one is, completing a test files it
   under that evening automatically; the test form can still assign a different
   one explicitly. A test that already carries a number keeps it, so re-saving an
   old test never moves it into tonight's evening.
-- "Testabend abschließen" closes the evening. Later tests are then unassigned
+- "Spezistream abschließen" closes the evening. Later tests are then unassigned
   until the next one is started.
 - The stream address is validated to an absolute `http(s)` URL before it is
   stored, because it is rendered as a link on the public detail page. A segment
   timestamp turns it into a deep link (`…&t=444s`); without a timestamp the link
   opens the episode. No link is rendered when no address is on file.
-- The Testabend report derives its figures (Ø Gesamtwertung, Ø time per Spezi,
+- The Spezistream report derives its figures (Ø Gesamtwertung, Ø time per Spezi,
   longest/shortest tasting, best/worst of the evening) through the same
   `StreamEpisode` the public streams page uses, so both always agree and the
   rating figures still come from the verified engine only.

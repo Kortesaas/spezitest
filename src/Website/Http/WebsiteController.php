@@ -136,7 +136,7 @@ final class WebsiteController
     }
 
     /**
-     * The recording date of each Testabend, keyed by episode number. Kept out
+     * The recording date of each Spezistream, keyed by episode number. Kept out
      * of the catalog query because it belongs to the episode, not the test.
      *
      * @return array<int, ?string>
@@ -184,7 +184,7 @@ final class WebsiteController
 
     /**
      * `/sitemap.xml`: every public page plus one entry per Spezi and per
-     * Testabend, with `lastmod` from each record. Referenced from robots.txt.
+     * Spezistream, with `lastmod` from each record. Referenced from robots.txt.
      */
     public function sitemap(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
     {
@@ -206,7 +206,7 @@ final class WebsiteController
     }
 
     /**
-     * The Testabende as the streams pages see them, newest first, each carrying
+     * The Spezistreams as the streams pages see them, newest first, each carrying
      * its recording date.
      *
      * @return list<StreamEpisode>

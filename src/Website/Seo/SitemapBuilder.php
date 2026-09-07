@@ -11,7 +11,7 @@ use Spezitest\Website\Catalog\StreamEpisode;
 /**
  * Builds `/sitemap.xml` from live catalog data: the fixed public pages, one
  * entry per Spezi (whatever its lifecycle state — every drink has a detail
- * page), and one per Testabend. `lastmod` comes from the record's own
+ * page), and one per Spezistream. `lastmod` comes from the record's own
  * timestamp so search engines only re-crawl what actually changed.
  */
 final readonly class SitemapBuilder
