@@ -580,19 +580,30 @@ final class HtmlRenderer
         $rows = '';
 
         foreach ($runs as $run) {
-            $rows .= '<tr><td data-label="Spezistream">'
+            $missingMarks = max(0, $run->testCount - $run->timedCount);
+            $index = $run->streamUrl === null
+                ? 'kein Video hinterlegt'
+                : ($run->testCount === 0
+                    ? 'Video hinterlegt'
+                    : ($missingMarks === 0
+                        ? 'Sprungmarken vollständig'
+                        : $missingMarks . ' Spezi' . ($missingMarks === 1 ? '' : 's') . ' ohne Sprungmarke'));
+
+            $rows .= '<tr><td><span class="run-num">' . $run->number . '</span></td>'
+                . '<td>'
                 . '<a class="dt__name" href="/admin/testabende/' . $run->number . '">'
                 . '<strong>' . $this->escape($run->displayTitle()) . '</strong></a>'
-                . ($run->title === null ? '' : '<span class="dt__sub">Spezistream #' . $run->number . '</span>')
+                . '<span class="dt__sub">'
+                . ($run->title === null ? '' : 'Spezistream #' . $run->number)
                 . ($run->recordedOn === null
                     ? ''
-                    : '<span class="dt__sub">' . $this->escape($this->germanDate($run->recordedOn)) . '</span>')
+                    : ($run->title === null ? '' : ' · ') . $this->escape($this->germanDate($run->recordedOn)))
+                . '</span>'
                 . '</td>'
-                . '<td class="table__num" data-label="Spezis">' . $run->testCount . '</td>'
-                . '<td data-label="Zeitstempel">' . $run->timedCount . ' von ' . $run->testCount . '</td>'
-                . '<td data-label="Stream">' . ($run->streamUrl === null
-                    ? '<span class="badge">fehlt</span>'
-                    : '<span class="meta">hinterlegt</span>') . '</td>'
+                . '<td data-label="Verkostet">'
+                . '<span><strong>' . $run->testCount . '</strong>&nbsp;Spezi' . ($run->testCount === 1 ? '' : 's') . '</span>'
+                . '<span class="dt__sub">' . $index . '</span>'
+                . '</td>'
                 . '<td data-label="Status">' . $this->runBadge($run) . '</td>'
                 . '<td class="table__actions" data-label="Aktionen"><div class="dt__actions">'
                 . '<a class="btn btn--quiet" href="/admin/testabende/' . $run->number . '">Bericht</a>'
@@ -623,8 +634,9 @@ final class HtmlRenderer
                 )
                 : '<section class="panel panel--flush"><div class="table-scroll">'
                     . '<table class="table table--drinks"><thead><tr>'
-                    . '<th><span>Spezistream</span></th><th class="table__num"><span>Spezis</span></th>'
-                    . '<th><span>Zeitstempel</span></th><th><span>Stream</span></th>'
+                    . '<th><span class="visually-hidden">Nummer</span></th>'
+                    . '<th><span>Spezistream</span></th>'
+                    . '<th><span>Verkostet</span></th>'
                     . '<th><span>Status</span></th><th class="table__actions">Aktionen</th>'
                     . '</tr></thead><tbody>' . $rows . '</tbody></table></div></section>');
 
@@ -1557,10 +1569,10 @@ final class HtmlRenderer
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . $this->escape($title) . ' · Spezitest Verwaltung</title>'
             . '<meta name="robots" content="noindex, nofollow">'
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p26">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p27">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shell
-            . '<script src="/assets/spezitest.js?v=p26" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p27" defer></script>'
             . '</body></html>';
     }
 

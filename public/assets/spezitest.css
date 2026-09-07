@@ -408,6 +408,8 @@ table{border-collapse:collapse;width:100%}
 .table td strong{color:var(--text-strong)}
 .table tbody tr:hover{background:var(--surface-tint)}
 .table__num{text-align:right;font-variant-numeric:tabular-nums;font-weight:var(--fw-bold);color:var(--text-strong)}
+.table th.table__num{text-align:right}
+.run-num{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;background:var(--surface-tint);border-radius:var(--radius-1);font-weight:var(--fw-bold);font-size:var(--fs-body-lg);color:var(--navy);font-variant-numeric:tabular-nums}
 .table--compact td{padding:10px var(--sp-3)}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .table a{font-weight:var(--fw-bold);text-decoration:none;color:var(--navy)}
