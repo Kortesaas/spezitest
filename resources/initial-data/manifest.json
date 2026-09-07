@@ -3,14 +3,15 @@
     "source_workbook_sha256": "39b7d954dc3b39dabe71852d841ac66f02e7564390af55b5cf1eb413cf0ca096",
     "refresh_plan_sha256": "4cb41e75aaed1123003f531cb4c05eb3680263be85300ae63fb8bce8495d602a",
     "sql_path": "resources/initial-data/spezitest-data.sql",
-    "sql_sha256": "2dadfd43f155310c37b97406c0f884ee7f2c3a36635682a6e98f2da9fc1b6323",
+    "sql_sha256": "1231689d8229b7ba2f34cfa988c1161fcc69d073ece4eb293458f011743128a7",
     "counts": {
         "drinks": 196,
         "testers": 3,
         "drink_tests": 125,
         "ratings": 375,
         "drink_images": 195,
-        "legacy_import_runs": 1
+        "legacy_import_runs": 1,
+        "test_runs": 5
     },
     "lifecycle": {
         "identified": 54,

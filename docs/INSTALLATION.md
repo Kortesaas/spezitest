@@ -6,8 +6,8 @@ Spezitest beta on another computer or a fresh server:
 - application source and locked Composer dependencies;
 - all tracked database migrations;
 - the portable reviewed refresh plan and its approved source hashes;
-- the reviewed data-only seed for 196 drinks, 125 completed tests, and 375 raw
-  ratings;
+- the reviewed data-only seed for 196 drinks, 125 completed tests, 375 raw
+  ratings, and 5 Testabende;
 - all 195 referenced private images: 186 optimized WebPs and nine retained
   JPEG/PNG fallbacks; and
 - safe environment templates without credentials.

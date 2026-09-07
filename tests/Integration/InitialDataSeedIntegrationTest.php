@@ -40,6 +40,13 @@ final class InitialDataSeedIntegrationTest extends TestCase
         self::assertSame(375, $this->tableCount('ratings'));
         self::assertSame(195, $this->tableCount('drink_images'));
         self::assertSame(1, $this->tableCount('legacy_import_runs'));
+        self::assertSame(5, $this->tableCount('test_runs'));
+        self::assertSame(0, $this->queryCount(
+            "SELECT COUNT(*) FROM test_runs WHERE status <> 'completed' OR stream_url IS NULL",
+        ));
+        self::assertSame(0, $this->queryCount(
+            'SELECT COUNT(*) FROM test_runs r LEFT JOIN drink_tests t ON t.stream_reference = r.number WHERE t.id IS NULL',
+        ));
         self::assertSame(186, $this->queryCount("SELECT COUNT(*) FROM drink_images WHERE mime_type = 'image/webp' AND width = 640 AND height = 1024"));
         self::assertSame(10, $this->queryCount('SELECT COUNT(*) FROM drinks WHERE needs_new_photo = 1'));
 
@@ -77,12 +84,13 @@ final class InitialDataSeedIntegrationTest extends TestCase
             self::assertSame(0, $this->tableCount('drink_tests'));
             self::assertSame(0, $this->tableCount('ratings'));
             self::assertSame(0, $this->tableCount('drink_images'));
+            self::assertSame(0, $this->tableCount('test_runs'));
         }
     }
 
     private function tableCount(string $table): int
     {
-        self::assertContains($table, ['drinks', 'testers', 'drink_tests', 'ratings', 'drink_images', 'legacy_import_runs']);
+        self::assertContains($table, ['drinks', 'testers', 'drink_tests', 'ratings', 'drink_images', 'legacy_import_runs', 'test_runs']);
 
         return $this->queryCount("SELECT COUNT(*) FROM $table");
     }

@@ -13,6 +13,7 @@ const EXPECTED_COUNTS = [
     'ratings' => 375,
     'drink_images' => 195,
     'legacy_import_runs' => 1,
+    'test_runs' => 5,
 ];
 const EXPECTED_LIFECYCLE = ['identified' => 54, 'acquired' => 17, 'tested' => 125];
 const EXPECTED_WEBP_IMAGES = 186;
@@ -314,6 +315,7 @@ function exportInitialData(string $root, string $sqlPath, string $manifestPath):
         'ratings' => fetchRows($pdo, 'SELECT r.id, r.test_id, t.code tester_code, r.optik, r.sueffigkeit, r.geschmack, r.created_at, r.updated_at FROM ratings r INNER JOIN testers t ON t.id = r.tester_id ORDER BY r.id'),
         'drink_images' => fetchRows($pdo, 'SELECT id, drink_id, storage_path, mime_type, width, height, display_order, created_at FROM drink_images ORDER BY id'),
         'legacy_import_runs' => fetchRows($pdo, 'SELECT run_id, plan_sha256, primaerliste_sha256, beschaffungsliste_sha256, summary_json, applied_at FROM legacy_import_runs ORDER BY run_id'),
+        'test_runs' => fetchRows($pdo, 'SELECT number, title, recorded_on, stream_url, status, notes, completed_at, created_at, updated_at FROM test_runs ORDER BY number'),
     ];
     foreach (EXPECTED_COUNTS as $table => $expected) {
         $actual = $table === 'testers' ? count($tables['testers']) : count($tables[$table]);
@@ -340,6 +342,13 @@ function exportInitialData(string $root, string $sqlPath, string $manifestPath):
     }
     if (fetchCount($pdo, 'SELECT COUNT(*) FROM (SELECT test_id FROM ratings GROUP BY test_id HAVING COUNT(*) <> 3) invalid') !== 0) {
         throw new InitialDataException('A completed test does not have exactly three ratings.');
+    }
+    if (fetchCount($pdo, "SELECT COUNT(*) FROM test_runs WHERE status <> 'completed'") !== 0) {
+        throw new InitialDataException('The export database contains a Spezistream that is not completed.');
+    }
+    $orphanRuns = fetchCount($pdo, 'SELECT COUNT(*) FROM test_runs r LEFT JOIN drink_tests t ON t.stream_reference = r.number WHERE t.id IS NULL');
+    if ($orphanRuns !== 0) {
+        throw new InitialDataException('A Spezistream has no tested Spezi referring to it.');
     }
 
     $testerCodes = array_map(static fn (array $row): string => requiredString($row, 'code'), $tables['testers']);
@@ -382,6 +391,18 @@ function exportInitialData(string $root, string $sqlPath, string $manifestPath):
         sqlText($row['run_id'] ?? null), sqlText($row['plan_sha256'] ?? null), sqlText($row['primaerliste_sha256'] ?? null),
         sqlText($row['beschaffungsliste_sha256'] ?? null), sqlText($row['summary_json'] ?? null), sqlText($row['applied_at'] ?? null),
     ], $tables['legacy_import_runs']);
+    $streamValues = array_map(static function (array $row): array {
+        $status = requiredString($row, 'status');
+        if ($status !== 'completed') {
+            throw new InitialDataException('A Spezistream in the export is not completed.');
+        }
+
+        return [
+            sqlInteger($row['number'] ?? null), sqlText($row['title'] ?? null), sqlText($row['recorded_on'] ?? null),
+            sqlText($row['stream_url'] ?? null), sqlText($status), sqlText($row['notes'] ?? null),
+            sqlText($row['completed_at'] ?? null), sqlText($row['created_at'] ?? null), sqlText($row['updated_at'] ?? null),
+        ];
+    }, $tables['test_runs']);
 
     $sql = <<<'SQL'
 -- Spezitest reviewed initial data, data-only and safe for a freshly migrated empty database.
@@ -400,6 +421,7 @@ SELECT
     + (SELECT COUNT(*) FROM ratings)
     + (SELECT COUNT(*) FROM drink_images)
     + (SELECT COUNT(*) FROM legacy_import_runs)
+    + (SELECT COUNT(*) FROM test_runs)
     + ABS(3 - (SELECT COUNT(*) FROM testers))
     + ABS(3 - (SELECT COUNT(*) FROM testers WHERE code IN ('manu', 'fabi', 'schorsch')));
 DROP TEMPORARY TABLE spezitest_seed_guard;
@@ -413,6 +435,7 @@ START TRANSACTION;
 SQL;
     $sql .= insertSql('drinks', ['id', 'name', 'lifecycle_status', 'manufacturer', 'origin_location', 'origin_region', 'notes', 'needs_new_photo', 'price_amount', 'price_volume_ml', 'created_at', 'updated_at'], $drinkValues) . "\n";
     $sql .= insertSql('drink_tests', ['id', 'drink_id', 'status', 'price_amount', 'recorded_time', 'duration_value', 'stream_reference', 'completed_at', 'notes', 'created_at', 'updated_at'], $testValues) . "\n";
+    $sql .= insertSql('test_runs', ['number', 'title', 'recorded_on', 'stream_url', 'status', 'notes', 'completed_at', 'created_at', 'updated_at'], $streamValues) . "\n";
     $sql .= insertSql('ratings', ['id', 'test_id', 'tester_id', 'optik', 'sueffigkeit', 'geschmack', 'created_at', 'updated_at'], $ratingValues) . "\n";
     $sql .= insertSql('drink_images', ['id', 'drink_id', 'storage_path', 'mime_type', 'width', 'height', 'display_order', 'created_at'], $imageValues) . "\n";
     $sql .= insertSql('legacy_import_runs', ['run_id', 'plan_sha256', 'primaerliste_sha256', 'beschaffungsliste_sha256', 'summary_json', 'applied_at'], $runValues) . "\n";
@@ -428,6 +451,8 @@ SELECT
     + ABS(375 - (SELECT COUNT(*) FROM ratings))
     + ABS(195 - (SELECT COUNT(*) FROM drink_images))
     + ABS(1 - (SELECT COUNT(*) FROM legacy_import_runs))
+    + ABS(5 - (SELECT COUNT(*) FROM test_runs))
+    + (SELECT COUNT(*) FROM test_runs WHERE status <> 'completed')
     + ABS(3 - (SELECT COUNT(*) FROM testers))
     + ABS(3 - (SELECT COUNT(*) FROM testers WHERE code IN ('manu', 'fabi', 'schorsch')))
     + ABS(54 - (SELECT COUNT(*) FROM drinks WHERE lifecycle_status = 'identified'))
@@ -446,6 +471,11 @@ SET @tester_fabi = NULL;
 SET @tester_schorsch = NULL;
 SQL;
     $sql .= "\n";
+
+    // The tracked seed is LF-only (`.gitattributes` enforces it and `verify`
+    // rejects CRLF). Normalise here so the file and its manifest hash are
+    // LF regardless of this script's own line endings on the exporting host.
+    $sql = str_replace("\r\n", "\n", $sql);
 
     $planPath = $root . '/resources/initial-data/refresh-plan.json';
     $planContents = is_file($planPath) ? file_get_contents($planPath) : false;

@@ -47,8 +47,9 @@ importer against production (its `APP_ENV` guard forbids it anyway), or deploy,
 without explicit instruction.
 
 The implemented domain tables are `drinks`, `testers`, `drink_tests`,
-`ratings`, and `drink_images`; `schema_migrations` and `legacy_import_runs` are
-infrastructure. The rating services live under `src/Domain/Rating/`. See
+`ratings`, `drink_images`, and `test_runs` (the livestream episodes, keyed by
+`drink_tests.stream_reference`); `schema_migrations` and `legacy_import_runs`
+are infrastructure. The rating services live under `src/Domain/Rating/`. See
 `docs/DATA_MODEL.md` and `docs/RATING_SYSTEM.md` before changing either design.
 Never edit an applied
 migration; add a reviewed forward migration.

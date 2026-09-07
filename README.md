@@ -391,9 +391,9 @@ available over HTTP.
 
 ## Domain schema and rating engine
 
-The migrations create `drinks`, `testers`, `drink_tests`, `ratings`, and
-`drink_images`, plus the migrator-owned `schema_migrations` and import-safety
-`legacy_import_runs` tables. Derived
+The migrations create `drinks`, `testers`, `drink_tests`, `ratings`,
+`drink_images`, and `test_runs` (livestream episodes), plus the migrator-owned
+`schema_migrations` and import-safety `legacy_import_runs` tables. Derived
 rating results are not authoritative columns. The calculation classes under
 `src/Domain/Rating/` implement three-tester category averages, weighted and
 Excel-compatible rounded Gesamt, competition ranking, and explicit-set
