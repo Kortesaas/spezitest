@@ -175,6 +175,7 @@ final class HtmlRenderer
                 . '<table class="table table--drinks"><thead><tr>'
                 . '<th><span class="visually-hidden">Bild</span></th>'
                 . $this->sortableHeader('Spezi', 'name', $filters)
+                . $this->sortableHeader('Herkunft', 'region', $filters)
                 . $this->sortableHeader('Preis / 0,5&nbsp;l', 'price', $filters, ' class="table__num"')
                 . $this->sortableHeader('Status', 'status', $filters)
                 . '<th class="table__actions">Aktionen</th></tr></thead>'
@@ -818,21 +819,17 @@ final class HtmlRenderer
             $flags .= '<span class="badge">Kein Bild</span>';
         }
 
-        $origin = array_values(array_filter([
-            $drink['origin_location'],
-            $drink['origin_region'] !== null && trim($drink['origin_region']) !== '' ? $drink['origin_region'] : null,
-        ]));
-        $sub = implode(' · ', array_values(array_filter([
-            $drink['manufacturer'],
-            $origin === [] ? null : implode(', ', $origin),
-        ])));
-
         return '<tr><td>' . $this->thumbnail($id, $drink['has_primary_image']) . '</td>'
             . '<td data-label="Spezi">'
             . '<a class="dt__name" href="/admin/drinks/' . $id . '/edit"><strong>' . $this->escape($drink['name']) . '</strong></a>'
-            . '<span class="dt__sub">' . ($sub === '' ? '–' : $this->escape($sub)) . '</span>'
+            . '<span class="dt__sub">' . $this->cellOrDash($drink['manufacturer']) . '</span>'
             . $this->notesCell($drink['notes'])
             . ($flags === '' ? '' : '<span class="dt__flags">' . $flags . '</span>')
+            . '</td>'
+            . '<td data-label="Herkunft"><span>' . $this->cellOrDash($drink['origin_location']) . '</span>'
+            . ($drink['origin_region'] === null || trim($drink['origin_region']) === ''
+                ? ''
+                : '<span class="dt__sub">' . $this->escape($drink['origin_region']) . '</span>')
             . '</td>'
             . '<td class="table__num" data-label="Preis">' . $this->priceCell($drink['price_amount'], $drink['price_volume_ml']) . '</td>'
             // The Status column is the status control: one dropdown that both
