@@ -339,8 +339,8 @@ final class WebsiteRenderer
 
         return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
-            . '<h2 class="display-3">Wer ist sein Geld wert?</h2>'
-            . '<p class="meta">Jeder Punkt eine getestete Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
+            . '<h2 class="display-3">Welche Spezi ist ihr Geld wert?</h2>'
+            . '<p class="meta">Jeder Punkt ist eine getestete Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
             . 'antippen oder mit der Maus darüberfahren.</p></div>'
             . $figures . $bestCaption . $this->priceScatterChart($stats)
             . '</div></section>';

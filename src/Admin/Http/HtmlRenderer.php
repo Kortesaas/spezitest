@@ -1541,10 +1541,15 @@ final class HtmlRenderer
             . ($counts !== null ? $this->logoutButton($csrfToken) : '')
             . '</div></div>';
 
+        // `.admin-main` is width-capped in the stylesheet but never got an auto
+        // margin, so past ~1616px it pins left and its content drifts
+        // off-centre. Authenticated pages keep a full-width main (so tables and
+        // grids still stretch) but centre the capped box in its track; the
+        // login screen drops the cap entirely and lets `.auth` centre the card.
         $shell .= $counts !== null
             ? '<div class="admin-body">' . $this->sidebar($active, $counts)
-                . '<main class="admin-main" id="main">' . $content . '</main></div>'
-            : '<main class="admin-main" id="main" style="padding:0">' . $content . '</main>';
+                . '<main class="admin-main" id="main" style="width:100%;margin-inline:auto">' . $content . '</main></div>'
+            : '<main class="admin-main" id="main" style="padding:0;max-width:none">' . $content . '</main>';
 
         $shell .= '</div>';
 
