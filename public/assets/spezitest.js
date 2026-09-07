@@ -141,155 +141,162 @@
         });
     });
   })();
-  // Type-ahead for the catalog search. The form submits normally without it.
+  // Type-ahead for catalogue searches. The public catalogue and the admin
+  // Spezi list share this behaviour; each page controls where a selected
+  // suggestion leads through its data-suggest-href template.
   (function () {
-    var form = document.querySelector('[data-suggest]');
-    if (!form || !window.fetch) {
+    var forms = document.querySelectorAll('[data-suggest]');
+    if (forms.length === 0 || !window.fetch) {
       return;
     }
 
-    var input = form.querySelector('input[type="search"]');
-    var list = form.querySelector('.suggest');
-    if (!input || !list) {
-      return;
-    }
-
-    var items = [];
-    var cursor = -1;
-    var timer = null;
-    var latest = 0;
-
-    var close = function () {
-      list.hidden = true;
-      list.innerHTML = '';
-      items = [];
-      cursor = -1;
-      input.setAttribute('aria-expanded', 'false');
-      input.removeAttribute('aria-activedescendant');
-    };
-
-    var move = function (delta) {
-      if (items.length === 0) {
+    Array.prototype.forEach.call(forms, function (form) {
+      var input = form.querySelector('input[type="search"]');
+      var list = form.querySelector('.suggest');
+      if (!input || !list) {
         return;
       }
-      if (cursor >= 0) {
-        items[cursor].classList.remove('is-active');
-      }
-      cursor = (cursor + delta + items.length) % items.length;
-      items[cursor].classList.add('is-active');
-      input.setAttribute('aria-activedescendant', items[cursor].id);
-      items[cursor].scrollIntoView({ block: 'nearest' });
-    };
 
-    var render = function (results) {
-      if (results.length === 0) {
-        close();
-        return;
-      }
-      list.innerHTML = '';
-      results.forEach(function (item, index) {
-        var li = document.createElement('li');
-        li.id = 'q-suggest-' + index;
-        li.className = 'suggest__item';
-        li.setAttribute('role', 'option');
+      var items = [];
+      var cursor = -1;
+      var timer = null;
+      var latest = 0;
+      var hrefTemplate = form.getAttribute('data-suggest-href') || '/spezi/{slug}';
 
-        var link = document.createElement('a');
-        link.href = '/spezi/' + item.slug;
+      var close = function () {
+        list.hidden = true;
+        list.innerHTML = '';
+        items = [];
+        cursor = -1;
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+      };
 
-        var figure = document.createElement('span');
-        figure.className = 'suggest__img';
-        if (item.image) {
-          var img = document.createElement('img');
-          img.src = item.image;
-          img.alt = '';
-          img.loading = 'lazy';
-          figure.appendChild(img);
+      var move = function (delta) {
+        if (items.length === 0) {
+          return;
         }
-
-        var body = document.createElement('span');
-        body.className = 'suggest__body';
-        var name = document.createElement('span');
-        name.className = 'suggest__name';
-        name.textContent = item.name;
-        body.appendChild(name);
-        if (item.sub) {
-          var sub = document.createElement('span');
-          sub.className = 'suggest__sub';
-          sub.textContent = item.sub;
-          body.appendChild(sub);
+        if (cursor >= 0) {
+          items[cursor].classList.remove('is-active');
         }
+        cursor = (cursor + delta + items.length) % items.length;
+        items[cursor].classList.add('is-active');
+        input.setAttribute('aria-activedescendant', items[cursor].id);
+        items[cursor].scrollIntoView({ block: 'nearest' });
+      };
 
-        link.appendChild(figure);
-        link.appendChild(body);
-        if (item.rank) {
-          var rank = document.createElement('span');
-          rank.className = 'suggest__rank';
-          rank.textContent = '#' + item.rank;
-          link.appendChild(rank);
+      var render = function (results) {
+        if (results.length === 0) {
+          close();
+          return;
         }
+        list.innerHTML = '';
+        results.forEach(function (item, index) {
+          var li = document.createElement('li');
+          li.id = list.id + '-' + index;
+          li.className = 'suggest__item';
+          li.setAttribute('role', 'option');
 
-        li.appendChild(link);
-        list.appendChild(li);
+          var link = document.createElement('a');
+          link.href = hrefTemplate
+            .replace('{id}', encodeURIComponent(String(item.id)))
+            .replace('{slug}', encodeURIComponent(String(item.slug)));
+
+          var figure = document.createElement('span');
+          figure.className = 'suggest__img';
+          if (item.image) {
+            var img = document.createElement('img');
+            img.src = item.image;
+            img.alt = '';
+            img.loading = 'lazy';
+            figure.appendChild(img);
+          }
+
+          var body = document.createElement('span');
+          body.className = 'suggest__body';
+          var name = document.createElement('span');
+          name.className = 'suggest__name';
+          name.textContent = item.name;
+          body.appendChild(name);
+          if (item.sub) {
+            var sub = document.createElement('span');
+            sub.className = 'suggest__sub';
+            sub.textContent = item.sub;
+            body.appendChild(sub);
+          }
+
+          link.appendChild(figure);
+          link.appendChild(body);
+          if (item.rank) {
+            var rank = document.createElement('span');
+            rank.className = 'suggest__rank';
+            rank.textContent = '#' + item.rank;
+            link.appendChild(rank);
+          }
+
+          li.appendChild(link);
+          list.appendChild(li);
+        });
+
+        items = Array.prototype.slice.call(list.querySelectorAll('.suggest__item'));
+        cursor = -1;
+        list.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      };
+
+      var lookup = function () {
+        var term = input.value.trim();
+        if (term.length < 2) {
+          close();
+          return;
+        }
+        var token = ++latest;
+        fetch('/spezis/vorschlaege?q=' + encodeURIComponent(term), {
+          headers: { Accept: 'application/json' }
+        })
+          .then(function (response) {
+            return response.ok ? response.json() : { items: [] };
+          })
+          .then(function (data) {
+            // Ignore responses that a newer keystroke has already superseded.
+            if (token === latest) {
+              render(data.items || []);
+            }
+          })
+          .catch(close);
+      };
+
+      input.addEventListener('input', function () {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(lookup, 140);
       });
 
-      items = Array.prototype.slice.call(list.querySelectorAll('.suggest__item'));
-      cursor = -1;
-      list.hidden = false;
-      input.setAttribute('aria-expanded', 'true');
-    };
-
-    var lookup = function () {
-      var term = input.value.trim();
-      if (term.length < 2) {
-        close();
-        return;
-      }
-      var token = ++latest;
-      fetch('/spezis/vorschlaege?q=' + encodeURIComponent(term), {
-        headers: { Accept: 'application/json' }
-      })
-        .then(function (response) {
-          return response.ok ? response.json() : { items: [] };
-        })
-        .then(function (data) {
-          // Ignore responses that a newer keystroke has already superseded.
-          if (token === latest) {
-            render(data.items || []);
-          }
-        })
-        .catch(close);
-    };
-
-    input.addEventListener('input', function () {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(lookup, 140);
-    });
-
-    input.addEventListener('keydown', function (event) {
-      if (list.hidden) {
-        return;
-      }
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        move(1);
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        move(-1);
-      } else if (event.key === 'Enter' && cursor >= 0) {
-        event.preventDefault();
-        var link = items[cursor].querySelector('a');
-        if (link) {
-          window.location.href = link.href;
+      input.addEventListener('keydown', function (event) {
+        if (list.hidden) {
+          return;
         }
-      } else if (event.key === 'Escape') {
-        close();
-      }
-    });
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          move(1);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          move(-1);
+        } else if (event.key === 'Enter' && cursor >= 0) {
+          event.preventDefault();
+          var link = items[cursor].querySelector('a');
+          if (link) {
+            window.location.href = link.href;
+          }
+        } else if (event.key === 'Escape') {
+          close();
+        }
+      });
 
-    document.addEventListener('click', function (event) {
-      if (!form.contains(event.target)) {
-        close();
-      }
+      document.addEventListener('click', function (event) {
+        if (!form.contains(event.target)) {
+          close();
+        }
+      });
     });
   })();
 

@@ -93,7 +93,7 @@ final class Layout
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p27" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p28" defer></script>'
             . '</body></html>';
     }
 

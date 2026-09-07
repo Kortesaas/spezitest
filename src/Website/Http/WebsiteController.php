@@ -226,7 +226,9 @@ final class WebsiteController
     /**
      * Type-ahead for the catalog search box. Read-only JSON, matched against
      * the same fields as the catalog itself so a suggestion always yields
-     * results when it is submitted.
+     * results when it is submitted. This deliberately covers the entire
+     * catalogue: identified and acquired drinks are just as searchable as
+     * completed tests.
      */
     public function suggestions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -237,7 +239,7 @@ final class WebsiteController
         if (mb_strlen($term) >= 2) {
             $needle = mb_strtolower($term);
 
-            foreach ($this->catalogRepository()->ratedDrinks()->ranked() as $drink) {
+            foreach ($this->catalogRepository()->ratedDrinks()->all() as $drink) {
                 $haystack = mb_strtolower(
                     $drink->name . ' ' . ($drink->manufacturer ?? '') . ' ' . ($drink->displayOrigin() ?? ''),
                 );
@@ -247,6 +249,7 @@ final class WebsiteController
                 }
 
                 $matches[] = [
+                    'id' => $drink->id,
                     'name' => $drink->name,
                     'sub' => $drink->manufacturer ?? $drink->displayOrigin() ?? '',
                     'slug' => $drink->slug(),

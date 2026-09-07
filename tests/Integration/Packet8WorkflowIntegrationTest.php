@@ -384,6 +384,18 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('Süffiger Testsieger', (string) $catalog->getBody());
         self::assertStringNotContainsString('Wartender Kandidat', (string) $catalog->getBody());
 
+        $suggestions = $this->requestWithQuery('GET', '/spezis/vorschlaege', ['q' => 'kandidat']);
+        self::assertSame(200, $suggestions->getStatusCode());
+        self::assertSame('application/json; charset=UTF-8', $suggestions->getHeaderLine('Content-Type'));
+        $payload = json_decode((string) $suggestions->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($payload);
+        $items = $payload['items'] ?? null;
+        self::assertIsArray($items);
+        self::assertSame(
+            ['Wartender Kandidat'],
+            array_column($items, 'name'),
+        );
+
         $filtered = $this->requestWithQuery('GET', '/spezis', ['status' => ['identified']]);
         self::assertStringContainsString('Nur identifiziert', (string) $filtered->getBody());
         self::assertStringNotContainsString('Süffiger Testsieger', (string) $filtered->getBody());

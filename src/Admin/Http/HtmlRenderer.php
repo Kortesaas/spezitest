@@ -955,12 +955,15 @@ final class HtmlRenderer
 
         return '<section class="panel panel--pad filterbar" style="margin-bottom:var(--sp-5)">'
             . '<div class="filterbar__top">'
-            . '<form class="filterbar__search" method="get" action="' . $this->escape($filters->path) . '" role="search">'
+            . '<form class="filterbar__search search-wrap" method="get" action="' . $this->escape($filters->path) . '" '
+            . 'role="search" data-suggest data-suggest-href="/admin/drinks/{id}/edit">'
             . $hidden
-            . '<div class="search"><label class="visually-hidden" for="q">Suchen</label>'
-            . '<input id="q" name="q" type="search" placeholder="Name oder Hersteller …" '
-            . 'value="' . $this->escape($filters->search) . '">'
-            . '<button type="submit">Suchen</button></div></form>'
+            . '<div class="search"><label class="visually-hidden" for="admin-q">Suchen</label>'
+            . '<input id="admin-q" name="q" type="search" placeholder="Name oder Hersteller …" '
+            . 'autocomplete="off" role="combobox" aria-expanded="false" aria-controls="admin-q-suggest" '
+            . 'aria-autocomplete="list" value="' . $this->escape($filters->search) . '">'
+            . '<button type="submit">Suchen</button></div>'
+            . '<ul class="suggest" id="admin-q-suggest" role="listbox" aria-label="Vorschläge" hidden></ul></form>'
             . '<form class="filterbar__sort" method="get" action="' . $this->escape($filters->path) . '">'
             . $sortHidden
             . '<label class="label" for="sort">Sortierung</label>'
@@ -1569,10 +1572,10 @@ final class HtmlRenderer
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . $this->escape($title) . ' · Spezitest Verwaltung</title>'
             . '<meta name="robots" content="noindex, nofollow">'
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p27">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p28">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shell
-            . '<script src="/assets/spezitest.js?v=p27" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p28" defer></script>'
             . '</body></html>';
     }
 

@@ -113,10 +113,13 @@ final class AdminApplicationIntegrationTest extends TestCase
         self::assertSame(2, $this->tableCount('drinks'));
         self::assertTrue($this->needsNewPhoto($firstId));
         self::assertTrue($this->needsNewPhoto($secondId));
+        $list = (string) $this->request('GET', '/admin/drinks')->getBody();
         self::assertStringContainsString(
             'Neues Foto nötig',
-            (string) $this->request('GET', '/admin/drinks')->getBody(),
+            $list,
         );
+        self::assertStringContainsString('data-suggest-href="/admin/drinks/{id}/edit"', $list);
+        self::assertStringContainsString('id="admin-q-suggest"', $list);
 
         $dashboard = (string) $this->request('GET', '/admin')->getBody();
         self::assertMatchesRegularExpression(
