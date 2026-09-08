@@ -852,8 +852,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p44">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p44" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p45">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p45" defer></script>',
         );
     }
 
@@ -1907,7 +1907,8 @@ final class WebsiteRenderer
 
         $rows = '';
 
-        foreach ($stats->gesamtDistribution as $index => $bin) {
+        // Best band (50–60) on top, worst (0–10) at the bottom.
+        foreach (array_reverse($stats->gesamtDistribution, true) as $index => $bin) {
             $width = $max > 0 ? (int) round($bin['count'] / $max * 100) : 0;
             $accent = $index >= 4 ? ' barchart__row--accent' : '';
             $hasDrinks = $bin['drinks'] !== [];
