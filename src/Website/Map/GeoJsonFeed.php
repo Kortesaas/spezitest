@@ -16,17 +16,25 @@ use Spezitest\Website\Catalog\HuntMap;
  * feed on the next request — there is no separate map data to keep in sync.
  *
  * Each drink becomes one Point feature carrying its stable database id, its
- * name, and — when a package photo exists — a `description` written in uMap's
- * own text syntax (`{{url|width}}`) that embeds the picture straight from this
- * site, so the default uMap popup shows what the tester is looking for with no
- * template configuration. The bare `image` URL is included too for any other
- * consumer. Coordinates that are somehow non-finite or outside the valid range
- * are dropped so the output is always well-formed GeoJSON.
+ * name, and a `description` written in uMap's own text syntax: the package
+ * photo (when one exists), the manufacturer, the place, and a link back to the
+ * drink page on this site. The default uMap popup renders `description`, so it
+ * shows everything with no popup-template setup. The bare `image` URL and the
+ * `manufacturer` / `place` strings are included as their own properties too,
+ * for any other consumer. Coordinates that are somehow non-finite or outside
+ * the valid range are dropped so the output is always well-formed GeoJSON.
  */
 final readonly class GeoJsonFeed
 {
+    /** Popup thumbnail width in pixels — small; the popup is narrow. */
+    private const IMAGE_WIDTH = 110;
+
     /**
-     * @param list<array{id: int, name: string, latitude: float, longitude: float, image: ?string}> $features
+     * @param list<array{
+     *     id: int, name: string, latitude: float, longitude: float,
+     *     image: ?string, manufacturer: ?string, place: string,
+     *     approximate: bool, link: string
+     * }> $features
      */
     private function __construct(private array $features)
     {
@@ -42,13 +50,21 @@ final readonly class GeoJsonFeed
                 continue;
             }
 
+            $place = trim($point['postalCode'] . ' ' . $point['place']);
+
             foreach ($point['drinks'] as $drink) {
+                $manufacturer = $drink['manufacturer'] ?? '';
+
                 $features[] = [
                     'id' => $drink['id'],
                     'name' => $drink['name'],
                     'latitude' => $point['latitude'],
                     'longitude' => $point['longitude'],
                     'image' => $drink['hasImage'] ? $base . '/spezi/' . $drink['id'] . '/bild' : null,
+                    'manufacturer' => $manufacturer === '' ? null : $manufacturer,
+                    'place' => $place,
+                    'approximate' => $point['approximate'],
+                    'link' => $base . '/spezi/' . $drink['id'],
                 ];
             }
         }
@@ -65,7 +81,10 @@ final readonly class GeoJsonFeed
      *     features: list<array{
      *         type: 'Feature',
      *         id: int,
-     *         properties: array{name: string, description?: string, image?: string},
+     *         properties: array{
+     *             name: string, description: string, manufacturer?: string,
+     *             place: string, image?: string
+     *         },
      *         geometry: array{type: 'Point', coordinates: array{0: float, 1: float}}
      *     }>
      * }
@@ -75,13 +94,17 @@ final readonly class GeoJsonFeed
         $features = [];
 
         foreach ($this->features as $feature) {
-            $properties = ['name' => $feature['name']];
+            $properties = [
+                'name' => $feature['name'],
+                'description' => self::describe($feature),
+                'place' => $feature['place'],
+            ];
+
+            if ($feature['manufacturer'] !== null) {
+                $properties['manufacturer'] = $feature['manufacturer'];
+            }
 
             if ($feature['image'] !== null) {
-                // uMap image syntax ({{url|width}}): the default popup renders
-                // `description`, so the package photo shows up from spezitest.de
-                // with no popup-template setup.
-                $properties['description'] = '{{' . $feature['image'] . '|180}}';
                 $properties['image'] = $feature['image'];
             }
 
@@ -100,6 +123,44 @@ final readonly class GeoJsonFeed
         }
 
         return ['type' => 'FeatureCollection', 'features' => $features];
+    }
+
+    /**
+     * The popup body in uMap text syntax: photo, then a labelled detail line
+     * per fact we hold, then a link back to the drink page. `name` is the popup
+     * heading (uMap's default template), so it is not repeated here.
+     *
+     * @param array{
+     *     image: ?string, manufacturer: ?string, place: string,
+     *     approximate: bool, link: string
+     * } $feature
+     */
+    private static function describe(array $feature): string
+    {
+        $blocks = [];
+
+        if ($feature['image'] !== null) {
+            $blocks[] = '{{' . $feature['image'] . '|' . self::IMAGE_WIDTH . '}}';
+        }
+
+        $rows = [];
+
+        if ($feature['manufacturer'] !== null) {
+            $rows[] = 'Hersteller: **' . $feature['manufacturer'] . '**';
+        }
+
+        $place = $feature['place'];
+
+        if ($feature['approximate']) {
+            $place .= ' *(ungefähre Lage)*';
+        }
+
+        $rows[] = 'Ort: **' . $place . '**';
+        $blocks[] = implode("\n", $rows);
+
+        $blocks[] = '[[' . $feature['link'] . '|Auf spezitest.de ansehen]]';
+
+        return implode("\n\n", $blocks);
     }
 
     public function count(): int

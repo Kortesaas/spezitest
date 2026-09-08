@@ -514,7 +514,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
         self::assertStringContainsString('max-age=', $response->getHeaderLine('Cache-Control'));
 
-        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string, description?: string, image?: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
+        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string, description: string, place: string, manufacturer?: string, image?: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
         $document = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('FeatureCollection', $document['type']);
@@ -524,7 +524,8 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         foreach ($document['features'] as $feature) {
             self::assertSame('Feature', $feature['type']);
             self::assertSame('Point', $feature['geometry']['type']);
-            self::assertContains(array_keys($feature['properties']), [['name'], ['name', 'description', 'image']]);
+            self::assertSame([], array_diff(['name', 'description', 'place'], array_keys($feature['properties'])));
+            self::assertSame([], array_diff(array_keys($feature['properties']), ['name', 'description', 'place', 'manufacturer', 'image']));
             [$longitude, $latitude] = $feature['geometry']['coordinates'];
             self::assertGreaterThanOrEqual(-180.0, $longitude);
             self::assertLessThanOrEqual(180.0, $longitude);
@@ -544,21 +545,26 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
         self::assertArrayNotHasKey('GeoJSON Ausland', $byName);
 
-        // A drink with a package photo carries a uMap-syntax description that
-        // embeds the picture straight from spezitest.de, plus the bare image URL.
+        // A drink with a package photo: the description embeds the picture in
+        // uMap syntax, lists the place, and links back to the drink page.
         self::assertArrayHasKey('GeoJSON Mit Bild', $byName);
+        $withPhotoProps = $byName['GeoJSON Mit Bild']['properties'];
         $imageUrl = 'https://www.spezitest.de/spezi/' . $withPhoto . '/bild';
-        self::assertSame(
-            [
-                'name' => 'GeoJSON Mit Bild',
-                'description' => '{{' . $imageUrl . '|180}}',
-                'image' => $imageUrl,
-            ],
-            $byName['GeoJSON Mit Bild']['properties'],
+        self::assertSame($imageUrl, $withPhotoProps['image'] ?? null);
+        self::assertSame('80331 München', $withPhotoProps['place']);
+        self::assertStringContainsString('{{' . $imageUrl . '|110}}', $withPhotoProps['description']);
+        self::assertStringContainsString('Ort: **80331 München**', $withPhotoProps['description']);
+        self::assertStringContainsString(
+            '[[https://www.spezitest.de/spezi/' . $withPhoto . '|Auf spezitest.de ansehen]]',
+            $withPhotoProps['description'],
         );
 
-        // A drink without a photo stays name-only.
-        self::assertSame(['name' => 'GeoJSON Sichtbar'], $byName['GeoJSON Sichtbar']['properties']);
+        // A drink without a photo: no image key, but still a place line and link.
+        $plainProps = $byName['GeoJSON Sichtbar']['properties'];
+        self::assertArrayNotHasKey('image', $plainProps);
+        self::assertSame('69115 Heidelberg', $plainProps['place']);
+        self::assertStringContainsString('Ort: **69115 Heidelberg**', $plainProps['description']);
+        self::assertStringNotContainsString('{{', $plainProps['description']);
     }
 
     public function testPublicMapTestGeoJsonFile(): void

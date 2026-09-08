@@ -26,7 +26,7 @@ final class GeoJsonFeedTest extends TestCase
         return GeoJsonFeed::fromHuntMap(HuntMap::fromCollection($collection, $this->geocoder()));
     }
 
-    public function testProducesAValidFeatureCollectionWithOnlyNameAndDatabaseId(): void
+    public function testProducesAValidFeatureCollection(): void
     {
         $alpha = CatalogFixture::untested('Alpha Cola', 'identified', 'Brauerei A', false, '2026-01-01 00:00:00', '74939 Zuzenhausen');
         $collection = new RatedDrinkCollection([$alpha]);
@@ -39,15 +39,24 @@ final class GeoJsonFeedTest extends TestCase
         $feature = $document['features'][0];
         self::assertSame('Feature', $feature['type']);
         self::assertSame($alpha->id, $feature['id']);
-        self::assertSame(['name' => 'Alpha Cola'], $feature['properties']);
+        self::assertSame(
+            [
+                'name' => 'Alpha Cola',
+                'description' => "Hersteller: **Brauerei A**\nOrt: **74939 Zuzenhausen**\n\n"
+                    . "[[https://www.spezitest.de/spezi/{$alpha->id}|Auf spezitest.de ansehen]]",
+                'place' => '74939 Zuzenhausen',
+                'manufacturer' => 'Brauerei A',
+            ],
+            $feature['properties'],
+        );
         self::assertSame('Point', $feature['geometry']['type']);
         // GeoJSON order is [longitude, latitude].
         self::assertSame([8.8225, 49.2964], $feature['geometry']['coordinates']);
     }
 
-    public function testEmbedsThePackagePhotoInUmapSyntaxWhenTheDrinkHasOne(): void
+    public function testEmbedsThePackagePhotoAndDetailsInUmapSyntax(): void
     {
-        $withPhoto = CatalogFixture::untested('Foto Cola', 'identified', null, true, '2026-01-01 00:00:00', '74939 Zuzenhausen');
+        $withPhoto = CatalogFixture::untested('Foto Cola', 'identified', 'Sprudel AG', true, '2026-01-01 00:00:00', '74939 Zuzenhausen');
         $without = CatalogFixture::untested('Ohne Foto', 'identified', null, false, '2026-01-01 00:00:00', '30419 Hannover');
 
         $features = GeoJsonFeed::fromHuntMap(
@@ -60,12 +69,29 @@ final class GeoJsonFeedTest extends TestCase
             $byName[$feature['properties']['name']] = $feature['properties'];
         }
 
-        $url = 'https://www.spezitest.de/spezi/' . $withPhoto->id . '/bild';
+        $image = 'https://www.spezitest.de/spezi/' . $withPhoto->id . '/bild';
         self::assertSame(
-            ['name' => 'Foto Cola', 'description' => '{{' . $url . '|180}}', 'image' => $url],
+            [
+                'name' => 'Foto Cola',
+                'description' => "{{{$image}|110}}\n\nHersteller: **Sprudel AG**\nOrt: **74939 Zuzenhausen**\n\n"
+                    . "[[https://www.spezitest.de/spezi/{$withPhoto->id}|Auf spezitest.de ansehen]]",
+                'place' => '74939 Zuzenhausen',
+                'manufacturer' => 'Sprudel AG',
+                'image' => $image,
+            ],
             $byName['Foto Cola'],
         );
-        self::assertSame(['name' => 'Ohne Foto'], $byName['Ohne Foto']);
+
+        // No photo, no manufacturer: still a place line and the link, no image key.
+        self::assertSame(
+            [
+                'name' => 'Ohne Foto',
+                'description' => "Ort: **30419 Hannover**\n\n"
+                    . "[[https://www.spezitest.de/spezi/{$without->id}|Auf spezitest.de ansehen]]",
+                'place' => '30419 Hannover',
+            ],
+            $byName['Ohne Foto'],
+        );
     }
 
     public function testOneFeaturePerDrinkEvenWhenTheyShareAPostalCode(): void
