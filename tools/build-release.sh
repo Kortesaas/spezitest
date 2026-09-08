@@ -60,7 +60,7 @@ do
 done
 
 # Writable runtime directories (empty, kept in the archive).
-mkdir -p "$STAGE/$NAME/var/admin-images" "$STAGE/$NAME/var/legacy-images"
+mkdir -p "$STAGE/$NAME/var/admin-images" "$STAGE/$NAME/var/legacy-images" "$STAGE/$NAME/var/tile-cache"
 printf 'Private runtime storage. Must be writable by PHP-FPM and must stay OUTSIDE public/.\n' \
     > "$STAGE/$NAME/var/README.txt"
 

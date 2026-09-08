@@ -7,6 +7,8 @@ namespace Spezitest\Website\View;
 use Spezitest\Domain\Rating\PriceNormalizer;
 use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
+use Spezitest\Website\Catalog\Geo\PostalGeocoder;
+use Spezitest\Website\Catalog\HuntMap;
 use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrink;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
@@ -21,6 +23,22 @@ use Spezitest\Website\Catalog\StreamEpisode;
 final class WebsiteRenderer
 {
     private const TESTERS = ['manu' => 'Manu', 'fabi' => 'Fabi', 'schorsch' => 'Schorsch'];
+
+    /** "Locate me" crosshair, sized in `em` so it tracks the button text. */
+    private const ICON_LOCATE = '<svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        . ' stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+        . '<circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'
+        . '<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>';
+
+    /** Download tray-and-arrow, used on every link that saves a file. */
+    private const ICON_DOWNLOAD = '<svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        . ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        . '<path d="M12 3v11M8 10l4 4 4-4M5 20h14"/></svg>';
+
+    /** Magnifier, on the map search button. */
+    private const ICON_SEARCH = '<svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        . ' stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+        . '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
 
     private readonly string $siteUrl;
 
@@ -48,6 +66,8 @@ final class WebsiteRenderer
         array $schemaNodes = [],
         ?string $imagePath = null,
         string $ogType = 'website',
+        string $headExtra = '',
+        string $bodyEndExtra = '',
     ): string {
         $structuredData = $path === null ? '' : $this->schema->script($schemaNodes);
 
@@ -61,6 +81,8 @@ final class WebsiteRenderer
             $structuredData,
             $imagePath,
             $ogType,
+            $headExtra,
+            $bodyEndExtra,
         );
     }
 
@@ -207,6 +229,14 @@ final class WebsiteRenderer
             $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Spezistream.</span></div>';
         }
 
+        if ($drink->lifecycleStatus === 'identified') {
+            $postalCode = PostalGeocoder::postalCode($drink->originLocation);
+
+            if ($postalCode !== null) {
+                $hero .= '<p><a class="link-arrow" href="/karte#ort-' . Html::e($postalCode) . '">Auf der Karte ansehen</a></p>';
+            }
+        }
+
         $hero .= '</div></div></section>';
 
         $body = $hero . $this->previousNextNav($drink, $collection) . '</article>';
@@ -310,6 +340,173 @@ final class WebsiteRenderer
             'Auswertung der Spezistreams: Herkunftskarte, Verteilung, Tester und Preis/Leistung.',
             '/statistik',
         );
+    }
+
+    /**
+     * The hunt map: every still-wanted drink placed on a real map of Germany by
+     * the postal code in its origin, so a tester passing through can see what is
+     * available nearby. The map is progressive enhancement — the list beside it
+     * carries every drink and link with JavaScript disabled.
+     */
+    public function karte(HuntMap $map): string
+    {
+        $identifiedCount = $map->total();
+
+        $intro = '<section class="wrap section"><div class="stack">'
+            . '<span class="eyebrow eyebrow--accent">Karte</span>'
+            . '<h1 class="display-2">Wo die noch gesuchten Spezis wohnen</h1>'
+            . '<p class="lede">Jede identifizierte, aber noch nicht gekaufte Spezi sitzt hier an ihrem '
+            . 'Herkunftsort.</p></div>';
+
+        if ($map->isEmpty()) {
+            $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Nichts mehr gesucht</p>'
+                . '<p>Sobald eine Spezi identifiziert, aber noch nicht erworben ist, erscheint sie hier.</p>'
+                . '</div></section>';
+
+            return $this->shell('Karte', $intro, 'karte');
+        }
+
+        $intro .= '<div class="figure-row" style="margin-top:var(--sp-6)">'
+            . $this->figure((string) $identifiedCount, 'noch gesucht')
+            . $this->figure((string) $map->placed, 'auf der Karte')
+            . $this->figure((string) count($map->points), $this->pluralOrte(count($map->points)))
+            . '</div></section>';
+
+        $toolbar = '<div class="karte__toolbar">'
+            . '<div class="karte__toolbar-actions">'
+            . '<form class="karte__search" data-karte-search role="search" hidden>'
+            . '<label class="visually-hidden" for="karte-q">PLZ oder Ort suchen</label>'
+            . '<input id="karte-q" name="q" type="search" placeholder="PLZ oder Ort" autocomplete="off" maxlength="120">'
+            . '<button type="submit">' . self::ICON_SEARCH . '<span class="visually-hidden">Suchen</span></button>'
+            . '</form>'
+            . '<div class="karte__toolbar-buttons">'
+            . '<button type="button" class="btn btn--secondary btn--sm" data-karte-near hidden>'
+            . self::ICON_LOCATE . 'In meiner Nähe</button>'
+            . '<a class="btn btn--secondary btn--sm" href="/karte/spezikarte.gpx" download'
+            . ' title="GPX mit allen Orten – öffnet sich auf dem Handy in der Karten-App">'
+            . self::ICON_DOWNLOAD . 'Alle Orte als GPX</a>'
+            . '</div>'
+            . '</div>'
+            . '<p class="karte__hint" data-karte-near-note hidden>Dein Standort wird nur in deinem Browser '
+            . 'zum Sortieren verwendet und verlässt dein Gerät nicht.</p>'
+            . '</div>';
+
+        $mapSection = '<section class="section section--tint"><div class="wrap stack-lg">'
+            . $toolbar
+            . '<div class="karte">'
+            . '<div class="karte__stage">'
+            . '<div id="karte-map" data-karte aria-label="Karte von Deutschland mit den Herkunftsorten der noch gesuchten Spezis">'
+            . '<noscript><p class="karte__noscript">Die interaktive Karte braucht JavaScript. '
+            . 'Die vollständige Liste mit allen Orten steht daneben.</p></noscript></div>'
+            . '<p class="karte__credit">Karte: © <a href="https://www.openstreetmap.org/copyright" rel="nofollow noopener">OpenStreetMap</a>-Mitwirkende'
+            . ' · PLZ-Koordinaten: <a href="https://www.geonames.org/" rel="nofollow noopener">GeoNames</a> (CC BY 4.0)</p>'
+            . '</div>'
+            . '<div class="karte__side">'
+            . '<div class="karte__list map__list">' . $this->karteEntries($map) . '</div>'
+            . '</div></div></div></section>';
+
+        $data = json_encode(
+            ['markers' => $map->markers()],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS,
+        );
+        $blob = '<script type="application/json" id="karte-data">' . $data . '</script>';
+
+        return $this->shell(
+            'Karte',
+            $intro . $mapSection . $blob,
+            'karte',
+            'Karte aller noch gesuchten Cola-Mix-Getränke: wo die identifizierten, aber noch nicht erworbenen Spezis herkommen.',
+            '/karte',
+            [],
+            null,
+            'website',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p36">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p36" defer></script>',
+        );
+    }
+
+    private function pluralOrte(int $count): string
+    {
+        return $count === 1 ? 'Ort' : 'Orte';
+    }
+
+    private function karteEntries(HuntMap $map): string
+    {
+        $entries = '';
+
+        foreach ($map->points as $point) {
+            $drinks = '';
+
+            foreach ($point['drinks'] as $drink) {
+                $sub = $drink['manufacturer'] ?? $point['place'];
+                $drinks .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                    . '<span class="map__place">' . Html::e($sub) . '</span></li>';
+            }
+
+            $approx = $point['approximate']
+                ? ' <span class="karte__approx" title="Ungefähre Lage – die genaue PLZ fehlt in der Tabelle">≈</span>'
+                : '';
+
+            $pinLabel = HuntMap::pointLabel($point);
+
+            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['postalCode']) . '">'
+                . '<h3 class="map__entry-title">' . Html::e($point['place']) . $approx
+                . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
+                . '<ul class="map__drinks">' . $drinks . '</ul>'
+                . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['postalCode'])
+                . '</section>';
+        }
+
+        if ($map->unplaced !== []) {
+            $rest = '';
+
+            foreach ($map->unplaced as $drink) {
+                $rest .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                    . '<span>' . Html::e($drink['location'] ?? 'ohne Angabe') . '</span></li>';
+            }
+
+            $entries .= '<section class="map__entry map__entry--rest">'
+                . '<h3 class="map__entry-title">Nicht auf der Karte</h3>'
+                . '<ul class="map__rest">' . $rest . '</ul></section>';
+        }
+
+        return $entries;
+    }
+
+    /**
+     * The "open in maps" links for one place, tucked into a closed disclosure so
+     * the list stays scannable. Plain anchors that open in a browser on any
+     * device — the visitor's click is what hands the coordinates to the map
+     * service; the site itself sends nothing. OpenStreetMap and Apple Maps keep
+     * the Spezi name on the pin; Google Maps ignores a label passed with
+     * coordinates, so it just receives the exact spot. The GPX link downloads a
+     * named waypoint file from the site's own origin. On a touch device karte.js
+     * adds a "Karten-App" link (the `geo:` scheme) in front.
+     */
+    private function karteEntryActions(
+        float $latitude,
+        float $longitude,
+        string $label,
+        string $postalCode,
+    ): string {
+        $coords = number_format($latitude, 5, '.', '') . ',' . number_format($longitude, 5, '.', '');
+        $pin = rawurlencode($label);
+        $osm = 'https://www.openstreetmap.org/?mlat=' . number_format($latitude, 5, '.', '')
+            . '&amp;mlon=' . number_format($longitude, 5, '.', '')
+            . '#map=15/' . number_format($latitude, 4, '.', '') . '/' . number_format($longitude, 4, '.', '');
+
+        return '<details class="map__entry-more"><summary>Öffnen &amp; GPX</summary>'
+            . '<p class="map__entry-actions" data-map-actions'
+            . ' data-lat="' . $coords . '"'
+            . ' data-label="' . Html::e($label) . '">'
+            . '<a href="' . $osm . '" target="_blank" rel="noopener nofollow">OpenStreetMap</a>'
+            . '<a href="https://maps.apple.com/?ll=' . $coords . '&amp;q=' . $pin . '"'
+            . ' target="_blank" rel="noopener nofollow">Apple&nbsp;Maps</a>'
+            . '<a href="https://www.google.com/maps/search/?api=1&amp;query=' . $coords . '"'
+            . ' target="_blank" rel="noopener nofollow">Google&nbsp;Maps</a>'
+            . '<a class="map__dl" href="/karte/ort/' . Html::e($postalCode) . '.gpx" download>'
+            . self::ICON_DOWNLOAD . 'GPX</a>'
+            . '</p></details>';
     }
 
     private function priceLeistungSection(Statistics $stats): string

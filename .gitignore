@@ -39,6 +39,7 @@ __pycache__/
 /var/stream-index-plan*.json
 /var/share-card.html
 /var/icons/
+/var/tile-cache/
 
 # IDE and operating-system files
 .DS_Store

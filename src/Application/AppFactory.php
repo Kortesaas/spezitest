@@ -24,8 +24,10 @@ use Spezitest\Admin\Security\AdminAuthenticator;
 use Spezitest\Admin\Security\CsrfTokenManager;
 use Spezitest\Configuration\AppConfiguration;
 use Spezitest\Development\LiveReloadMiddleware;
+use Spezitest\Website\Http\PublicMapApiMiddleware;
 use Spezitest\Website\Http\WebsiteController;
 use Spezitest\Website\Http\WebsiteSecurityHeadersMiddleware;
+use Spezitest\Website\Map\TileProxy;
 use Spezitest\Website\View\WebsiteRenderer;
 
 final class AppFactory
@@ -39,9 +41,10 @@ final class AppFactory
         ?AdminRuntime $adminRuntime = null,
     ): App {
         $app = SlimAppFactory::create();
+        $root = dirname(__DIR__, 2);
         $adminRuntime ??= AdminRuntime::fromEnvironment(
             $configuration,
-            dirname(__DIR__, 2),
+            $root,
         );
         $adminConfiguration = $adminRuntime->configuration();
         $authenticator = new AdminAuthenticator($adminConfiguration, $adminRuntime->session());
@@ -66,6 +69,7 @@ final class AppFactory
             $imageStorage,
             $websiteRenderer,
             $siteUrl,
+            new TileProxy($root . '/var/tile-cache'),
         );
 
         $responseFactory = $app->getResponseFactory();
@@ -74,6 +78,7 @@ final class AppFactory
         $websiteSecurityHeaders = new WebsiteSecurityHeadersMiddleware();
 
         self::registerWebsiteRoutes($app, $websiteController, $websiteSecurityHeaders);
+        self::registerMapApiRoutes($app, $websiteController);
         self::registerAdminRoutes(
             $app,
             $adminController,
@@ -117,7 +122,6 @@ final class AppFactory
         // the outermost middleware and can patch every HTML response, 404s
         // included.
         if ($configuration->environment() !== 'production' && $configuration->debug()) {
-            $root = dirname(__DIR__, 2);
             $app->add(new LiveReloadMiddleware([
                 $root . '/src',
                 $root . '/config',
@@ -143,6 +147,11 @@ final class AppFactory
             $group->get('/', [$controller, 'home']);
             $group->get('/spezis', [$controller, 'catalog']);
             $group->get('/spezis/vorschlaege', [$controller, 'suggestions']);
+            $group->get('/karte', [$controller, 'karte']);
+            $group->get('/karte/suche', [$controller, 'karteSearch']);
+            $group->get('/karte/spezikarte.gpx', [$controller, 'karteGpx']);
+            $group->get('/karte/ort/{plz:[0-9]{5}}.gpx', [$controller, 'karteGpxForPlace']);
+            $group->get('/karte/kachel/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.png', [$controller, 'mapTile']);
             $group->get('/impressum', [$controller, 'impressum']);
             $group->get('/datenschutz', [$controller, 'datenschutz']);
             $group->get('/ranking', [$controller, 'ranking']);
@@ -155,6 +164,21 @@ final class AppFactory
             $group->get('/spezi/{id:[0-9]+}/bild', [$controller, 'image']);
             $group->get('/spezi/{ref:[0-9][A-Za-z0-9-]*}', [$controller, 'detail']);
         })->add($securityHeaders);
+    }
+
+    /**
+     * The public, unauthenticated map API. It is read cross-origin by a
+     * third-party map viewer (uMap), so it is served outside the website's
+     * page-oriented security headers with `Access-Control-Allow-Origin: *`.
+     *
+     * @param App<ContainerInterface|null> $app
+     */
+    private static function registerMapApiRoutes(App $app, WebsiteController $controller): void
+    {
+        $app->group('/api/map', static function (RouteCollectorProxy $group) use ($controller): void {
+            $group->get('/spezis.geojson', [$controller, 'mapSpezisGeoJson']);
+            $group->get('/test-spezis.geojson', [$controller, 'mapTestGeoJson']);
+        })->add(new PublicMapApiMiddleware());
     }
 
     /**

@@ -56,6 +56,23 @@ final readonly class RatedDrinkCollection
     }
 
     /**
+     * Drinks that are known but not yet acquired, ordered by name.
+     *
+     * @return list<RatedDrink>
+     */
+    public function identified(): array
+    {
+        $identified = array_values(array_filter(
+            $this->drinks,
+            static fn (RatedDrink $drink): bool => $drink->lifecycleStatus === 'identified',
+        ));
+
+        usort($identified, static fn (RatedDrink $a, RatedDrink $b): int => strcasecmp($a->name, $b->name));
+
+        return $identified;
+    }
+
+    /**
      * Tested drinks ordered by rank (best first); ties keep a stable order by name.
      *
      * @return list<RatedDrink>

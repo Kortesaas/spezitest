@@ -2,3 +2,7 @@
 # every operating system, including checkouts with core.autocrlf enabled.
 /resources/initial-data/*.sql text eol=lf
 /resources/initial-data/*.json text eol=lf
+
+# Generated geo tables: keep LF so regeneration produces no diff noise.
+/src/Website/Catalog/Geo/postal-centroids.php text eol=lf
+/src/Website/Catalog/Geo/place-centroids.php text eol=lf

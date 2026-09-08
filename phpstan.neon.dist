@@ -1,5 +1,9 @@
 parameters:
     level: max
+    excludePaths:
+        # Generated data tables; analysed as data, not logic.
+        - src/Website/Catalog/Geo/postal-centroids.php
+        - src/Website/Catalog/Geo/place-centroids.php
     paths:
         - bin
         - config

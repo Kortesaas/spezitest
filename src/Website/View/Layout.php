@@ -17,6 +17,7 @@ final class Layout
         'ranking' => ['/ranking', 'Ranking'],
         'statistik' => ['/statistik', 'Statistik'],
         'streams' => ['/streams', 'Streams'],
+        'karte' => ['/karte', 'Karte'],
         'ueber' => ['/ueber', 'Über'],
     ];
 
@@ -53,6 +54,8 @@ final class Layout
      *        this site); null uses the default Spezitest card
      * @param string $ogType the Open Graph object type, e.g. `article` for a
      *        single Spezi or Spezistream
+     * @param string $headExtra markup appended to <head> (page-specific stylesheets)
+     * @param string $bodyEndExtra markup appended just before </body> (page-specific scripts)
      */
     public static function page(
         string $title,
@@ -64,6 +67,8 @@ final class Layout
         string $structuredData = '',
         ?string $imagePath = null,
         string $ogType = 'website',
+        string $headExtra = '',
+        string $bodyEndExtra = '',
     ): string {
         $siteUrl = rtrim($siteUrl, '/');
         $summary = $description ?? self::DEFAULT_DESCRIPTION;
@@ -81,19 +86,21 @@ final class Layout
             . ($path === null ? '<meta name="robots" content="noindex">' : '')
             . ($canonical === null ? '' : '<link rel="canonical" href="' . Html::e($canonical) . '">')
             . self::sharePreview($shareTitle, $summary, $canonical, $siteUrl, $imagePath, $ogType)
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p27">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p36">'
             . '<link rel="icon" href="/favicon.ico" sizes="32x32">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">'
             . '<link rel="manifest" href="/site.webmanifest">'
             . '<link rel="alternate" type="application/atom+xml" title="Spezitest – Neu getestet" href="/feed.xml">'
             . $structuredData
+            . $headExtra
             . '</head><body>'
             . '<a class="skip-link" href="#main">Zum Inhalt springen</a>'
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p28" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p36" defer></script>'
+            . $bodyEndExtra
             . '</body></html>';
     }
 
@@ -181,7 +188,8 @@ final class Layout
             . '<div class="grid grid--3" style="gap:var(--sp-5)">'
             . '<div><h3>Katalog</h3><ul class="stack-sm">'
             . '<li><a href="/spezis">Alle Spezis</a></li><li><a href="/ranking">Ranking</a></li>'
-            . '<li><a href="/statistik">Statistik</a></li><li><a href="/streams">Streams</a></li></ul></div>'
+            . '<li><a href="/statistik">Statistik</a></li><li><a href="/streams">Streams</a></li>'
+            . '<li><a href="/karte">Karte</a></li></ul></div>'
             . '<div><h3>Projekt</h3><ul class="stack-sm">'
             . '<li><a href="/ueber">Über Spezitest</a></li><li><a href="/ueber#methode">Testmethode</a></li><li><a href="/ueber#tester">Tester</a></li></ul></div>'
             . '<div><h3>Rechtliches</h3><ul class="stack-sm">'

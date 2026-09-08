@@ -72,13 +72,15 @@ final class CatalogFixture
         ?string $manufacturer = null,
         bool $hasImage = false,
         string $updatedAt = '2026-01-01 00:00:00',
+        ?string $originLocation = null,
+        ?string $originRegion = null,
     ): RatedDrink {
         return new RatedDrink(
             self::$nextId++,
             $name,
             $manufacturer,
-            null,
-            null,
+            $originLocation,
+            $originRegion,
             null,
             $status,
             $hasImage,

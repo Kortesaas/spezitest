@@ -38,6 +38,9 @@ candidates were resolved **DIFFERENT_PRODUCTS**.
   Settings, or a `phpinfo()` you delete straight after). GD / Imagick are **not
   required** — ordinary admin uploads retain validated originals, while the
   reviewed catalogue WebPs were already generated offline.
+- **PHP settings**: `allow_url_fopen = On` (the host default) lets the hunt map
+  fetch and cache OpenStreetMap tiles server-side. If it is off, `/karte` still
+  works — the map just shows markers on a blank background.
 - **PHP settings** for the domain: `display_errors = Off`. `memory_limit`
   256M and `upload_max_filesize` / `post_max_size` 64M are already the host
   defaults and are fine.
@@ -90,11 +93,15 @@ Assume the Plesk domain's home is `.../httpdocs/`.
      var/
        admin-images/     <- writable, admin uploads land here
        legacy-images/    <- writable, historical images land here
+       tile-cache/       <- writable, hunt-map map tiles are cached here
    ```
 
-3. Set permissions: `var/`, `var/admin-images/`, `var/legacy-images/` writable
-   by the PHP-FPM user (Plesk File Manager → Change Permissions; typically the
-   subscription's system user already owns them — `755` dirs is enough).
+3. Set permissions: `var/`, `var/admin-images/`, `var/legacy-images/` and
+   `var/tile-cache/` writable by the PHP-FPM user (Plesk File Manager → Change
+   Permissions; typically the subscription's system user already owns them —
+   `755` dirs is enough). `var/tile-cache/` fills itself on demand and can be
+   deleted at any time to reclaim space (a few hundred MB at most); it holds no
+   application data.
 4. Delete the now-empty `httpdocs/spezitest-<version>/` wrapper and the
    uploaded `.tar.gz`.
 
@@ -288,6 +295,8 @@ it will show empty-state pages until the data is imported, which is expected.
 | `GET /spezi/109` | 301 → `/spezi/109-flotzinger-cola-mix` |
 | `GET /spezi/109/bild` | 200, `image/webp`, `X-Content-Type-Options: nosniff` |
 | `GET /assets/spezitest.css` | 200, `text/css` |
+| `GET /api/map/spezis.geojson` | 200, `application/geo+json`, `Access-Control-Allow-Origin: *`, a GeoJSON `FeatureCollection` |
+| `GET /api/map/test-spezis.geojson` | 200, same headers, three `TEST Spezi …` features (temporary — remove once uMap is verified) |
 | `GET /nonsense` | 404, branded page, no stack trace |
 | `GET /.env` | 404 |
 | `GET /admin` | 302 → `/admin/login` |

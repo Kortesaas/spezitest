@@ -14,11 +14,17 @@ use Spezitest\Media\ImageResponder;
 use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
 use Spezitest\Website\Catalog\CatalogRepository;
+use Spezitest\Website\Catalog\Geo\LocationSearch;
+use Spezitest\Website\Catalog\Geo\PostalGeocoder;
+use Spezitest\Website\Catalog\HuntMap;
 use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Slug;
 use Spezitest\Website\Catalog\Statistics;
 use Spezitest\Website\Catalog\StreamEpisode;
+use Spezitest\Website\Map\GeoJsonFeed;
+use Spezitest\Website\Map\GpxDocument;
+use Spezitest\Website\Map\TileProxy;
 use Spezitest\Website\Seo\FeedBuilder;
 use Spezitest\Website\Seo\SitemapBuilder;
 use Spezitest\Website\View\WebsiteRenderer;
@@ -42,7 +48,8 @@ final class WebsiteController
         private readonly Closure $connectionFactory,
         private readonly ImageStorage $imageStorage,
         private readonly WebsiteRenderer $renderer,
-        private readonly string $siteUrl = 'https://www.spezitest.de',
+        private readonly string $siteUrl,
+        private readonly TileProxy $tileProxy,
     ) {
     }
 
@@ -165,6 +172,202 @@ final class WebsiteController
         }
 
         return $dates;
+    }
+
+    public function karte(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->html($response, $this->renderer->karte($this->huntMap()));
+    }
+
+    /**
+     * The live public map feed, as GeoJSON, for the uMap map viewer. It is the
+     * same set of pins as {@see karte()} — `identified` drinks whose origin
+     * resolves to a coordinate — rebuilt from the database on every request and
+     * cached briefly. See {@see GeoJsonFeed}.
+     */
+    public function mapSpezisGeoJson(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $collection = GeoJsonFeed::fromHuntMap($this->huntMap())->toFeatureCollection();
+
+        return $this->geoJson($response, $collection, 'public, max-age=60');
+    }
+
+    /**
+     * A fixed three-pin GeoJSON file, used once to confirm that uMap can load
+     * remote GeoJSON from this origin before the live feed is wired in.
+     */
+    public function mapTestGeoJson(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $collection = [
+            'type' => 'FeatureCollection',
+            'features' => [
+                self::testFeature('test-1', 'TEST Spezi Berlin', 13.4050, 52.5200),
+                self::testFeature('test-2', 'TEST Spezi München', 11.5820, 48.1351),
+                self::testFeature('test-3', 'TEST Spezi Hamburg', 9.9937, 53.5511),
+            ],
+        ];
+
+        return $this->geoJson($response, $collection, 'public, max-age=300');
+    }
+
+    /**
+     * @return array{type: 'Feature', id: string, properties: array{name: string}, geometry: array{type: 'Point', coordinates: array{0: float, 1: float}}}
+     */
+    private static function testFeature(string $id, string $name, float $longitude, float $latitude): array
+    {
+        return [
+            'type' => 'Feature',
+            'id' => $id,
+            'properties' => ['name' => $name],
+            'geometry' => ['type' => 'Point', 'coordinates' => [$longitude, $latitude]],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     */
+    private function geoJson(ResponseInterface $response, array $document, string $cacheControl): ResponseInterface
+    {
+        $response->getBody()->write((string) json_encode(
+            $document,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ));
+
+        return $response
+            ->withHeader('Content-Type', 'application/geo+json; charset=UTF-8')
+            ->withHeader('Cache-Control', $cacheControl);
+    }
+
+    /**
+     * The whole hunt map as a GPX waypoint file — one `<wpt>` per place, each
+     * carrying the Spezi name, so a phone's "open with" sheet can hand it to any
+     * map or GPS app. Read-only, built from the same data as the page.
+     */
+    public function karteGpx(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $waypoints = $this->huntMap()->waypoints();
+
+        if ($waypoints === []) {
+            return $response->withStatus(404);
+        }
+
+        return $this->gpx($response, 'spezitest-spezikarte', $waypoints);
+    }
+
+    /**
+     * Resolves a "PLZ oder Ort" search box entry to a coordinate, so the map
+     * can jump there and sort the list by distance. Offline and first-party —
+     * see {@see LocationSearch}. Read-only JSON, like the catalog suggestions.
+     */
+    public function karteSearch(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $term = $request->getQueryParams()['q'] ?? '';
+        $term = is_string($term) ? mb_substr($term, 0, 120) : '';
+
+        $hit = LocationSearch::default()->search($term, $this->huntMap());
+
+        $status = $hit === null ? 404 : 200;
+        $payload = $hit === null
+            ? ['error' => 'not_found']
+            : ['lat' => $hit['latitude'], 'lon' => $hit['longitude'], 'label' => $hit['label']];
+
+        $response->getBody()->write((string) json_encode(
+            $payload,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ));
+
+        return $response
+            ->withStatus($status)
+            ->withHeader('Content-Type', 'application/json; charset=UTF-8')
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /**
+     * One place from the hunt map as a GPX file.
+     *
+     * @param array<string, string> $arguments
+     */
+    public function karteGpxForPlace(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $postalCode = $arguments['plz'] ?? '';
+
+        if (preg_match('/^\d{5}$/', $postalCode) !== 1) {
+            return $response->withStatus(404);
+        }
+
+        $map = $this->huntMap();
+        $waypoints = $map->waypointsForPostalCode($postalCode);
+
+        if ($waypoints === []) {
+            return $response->withStatus(404);
+        }
+
+        return $this->gpx($response, GpxDocument::filename($waypoints[0]['name']), $waypoints);
+    }
+
+    /**
+     * @param list<array{latitude: float, longitude: float, name: string, description: ?string}> $waypoints
+     */
+    private function gpx(ResponseInterface $response, string $filenameStem, array $waypoints): ResponseInterface
+    {
+        $response->getBody()->write((new GpxDocument($waypoints))->render());
+
+        return $response
+            ->withHeader('Content-Type', 'application/gpx+xml; charset=UTF-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filenameStem . '.gpx"')
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'public, max-age=3600');
+    }
+
+    private function huntMap(): HuntMap
+    {
+        return HuntMap::fromCollection(
+            $this->catalogRepository()->ratedDrinks(),
+            PostalGeocoder::default(),
+        );
+    }
+
+    /**
+     * First-party OpenStreetMap tiles for the hunt map. The visitor's browser
+     * only ever talks to this origin; {@see TileProxy} fetches and caches each
+     * tile server-side. See its class docblock.
+     *
+     * @param array<string, string> $arguments
+     */
+    public function mapTile(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        foreach (['z', 'x', 'y'] as $key) {
+            if (!ctype_digit($arguments[$key] ?? '')) {
+                return $response->withStatus(404);
+            }
+        }
+
+        $tile = $this->tileProxy->tile(
+            (int) $arguments['z'],
+            (int) $arguments['x'],
+            (int) $arguments['y'],
+        );
+
+        if ($tile === null) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($tile);
+
+        return $response
+            ->withHeader('Content-Type', 'image/png')
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'public, max-age=1209600');
     }
 
     public function ueber(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface

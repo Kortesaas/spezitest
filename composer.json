@@ -36,7 +36,7 @@
         "sort-packages": true
     },
     "scripts": {
-        "analyse": "phpstan analyse --no-progress",
+        "analyse": "phpstan analyse --no-progress --memory-limit=512M",
         "check": [
             "@initial-data:verify",
             "@test",

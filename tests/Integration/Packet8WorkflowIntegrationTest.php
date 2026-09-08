@@ -420,6 +420,135 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }
 
+    public function testHuntMapPlacesIdentifiedDrinksAndListsForeignOrigins(): void
+    {
+        $this->login();
+        $nahe = $this->createDrinkWithOrigin('Nahe Limo', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
+        $this->createDrinkWithOrigin('Ferne Limo', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->createDrinkWithOrigin('Schon da', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
+        $this->logout();
+
+        $karte = $this->request('GET', '/karte');
+        self::assertSame(200, $karte->getStatusCode());
+
+        $body = (string) $karte->getBody();
+        self::assertStringContainsString('Nahe Limo', $body);
+        self::assertStringContainsString('id="karte-data"', $body);
+        self::assertStringContainsString('Heidelberg', $body);
+        self::assertStringContainsString('id="ort-69115"', $body);
+        // "Open in maps" links that work in any browser; OpenStreetMap and Apple
+        // Maps keep the Spezi name, Google Maps gets the exact coordinates. The
+        // "geo:" link is added by JavaScript only on touch devices.
+        self::assertStringContainsString('openstreetmap.org/?mlat=', $body);
+        self::assertStringContainsString('maps.apple.com/?ll=', $body);
+        self::assertStringContainsString('q=Nahe%20Limo', $body);
+        self::assertStringContainsString('google.com/maps/search/?api=1', $body);
+        self::assertStringNotContainsString('geo:', $body);
+        // A GPX waypoint file is offered per place and for the whole map.
+        self::assertStringContainsString('href="/karte/ort/69115.gpx"', $body);
+        self::assertStringContainsString('href="/karte/spezikarte.gpx"', $body);
+        // The acquired drink is not part of the hunt.
+        self::assertStringNotContainsString('Schon da', $body);
+        // Foreign origin is listed but not on the map.
+        self::assertStringContainsString('Nicht auf der Karte', $body);
+        self::assertStringContainsString('Ferne Limo', $body);
+
+        // The map stays first-party: tiles are served through our own route,
+        // so the CSP still allows images only from 'self'.
+        self::assertStringContainsString("img-src 'self' data:;", $karte->getHeaderLine('Content-Security-Policy'));
+        self::assertStringNotContainsString('openstreetmap.org', $karte->getHeaderLine('Content-Security-Policy'));
+
+        // An out-of-range tile coordinate is rejected without any upstream call.
+        self::assertSame(404, $this->request('GET', '/karte/kachel/2/1/1.png')->getStatusCode());
+
+        // The "PLZ oder Ort" search resolves a postal code and a town, 404s otherwise.
+        $plz = $this->requestWithQuery('GET', '/karte/suche', ['q' => '69115']);
+        self::assertSame(200, $plz->getStatusCode());
+        self::assertStringContainsString('application/json', $plz->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('"label":"69115"', (string) $plz->getBody());
+        $town = $this->requestWithQuery('GET', '/karte/suche', ['q' => 'Heidelberg']);
+        self::assertSame(200, $town->getStatusCode());
+        self::assertStringContainsString('"lat":', (string) $town->getBody());
+        self::assertSame(404, $this->requestWithQuery('GET', '/karte/suche', ['q' => 'xyzzy-nowhere'])->getStatusCode());
+
+        // The GPX endpoints return a real waypoint file for a place and the map.
+        $placeGpx = $this->request('GET', '/karte/ort/69115.gpx');
+        self::assertSame(200, $placeGpx->getStatusCode());
+        self::assertStringContainsString('application/gpx+xml', $placeGpx->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('filename="nahe-limo.gpx"', $placeGpx->getHeaderLine('Content-Disposition'));
+        self::assertStringContainsString('<name>Nahe Limo</name>', (string) $placeGpx->getBody());
+        self::assertStringContainsString('<wpt ', (string) $this->request('GET', '/karte/spezikarte.gpx')->getBody());
+        self::assertSame(404, $this->request('GET', '/karte/ort/00000.gpx')->getStatusCode());
+
+        // The Spezi detail page links back to its spot on the map.
+        $detail = $this->request('GET', "/spezi/$nahe");
+        $detail = $this->request('GET', $detail->getHeaderLine('Location'));
+        self::assertStringContainsString('/karte#ort-69115', (string) $detail->getBody());
+    }
+
+    public function testPublicMapGeoJsonFeedForUmap(): void
+    {
+        $this->login();
+        $eligible = $this->createDrinkWithOrigin('GeoJSON Sichtbar', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
+        $this->createDrinkWithOrigin('GeoJSON Erworben', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
+        $this->createDrinkWithOrigin('GeoJSON Ausland', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->logout();
+
+        $response = $this->request('GET', '/api/map/spezis.geojson');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('application/geo+json; charset=UTF-8', $response->getHeaderLine('Content-Type'));
+        self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertStringContainsString('max-age=', $response->getHeaderLine('Cache-Control'));
+
+        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
+        $document = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('FeatureCollection', $document['type']);
+
+        $byName = [];
+
+        foreach ($document['features'] as $feature) {
+            self::assertSame('Feature', $feature['type']);
+            self::assertSame('Point', $feature['geometry']['type']);
+            self::assertSame(['name'], array_keys($feature['properties']));
+            [$longitude, $latitude] = $feature['geometry']['coordinates'];
+            self::assertGreaterThanOrEqual(-180.0, $longitude);
+            self::assertLessThanOrEqual(180.0, $longitude);
+            self::assertGreaterThanOrEqual(-90.0, $latitude);
+            self::assertLessThanOrEqual(90.0, $latitude);
+            $byName[$feature['properties']['name']] = $feature;
+        }
+
+        // Eligible Spezi: present, keyed by its database id, coordinates in Heidelberg.
+        self::assertArrayHasKey('GeoJSON Sichtbar', $byName);
+        self::assertSame($eligible, $byName['GeoJSON Sichtbar']['id']);
+        [$longitude, $latitude] = $byName['GeoJSON Sichtbar']['geometry']['coordinates'];
+        self::assertEqualsWithDelta(8.69, $longitude, 0.3);
+        self::assertEqualsWithDelta(49.41, $latitude, 0.3);
+
+        // Not on the public map: an acquired drink and one without a usable origin.
+        self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
+        self::assertArrayNotHasKey('GeoJSON Ausland', $byName);
+    }
+
+    public function testPublicMapTestGeoJsonFile(): void
+    {
+        $response = $this->request('GET', '/api/map/test-spezis.geojson');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('application/geo+json; charset=UTF-8', $response->getHeaderLine('Content-Type'));
+        self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
+
+        /** @var array{type: string, features: array<int, array{properties: array{name: string}, geometry: array{coordinates: array{0: float, 1: float}}}>} $document */
+        $document = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('FeatureCollection', $document['type']);
+        self::assertCount(3, $document['features']);
+        self::assertSame('TEST Spezi Berlin', $document['features'][0]['properties']['name']);
+        self::assertSame([13.405, 52.52], $document['features'][0]['geometry']['coordinates']);
+    }
+
     public function testPublicImageIsServedWithoutAuthenticationAndMissingImageIs404(): void
     {
         $this->login();
@@ -512,6 +641,20 @@ final class Packet8WorkflowIntegrationTest extends TestCase
             '_csrf' => $this->csrfToken(),
             'name' => $name,
             'lifecycle_status' => $status,
+        ]);
+        self::assertSame(303, $response->getStatusCode());
+
+        return $this->lastDrinkId();
+    }
+
+    private function createDrinkWithOrigin(string $name, string $status, string $location, string $region): int
+    {
+        $response = $this->request('POST', '/admin/drinks', [
+            '_csrf' => $this->csrfToken(),
+            'name' => $name,
+            'lifecycle_status' => $status,
+            'origin_location' => $location,
+            'origin_region' => $region,
         ]);
         self::assertSame(303, $response->getStatusCode());
 

@@ -12,11 +12,12 @@ use Psr\Http\Server\RequestHandlerInterface;
 /**
  * Baseline security headers for the public website.
  *
- * The Content-Security-Policy keeps everything first-party: the one stylesheet,
- * the one small script and product images all load from the site's own origin
- * (plus `data:` for the inline select-arrow icon, and inline `style` attributes
- * carried over from the design system). A response that already set its own
- * `Cache-Control` (the image route) keeps it.
+ * The Content-Security-Policy keeps everything first-party: the stylesheet,
+ * the scripts and all images load from the site's own origin (plus `data:` for
+ * the inline select-arrow icon, and inline `style` attributes carried over from
+ * the design system). The hunt map's tiles are no exception — they are served
+ * through the site's own `/karte/kachel/...` route. A response that already set
+ * its own `Cache-Control` (the image and tile routes) keeps it.
  */
 final class WebsiteSecurityHeadersMiddleware implements MiddlewareInterface
 {

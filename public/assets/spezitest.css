@@ -756,6 +756,72 @@ table{border-collapse:collapse;width:100%}
 .map__rest span{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.map__pin{transition:none}}
 
+/* Hunt map (/karte): a real Leaflet map beside the same scrolling place list as
+   the origin map. The map is progressive enhancement; the list stands alone. */
+.karte{display:grid;gap:var(--sp-6);--map-h:560px}
+@media (min-width:900px){.karte{grid-template-columns:minmax(0,1fr) 340px;gap:var(--sp-8);align-items:start}}
+.karte__stage{position:relative;z-index:0;display:grid;gap:var(--sp-3);min-width:0}
+#karte-map{height:var(--map-h);border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-2);background:var(--navy-050)}
+#karte-map:focus-visible{outline:var(--bw-block) solid var(--red);outline-offset:2px}
+.karte__noscript{padding:var(--sp-5);margin:0;color:var(--text-muted);font-size:var(--fs-sm)}
+.karte__credit{margin:0;font-size:var(--fs-xs);color:var(--text-muted)}
+.karte__credit a{color:var(--text-muted);text-decoration:underline}
+.karte__credit a:hover{color:var(--navy)}
+.karte__side{min-width:0}
+.karte__toolbar{display:grid;gap:var(--sp-3);justify-items:start}
+.karte__toolbar-actions{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:start;width:100%}
+.karte__toolbar-buttons{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
+.karte__search{display:flex;flex:1 1 15rem;max-width:26rem;border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-1);overflow:hidden;background:var(--white)}
+.karte__search input{flex:1;min-width:0;border:0;background:transparent;padding:0 var(--sp-3);min-height:38px;font-size:var(--fs-sm);color:var(--text-strong)}
+.karte__search input::-webkit-search-cancel-button{-webkit-appearance:none}
+.karte__search input:focus-visible{outline:none}
+.karte__search:focus-within{outline:var(--bw-strong) solid var(--focus-ring);outline-offset:2px}
+.karte__search button{display:inline-flex;align-items:center;justify-content:center;border:0;background:var(--navy);color:var(--white);padding-inline:var(--sp-3);min-height:38px;cursor:pointer}
+.karte__search button:hover{background:var(--red)}
+.karte__search .btn__icon{width:1.05em;height:1.05em}
+.karte__hint{margin:0;font-size:var(--fs-xs);color:var(--text-muted);max-width:60ch}
+.karte__hint--error{color:var(--feedback-error-fg)}
+.btn__icon{width:1.15em;height:1.15em;flex:none}
+@media (min-width:900px){.karte__list{max-height:var(--map-h);overflow-y:auto}}
+.karte__approx{color:var(--text-muted);font-weight:var(--fw-bold)}
+.map__entry-dist{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);color:var(--text-muted);font-variant-numeric:tabular-nums;flex:none}
+.map__rest a{font-weight:var(--fw-bold);text-decoration:none}
+.map__rest a:hover{text-decoration:underline;text-decoration-thickness:2px}
+
+/* Each entry's map links live in a closed disclosure so the list stays quiet. */
+.map__entry-more{margin-top:var(--sp-2)}
+.map__entry-more>summary{display:inline-flex;align-items:center;gap:var(--sp-1);cursor:pointer;list-style:none;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-muted)}
+.map__entry-more>summary::-webkit-details-marker{display:none}
+.map__entry-more>summary::after{content:"\25BE";font-size:.8em}
+.map__entry-more[open]>summary::after{content:"\25B4"}
+.map__entry-more>summary:hover{color:var(--navy)}
+.map__entry-more[open]>summary{color:var(--navy)}
+
+/* Leaflet overrides: match the site type and the square, navy-framed look.
+   The tile pane is desaturated so the red markers dominate; markers, popups
+   and controls sit in their own panes and keep their colour. */
+.leaflet-container{font:inherit;background:var(--navy-050)}
+.leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.03)}
+.leaflet-container a{color:var(--navy)}
+.leaflet-bar,.leaflet-popup-content-wrapper,.leaflet-popup-tip{border-radius:var(--radius-1)}
+.leaflet-bar a{color:var(--navy)}
+.leaflet-control-attribution{font-size:var(--fs-xs);background:rgba(255,255,255,.85)}
+.karte-pop .leaflet-popup-content{margin:var(--sp-3) var(--sp-4);font-size:var(--fs-sm)}
+.karte-pop__place{margin:0 0 var(--sp-2);font-weight:var(--fw-bold);color:var(--text-strong)}
+.karte-pop__approx{color:var(--text-muted)}
+.karte-pop__list{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
+.karte-pop__list a{font-weight:var(--fw-bold);text-decoration:none;color:var(--navy)}
+.karte-pop__list a:hover{color:var(--red);text-decoration:underline}
+.karte-pop__sub{display:block;font-size:var(--fs-xs);color:var(--text-muted)}
+.karte-pop__actions,.map__entry-actions{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-2) var(--sp-3);margin:var(--sp-3) 0 0;font-size:var(--fs-xs)}
+.map__entry-actions{margin-top:var(--sp-2)}
+.karte-pop__actions a,.map__entry-actions a{font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;border-bottom:var(--bw-strong) solid var(--red);padding-bottom:1px}
+.karte-pop__actions a:hover,.map__entry-actions a:hover{color:var(--red)}
+.map__dl{display:inline-flex;align-items:center;gap:3px}
+.map__dl .btn__icon{width:1em;height:1em}
+.karte-pop__btn{font:inherit;font-size:var(--fs-xs);font-weight:var(--fw-bold);color:var(--navy);background:none;border:0;border-bottom:var(--bw-strong) solid var(--navy);padding:0 0 1px;cursor:pointer}
+.karte-pop__btn:hover{color:var(--red);border-color:var(--red)}
+
 .card__title,.rank__name{overflow-wrap:anywhere}
 .admin-title,.display-1,.display-2,.display-3,.card__title,.rank__name{overflow-wrap:break-word}
 .rank__sub{overflow-wrap:anywhere}
