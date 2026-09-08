@@ -212,6 +212,7 @@
   if (list && searchForm) {
     searchForm.hidden = false;
     searchForm.addEventListener('submit', onSearch);
+    wireSuggestions(searchForm);
   }
 
   if (nearButton && list && navigator.geolocation) {
@@ -248,6 +249,101 @@
         setNote('„' + term + '" nicht gefunden. Versuch eine Postleitzahl oder einen größeren Ort.', true);
       })
       .then(function () { button.disabled = false; });
+  }
+
+  // Type-ahead for the search box. A picked suggestion fills the input and
+  // submits, so it flows through onSearch() like a typed term.
+  function wireSuggestions(form) {
+    var input = form.querySelector('input');
+    var listEl = form.querySelector('.suggest');
+    if (!input || !listEl || !window.fetch) { return; }
+
+    var options = [];
+    var cursor = -1;
+    var timer = null;
+    var latest = 0;
+
+    function close() {
+      listEl.hidden = true;
+      listEl.innerHTML = '';
+      options = [];
+      cursor = -1;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    }
+
+    function choose(label) {
+      input.value = label;
+      close();
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+
+    function move(delta) {
+      if (!options.length) { return; }
+      if (cursor >= 0) { options[cursor].classList.remove('is-active'); }
+      cursor = (cursor + delta + options.length) % options.length;
+      options[cursor].classList.add('is-active');
+      input.setAttribute('aria-activedescendant', options[cursor].id);
+      options[cursor].scrollIntoView({ block: 'nearest' });
+    }
+
+    function render(items) {
+      if (!items.length) { close(); return; }
+      listEl.innerHTML = '';
+      items.forEach(function (item, index) {
+        var li = document.createElement('li');
+        li.id = listEl.id + '-' + index;
+        li.className = 'suggest__item';
+        li.setAttribute('role', 'option');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'suggest__body';
+        var name = document.createElement('span');
+        name.className = 'suggest__name';
+        name.textContent = item.label;
+        btn.appendChild(name);
+        if (item.sub) {
+          var sub = document.createElement('span');
+          sub.className = 'suggest__sub';
+          sub.textContent = item.sub;
+          btn.appendChild(sub);
+        }
+        btn.addEventListener('click', function () { choose(item.label); });
+        li.appendChild(btn);
+        listEl.appendChild(li);
+      });
+      options = Array.prototype.slice.call(listEl.querySelectorAll('.suggest__item'));
+      cursor = -1;
+      listEl.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    }
+
+    function lookup() {
+      var term = input.value.trim();
+      if (term.length < 2) { close(); return; }
+      var token = ++latest;
+      fetch('/karte/vorschlaege?q=' + encodeURIComponent(term), { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : { items: [] }; })
+        .then(function (data) { if (token === latest) { render((data && data.items) || []); } })
+        .catch(close);
+    }
+
+    input.addEventListener('input', function () {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(lookup, 140);
+    });
+
+    input.addEventListener('keydown', function (event) {
+      if (listEl.hidden) { return; }
+      if (event.key === 'ArrowDown') { event.preventDefault(); move(1); }
+      else if (event.key === 'ArrowUp') { event.preventDefault(); move(-1); }
+      else if (event.key === 'Enter' && cursor >= 0) { event.preventDefault(); choose(options[cursor].querySelector('.suggest__name').textContent); }
+      else if (event.key === 'Escape') { close(); }
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!form.contains(event.target)) { close(); }
+    });
   }
 
   function locateVisitor() {

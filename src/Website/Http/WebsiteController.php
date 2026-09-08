@@ -287,6 +287,28 @@ final class WebsiteController
     }
 
     /**
+     * Type-ahead for the map search box: place names that start with what the
+     * visitor has typed. Read-only JSON, matched offline against the same data
+     * {@see karteSearch()} resolves.
+     */
+    public function karteSuggest(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $term = $request->getQueryParams()['q'] ?? '';
+        $term = is_string($term) ? mb_substr($term, 0, 120) : '';
+
+        $items = LocationSearch::default()->suggest($term, $this->huntMap());
+
+        $response->getBody()->write((string) json_encode(
+            ['items' => $items],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ));
+
+        return $response
+            ->withHeader('Content-Type', 'application/json; charset=UTF-8')
+            ->withHeader('Cache-Control', 'public, max-age=300');
+    }
+
+    /**
      * One place from the hunt map as a GPX file.
      *
      * @param array<string, string> $arguments

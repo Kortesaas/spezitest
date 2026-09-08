@@ -374,10 +374,13 @@ final class WebsiteRenderer
 
         $toolbar = '<div class="karte__toolbar">'
             . '<div class="karte__toolbar-actions">'
-            . '<form class="karte__search" data-karte-search role="search" hidden>'
+            . '<form class="karte__search search-wrap" data-karte-search role="search" hidden>'
             . '<label class="visually-hidden" for="karte-q">PLZ oder Ort suchen</label>'
-            . '<input id="karte-q" name="q" type="search" placeholder="PLZ oder Ort" autocomplete="off" maxlength="120">'
+            . '<input id="karte-q" name="q" type="search" placeholder="PLZ oder Ort" autocomplete="off"'
+            . ' maxlength="120" role="combobox" aria-expanded="false" aria-controls="karte-q-suggest"'
+            . ' aria-autocomplete="list">'
             . '<button type="submit">' . self::ICON_SEARCH . '<span class="visually-hidden">Suchen</span></button>'
+            . '<ul class="suggest" id="karte-q-suggest" role="listbox" aria-label="Vorschläge" hidden></ul>'
             . '</form>'
             . '<div class="karte__toolbar-buttons">'
             . '<button type="button" class="btn btn--secondary btn--sm" data-karte-near hidden>'
@@ -420,8 +423,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p36">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p36" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p37">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p37" defer></script>',
         );
     }
 

@@ -82,6 +82,41 @@ final class LocationSearchTest extends TestCase
         self::assertNull($search->search('99999', $map));
     }
 
+    public function testSuggestListsPrefixMatchesWithSpeziPlacesFirst(): void
+    {
+        $search = new LocationSearch(
+            new PostalGeocoder(['74939' => [49.2964, 8.8225]], []),
+            [
+                'muenchen' => [48.1374, 11.5755, 'München'],
+                'muenchberg' => [50.19, 11.79, 'Münchberg'],
+                'muenster' => [51.96, 7.63, 'Münster'],
+            ],
+        );
+        $map = HuntMap::fromCollection(
+            new RatedDrinkCollection([
+                CatalogFixture::untested('Münchsdorfer', 'identified', null, false, '2026-01-01 00:00:00', '74939 Münchsdorf'),
+            ]),
+            new PostalGeocoder(['74939' => [48.5, 12.9]], []),
+        );
+
+        $items = $search->suggest('münch', $map);
+        $labels = array_map(static fn (array $i): string => $i['label'], $items);
+
+        self::assertContains('Münchsdorf', $labels);
+        self::assertSame('Münchsdorf', $labels[0], 'a Spezi place comes first');
+        self::assertContains('München', $labels);
+        self::assertNotContains('Münster', $labels);
+        self::assertSame('Spezi hier', $items[0]['sub']);
+
+        // Shortest matching name leads among the index hits.
+        self::assertLessThan(
+            array_search('Münchberg', $labels, true),
+            array_search('München', $labels, true),
+        );
+
+        self::assertSame([], $search->suggest('m', $map));
+    }
+
     public function testBundledIndexLoadsAndFindsARealCity(): void
     {
         $hit = LocationSearch::default()->search('Regensburg', $this->map());

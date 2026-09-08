@@ -771,14 +771,16 @@ table{border-collapse:collapse;width:100%}
 .karte__toolbar{display:grid;gap:var(--sp-3);justify-items:start}
 .karte__toolbar-actions{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:start;width:100%}
 .karte__toolbar-buttons{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
-.karte__search{display:flex;flex:1 1 15rem;max-width:26rem;border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-1);overflow:hidden;background:var(--white)}
-.karte__search input{flex:1;min-width:0;border:0;background:transparent;padding:0 var(--sp-3);min-height:38px;font-size:var(--fs-sm);color:var(--text-strong)}
+.karte__search{display:flex;flex:1 1 15rem;max-width:26rem;border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-1);background:var(--white)}
+.karte__search input{flex:1;min-width:0;border:0;background:transparent;padding:0 var(--sp-3);min-height:38px;font-size:var(--fs-sm);color:var(--text-strong);border-radius:var(--radius-1) 0 0 var(--radius-1)}
 .karte__search input::-webkit-search-cancel-button{-webkit-appearance:none}
 .karte__search input:focus-visible{outline:none}
 .karte__search:focus-within{outline:var(--bw-strong) solid var(--focus-ring);outline-offset:2px}
-.karte__search button{display:inline-flex;align-items:center;justify-content:center;border:0;background:var(--navy);color:var(--white);padding-inline:var(--sp-3);min-height:38px;cursor:pointer}
-.karte__search button:hover{background:var(--red)}
+.karte__search button[type="submit"]{display:inline-flex;align-items:center;justify-content:center;border:0;background:var(--navy);color:var(--white);padding-inline:var(--sp-3);min-height:38px;cursor:pointer;border-radius:0 2px 2px 0}
+.karte__search button[type="submit"]:hover{background:var(--red)}
 .karte__search .btn__icon{width:1.05em;height:1.05em}
+.karte__search .suggest__item>.suggest__body{width:100%;text-align:left;font:inherit;background:none;border:0;padding:var(--sp-2) var(--sp-3);border-radius:var(--radius-1);cursor:pointer;color:inherit}
+.karte__search .suggest__item.is-active>.suggest__body,.karte__search .suggest__item>.suggest__body:hover{background:var(--surface-tint)}
 .karte__hint{margin:0;font-size:var(--fs-xs);color:var(--text-muted);max-width:60ch}
 .karte__hint--error{color:var(--feedback-error-fg)}
 .btn__icon{width:1.15em;height:1.15em;flex:none}

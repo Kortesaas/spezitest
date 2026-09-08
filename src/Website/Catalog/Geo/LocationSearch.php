@@ -85,6 +85,59 @@ final readonly class LocationSearch
     }
 
     /**
+     * Up to eight place names that start with what the visitor has typed, for
+     * the search-box type-ahead. Places that actually have a still-wanted Spezi
+     * come first; the rest are the shortest matching names from the town index
+     * (so "münch" leads with "München", not "Münchenbernsdorf").
+     *
+     * @return list<array{label: string, sub: ?string}>
+     */
+    public function suggest(string $term, HuntMap $map): array
+    {
+        $key = self::normalise($term);
+
+        if (strlen($key) < 2) {
+            return [];
+        }
+
+        /** @var array<string, true> $seen */
+        $seen = [];
+        $suggestions = [];
+
+        foreach ($map->points as $point) {
+            if (str_starts_with(self::normalise($point['place']), $key) && !isset($seen[$point['place']])) {
+                $seen[$point['place']] = true;
+                $suggestions[] = ['label' => $point['place'], 'sub' => 'Spezi hier'];
+            }
+        }
+
+        /** @var list<array{0: string, 1: string}> $indexHits [display name, normalised key] */
+        $indexHits = [];
+
+        foreach ($this->places as $candidate => [, , $name]) {
+            if (str_starts_with((string) $candidate, $key) && !isset($seen[$name])) {
+                $seen[$name] = true;
+                $indexHits[] = [$name, (string) $candidate];
+            }
+        }
+
+        usort(
+            $indexHits,
+            static fn (array $a, array $b): int => [strlen($a[1]), $a[1]] <=> [strlen($b[1]), $b[1]],
+        );
+
+        foreach ($indexHits as [$name]) {
+            if (count($suggestions) >= 8) {
+                break;
+            }
+
+            $suggestions[] = ['label' => $name, 'sub' => null];
+        }
+
+        return array_slice($suggestions, 0, 8);
+    }
+
+    /**
      * A single unambiguous "starts with" hit (e.g. "garmisch" →
      * "Garmisch-Partenkirchen"), for terms of at least four characters.
      *

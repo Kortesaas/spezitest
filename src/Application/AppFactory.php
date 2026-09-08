@@ -149,6 +149,7 @@ final class AppFactory
             $group->get('/spezis/vorschlaege', [$controller, 'suggestions']);
             $group->get('/karte', [$controller, 'karte']);
             $group->get('/karte/suche', [$controller, 'karteSearch']);
+            $group->get('/karte/vorschlaege', [$controller, 'karteSuggest']);
             $group->get('/karte/spezikarte.gpx', [$controller, 'karteGpx']);
             $group->get('/karte/ort/{plz:[0-9]{5}}.gpx', [$controller, 'karteGpxForPlace']);
             $group->get('/karte/kachel/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.png', [$controller, 'mapTile']);

@@ -471,6 +471,18 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('"lat":', (string) $town->getBody());
         self::assertSame(404, $this->requestWithQuery('GET', '/karte/suche', ['q' => 'xyzzy-nowhere'])->getStatusCode());
 
+        // Search-box type-ahead: prefix matches, capped, no results below two chars.
+        $suggest = $this->requestWithQuery('GET', '/karte/vorschlaege', ['q' => 'Heidel']);
+        self::assertSame(200, $suggest->getStatusCode());
+        /** @var array{items: list<array{label: string, sub: ?string}>} $body */
+        $body = json_decode((string) $suggest->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertLessThanOrEqual(8, count($body['items']));
+        self::assertContains('Heidelberg', array_map(static fn (array $i): string => $i['label'], $body['items']));
+        self::assertSame(
+            '{"items":[]}',
+            (string) $this->requestWithQuery('GET', '/karte/vorschlaege', ['q' => 'x'])->getBody(),
+        );
+
         // The GPX endpoints return a real waypoint file for a place and the map.
         $placeGpx = $this->request('GET', '/karte/ort/69115.gpx');
         self::assertSame(200, $placeGpx->getStatusCode());
