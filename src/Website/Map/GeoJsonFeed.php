@@ -81,7 +81,7 @@ final readonly class GeoJsonFeed
                 // uMap image syntax ({{url|width}}): the default popup renders
                 // `description`, so the package photo shows up from spezitest.de
                 // with no popup-template setup.
-                $properties['description'] = '{{' . $feature['image'] . '|240}}';
+                $properties['description'] = '{{' . $feature['image'] . '|180}}';
                 $properties['image'] = $feature['image'];
             }
 

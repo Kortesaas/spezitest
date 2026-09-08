@@ -45,7 +45,7 @@ final class GeoJsonFeedTest extends TestCase
         self::assertSame([8.8225, 49.2964], $feature['geometry']['coordinates']);
     }
 
-    public function testEmbedsThePackagePhotoAsMarkdownWhenTheDrinkHasOne(): void
+    public function testEmbedsThePackagePhotoInUmapSyntaxWhenTheDrinkHasOne(): void
     {
         $withPhoto = CatalogFixture::untested('Foto Cola', 'identified', null, true, '2026-01-01 00:00:00', '74939 Zuzenhausen');
         $without = CatalogFixture::untested('Ohne Foto', 'identified', null, false, '2026-01-01 00:00:00', '30419 Hannover');
@@ -62,7 +62,7 @@ final class GeoJsonFeedTest extends TestCase
 
         $url = 'https://www.spezitest.de/spezi/' . $withPhoto->id . '/bild';
         self::assertSame(
-            ['name' => 'Foto Cola', 'description' => '{{' . $url . '|240}}', 'image' => $url],
+            ['name' => 'Foto Cola', 'description' => '{{' . $url . '|180}}', 'image' => $url],
             $byName['Foto Cola'],
         );
         self::assertSame(['name' => 'Ohne Foto'], $byName['Ohne Foto']);

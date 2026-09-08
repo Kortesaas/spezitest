@@ -551,7 +551,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame(
             [
                 'name' => 'GeoJSON Mit Bild',
-                'description' => '{{' . $imageUrl . '|240}}',
+                'description' => '{{' . $imageUrl . '|180}}',
                 'image' => $imageUrl,
             ],
             $byName['GeoJSON Mit Bild']['properties'],
