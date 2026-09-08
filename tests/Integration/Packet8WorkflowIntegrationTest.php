@@ -100,7 +100,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         // Each category bar exposes the three testers' grades (hover/focus peek).
         self::assertStringContainsString('rating--peek', $detail);
         self::assertStringContainsString(
-            'Einzelnoten: Manu 9, Fabi 9, Schorsch 8.',
+            'Einzelwertungen: Manu 9, Fabi 9, Schorsch 8.',
             $detail,
         );
 

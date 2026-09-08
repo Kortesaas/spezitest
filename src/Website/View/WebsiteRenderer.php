@@ -227,7 +227,7 @@ final class WebsiteRenderer
                 . $this->streamLink($drink)
                 . $this->ratingBreakdown($drink);
         } else {
-            $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Spezistream.</span></div>';
+            $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelwertungen folgen nach dem Spezistream.</span></div>';
         }
 
         if (PostalGeocoder::classify($drink->originLocation, $drink->originRegion) !== null) {
@@ -375,7 +375,7 @@ final class WebsiteRenderer
             $average = $stats->averageByCategory[$key];
             $columns .= '<div class="stack"><div class="cluster cluster--between" style="align-items:baseline">'
                 . '<h3 class="h4">' . $label . '</h3>'
-                . ($average === null ? '' : '<span class="meta">Schnitt ' . Html::grade($average, 1) . '</span>')
+                . ($average === null ? '' : '<span class="meta">Ø&nbsp;' . Html::grade($average, 1) . '</span>')
                 . '</div><div class="lboard">' . $rows . '</div></div>';
         }
 
@@ -383,7 +383,7 @@ final class WebsiteRenderer
             . '<div class="stack"><span class="eyebrow">Bestenlisten</span>'
             . '<h2 class="display-3">Die Top 5 in jeder Kategorie</h2>'
             . '<p class="meta">Sortiert nach dem Schnitt, den wir zu dritt in dieser Kategorie vergeben haben. '
-            . 'Die Noten gehen von 0 bis 10.</p></div>'
+            . 'Die Werte gehen von 0 bis 10.</p></div>'
             . '<div class="stat-cols">' . $columns . '</div></div></section>';
     }
 
@@ -395,7 +395,7 @@ final class WebsiteRenderer
             $panels .= '<div class="panel stack">'
                 . '<div class="stat-lines"><span class="tester__name">' . Html::e($profile['label']) . '</span>'
                 . '<span class="tester__val">' . Html::gradeOrDash($profile['average'], 1) . '</span>'
-                . '<span class="meta">Einzelnote im Schnitt</span></div>'
+                . '<span class="meta">je Kriterium im Schnitt</span></div>'
                 . $this->testerFavourite($profile['favourite'])
                 . '</div>';
         }
@@ -405,7 +405,7 @@ final class WebsiteRenderer
         return '<section class="section section--tint"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Wir drei</span>'
             . '<h2 class="display-3">Manu, Fabi und Schorsch</h2>'
-            . '<p class="meta">Unser Notenschnitt und die Spezi, der jeder von uns die höchste eigene '
+            . '<p class="meta">Unser Punkteschnitt und die Spezi, der jeder von uns die höchste eigene '
             . 'Wertung gegeben hat.</p></div>'
             . '<div class="grid grid--3">' . $panels . '</div>'
             . ($takeaway === '' ? '' : '<p class="meta">' . $takeaway . '</p>')
@@ -571,7 +571,7 @@ final class WebsiteRenderer
         return '<section class="section section--tint"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Herkunft</span>'
             . '<h2 class="display-3">Welche Region punktet</h2>'
-            . '<p class="meta">Notenschnitt der getesteten Spezis, nach Bundesland oder Land. '
+            . '<p class="meta">Punkteschnitt der getesteten Spezis, nach Bundesland oder Land. '
             . 'Nur Regionen mit mindestens drei Spezis, beste zuerst.</p></div>'
             . '<div class="barchart barchart--wide">' . $rows . '</div></div></section>';
     }
@@ -674,7 +674,7 @@ final class WebsiteRenderer
         [$heading, $lede, $countLabel, $title, $description, $path, $emptyTitle, $emptyBody] = match ($scope) {
             MapScope::All => [
                 'Wo die Spezis herkommen',
-                'Jede Spezi mit hinterlegtem Herkunftsort. Mit den Tabs oben lässt sich die Karte auf '
+                'Jede Spezi mit hinterlegtem Herkunftsort. Mit den Tabs lässt sich die Karte auf '
                     . 'getestete oder noch gesuchte Spezis eingrenzen.',
                 'Spezis',
                 'Karte',
@@ -1421,7 +1421,7 @@ final class WebsiteRenderer
             . '<div class="prose stack-lg"><div class="stack"><span class="eyebrow">Methode</span>'
             . '<h2 class="display-3">Wie getestet wird</h2></div>'
             . '<p>Gleiche Temperatur, gleiches Glas. Jeder von uns vergibt für Optik, Süffigkeit und '
-            . 'Geschmack eine Note von 0 bis 10. Höher ist besser.</p>'
+            . 'Geschmack Punkte von 0 bis 10. Höher ist besser.</p>'
             . '<h3>Optik</h3><p>Farbe im Glas, Kohlensäure, Schaum, Flasche oder Dose.</p>'
             . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Abgang.</p>'
             . '<h3>Geschmack</h3><p>Verhältnis von Cola zu Orange, Aromatik, Eigenständigkeit.</p>'
@@ -2271,7 +2271,7 @@ final class WebsiteRenderer
         }
 
         return Html::e(
-            $label . ' ' . Html::grade($value) . ' von 10. Einzelnoten: ' . implode(', ', $parts) . '.',
+            $label . ' ' . Html::grade($value) . ' von 10. Einzelwertungen: ' . implode(', ', $parts) . '.',
         );
     }
 
