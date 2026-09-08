@@ -120,8 +120,13 @@
     var items = point.drinks
       .map(function (drink) {
         var sub = drink.sub ? '<span class="karte-pop__sub">' + escapeHtml(drink.sub) + '</span>' : '';
+        var thumb = drink.image
+          ? '<img class="karte-pop__thumb" src="' + encodeURI(drink.image) + '" alt="" loading="lazy" width="40" height="64">'
+          : '';
         return (
-          '<li><a href="/spezi/' + encodeURIComponent(drink.slug) + '">' + escapeHtml(drink.name) + '</a>' + sub + '</li>'
+          '<li>' + thumb +
+          '<span class="karte-pop__drink"><a href="/spezi/' + encodeURIComponent(drink.slug) + '">' +
+          escapeHtml(drink.name) + '</a>' + sub + '</span></li>'
         );
       })
       .join('');

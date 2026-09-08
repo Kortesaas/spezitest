@@ -71,7 +71,20 @@ final class HuntMapTest extends TestCase
         self::assertCount(1, $markers);
         self::assertTrue($markers[0]['approximate']);
         self::assertSame('Limo GmbH', $markers[0]['drinks'][0]['sub']);
+        self::assertNull($markers[0]['drinks'][0]['image']);
         self::assertSame(49.2, $markers[0]['lat']);
+    }
+
+    public function testMarkerCarriesThePackagePhotoUrlWhenThereIsOne(): void
+    {
+        $collection = new RatedDrinkCollection([
+            CatalogFixture::untested('Mit Bild', 'identified', null, true, '2026-01-01 00:00:00', '74939 Zuzenhausen'),
+        ]);
+
+        $drink = $collection->all()[0];
+        $markers = HuntMap::fromCollection($collection, $this->geocoder())->markers();
+
+        self::assertSame('/spezi/' . $drink->id . '/bild', $markers[0]['drinks'][0]['image']);
     }
 
     public function testEmptyWhenNothingIsIdentified(): void

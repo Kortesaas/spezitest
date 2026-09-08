@@ -750,6 +750,10 @@ table{border-collapse:collapse;width:100%}
 .map__drinks a{font-weight:var(--fw-bold);text-decoration:none;overflow-wrap:anywhere}
 .map__drinks a:hover{text-decoration:underline;text-decoration-thickness:2px}
 .map__place{grid-column:1;font-size:var(--fs-xs);color:var(--text-muted)}
+.map__drinks--photo li{display:flex;gap:var(--sp-2);align-items:flex-start}
+.map__drinks--photo .map__drink-thumb{flex:none;width:32px;height:51px;object-fit:cover;border-radius:var(--radius-sm);background:var(--surface-sunken)}
+.map__drinks--photo .map__drink-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.map__drinks--photo .map__place{grid-column:auto}
 .map__grade{grid-row:1;grid-column:2;font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
 .map__rest{display:grid;gap:var(--sp-1);margin-top:var(--sp-2);font-size:var(--fs-sm);color:var(--text-muted)}
 .map__rest li{display:flex;justify-content:space-between;gap:var(--sp-3)}
@@ -812,6 +816,9 @@ table{border-collapse:collapse;width:100%}
 .karte-pop__place{margin:0 0 var(--sp-2);font-weight:var(--fw-bold);color:var(--text-strong)}
 .karte-pop__approx{color:var(--text-muted)}
 .karte-pop__list{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
+.karte-pop__list li{display:flex;gap:var(--sp-2);align-items:flex-start}
+.karte-pop__thumb{flex:none;width:40px;height:64px;object-fit:cover;border-radius:var(--radius-sm);background:var(--surface-sunken)}
+.karte-pop__drink{min-width:0}
 .karte-pop__list a{font-weight:var(--fw-bold);text-decoration:none;color:var(--navy)}
 .karte-pop__list a:hover{color:var(--red);text-decoration:underline}
 .karte-pop__sub{display:block;font-size:var(--fs-xs);color:var(--text-muted)}

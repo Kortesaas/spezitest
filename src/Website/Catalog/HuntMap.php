@@ -118,7 +118,7 @@ final readonly class HuntMap
      *
      * @return list<array{
      *     lat: float, lon: float, place: string, postalCode: string, approximate: bool,
-     *     drinks: list<array{name: string, slug: string, sub: string}>
+     *     drinks: list<array{name: string, slug: string, sub: string, image: ?string}>
      * }>
      */
     public function markers(): array
@@ -133,6 +133,7 @@ final readonly class HuntMap
                     'name' => $drink['name'],
                     'slug' => $drink['slug'],
                     'sub' => $drink['manufacturer'] ?? '',
+                    'image' => $drink['hasImage'] ? '/spezi/' . $drink['id'] . '/bild' : null,
                 ];
             }
 

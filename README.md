@@ -59,7 +59,9 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   unreachable the map still works, just without the basemap.
 - **Public map feed** (`GET /api/map/spezis.geojson`): the same pins as `/karte`
   as a GeoJSON `FeatureCollection` — one `Point` per `identified` drink whose
-  origin resolves to a coordinate, carrying only the database id and the name.
+  origin resolves to a coordinate, carrying the database id, the name, and — when
+  a package photo exists — a Markdown `description` that embeds the picture from
+  this site plus the bare `image` URL, so the uMap popup can show it.
   Rebuilt from the database each request, cached 60 s, served with
   `Content-Type: application/geo+json` and `Access-Control-Allow-Origin: *` so a
   third-party viewer such as uMap can load it as a remote data layer; the

@@ -45,6 +45,29 @@ final class GeoJsonFeedTest extends TestCase
         self::assertSame([8.8225, 49.2964], $feature['geometry']['coordinates']);
     }
 
+    public function testEmbedsThePackagePhotoAsMarkdownWhenTheDrinkHasOne(): void
+    {
+        $withPhoto = CatalogFixture::untested('Foto Cola', 'identified', null, true, '2026-01-01 00:00:00', '74939 Zuzenhausen');
+        $without = CatalogFixture::untested('Ohne Foto', 'identified', null, false, '2026-01-01 00:00:00', '30419 Hannover');
+
+        $features = GeoJsonFeed::fromHuntMap(
+            HuntMap::fromCollection(new RatedDrinkCollection([$withPhoto, $without]), $this->geocoder()),
+            'https://www.spezitest.de/',
+        )->toFeatureCollection()['features'];
+
+        $byName = [];
+        foreach ($features as $feature) {
+            $byName[$feature['properties']['name']] = $feature['properties'];
+        }
+
+        $url = 'https://www.spezitest.de/spezi/' . $withPhoto->id . '/bild';
+        self::assertSame(
+            ['name' => 'Foto Cola', 'description' => '![Foto Cola](' . $url . ')', 'image' => $url],
+            $byName['Foto Cola'],
+        );
+        self::assertSame(['name' => 'Ohne Foto'], $byName['Ohne Foto']);
+    }
+
     public function testOneFeaturePerDrinkEvenWhenTheyShareAPostalCode(): void
     {
         $collection = new RatedDrinkCollection([

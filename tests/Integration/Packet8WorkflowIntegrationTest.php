@@ -504,6 +504,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $eligible = $this->createDrinkWithOrigin('GeoJSON Sichtbar', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
         $this->createDrinkWithOrigin('GeoJSON Erworben', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
         $this->createDrinkWithOrigin('GeoJSON Ausland', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $withPhoto = $this->createDrinkWithImage('GeoJSON Mit Bild', 'identified', '80331 München', 'Bayern');
         $this->logout();
 
         $response = $this->request('GET', '/api/map/spezis.geojson');
@@ -513,7 +514,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
         self::assertStringContainsString('max-age=', $response->getHeaderLine('Cache-Control'));
 
-        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
+        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string, description?: string, image?: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
         $document = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('FeatureCollection', $document['type']);
@@ -523,7 +524,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         foreach ($document['features'] as $feature) {
             self::assertSame('Feature', $feature['type']);
             self::assertSame('Point', $feature['geometry']['type']);
-            self::assertSame(['name'], array_keys($feature['properties']));
+            self::assertContains(array_keys($feature['properties']), [['name'], ['name', 'description', 'image']]);
             [$longitude, $latitude] = $feature['geometry']['coordinates'];
             self::assertGreaterThanOrEqual(-180.0, $longitude);
             self::assertLessThanOrEqual(180.0, $longitude);
@@ -542,6 +543,22 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         // Not on the public map: an acquired drink and one without a usable origin.
         self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
         self::assertArrayNotHasKey('GeoJSON Ausland', $byName);
+
+        // A drink with a package photo carries a Markdown description that embeds
+        // the picture straight from spezitest.de, plus the bare image URL.
+        self::assertArrayHasKey('GeoJSON Mit Bild', $byName);
+        $imageUrl = 'https://www.spezitest.de/spezi/' . $withPhoto . '/bild';
+        self::assertSame(
+            [
+                'name' => 'GeoJSON Mit Bild',
+                'description' => '![GeoJSON Mit Bild](' . $imageUrl . ')',
+                'image' => $imageUrl,
+            ],
+            $byName['GeoJSON Mit Bild']['properties'],
+        );
+
+        // A drink without a photo stays name-only.
+        self::assertSame(['name' => 'GeoJSON Sichtbar'], $byName['GeoJSON Sichtbar']['properties']);
     }
 
     public function testPublicMapTestGeoJsonFile(): void
@@ -673,8 +690,12 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         return $this->lastDrinkId();
     }
 
-    private function createDrinkWithImage(string $name): int
-    {
+    private function createDrinkWithImage(
+        string $name,
+        string $status = 'acquired',
+        ?string $location = null,
+        ?string $region = null,
+    ): int {
         $png = base64_decode(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
             true,
@@ -686,12 +707,17 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         rewind($resource);
         $upload = new UploadedFile(new Stream($resource), 'x.png', 'image/png', strlen($png));
 
-        $response = $this->request(
-            'POST',
-            '/admin/drinks',
-            ['_csrf' => $this->csrfToken(), 'name' => $name, 'lifecycle_status' => 'acquired'],
-            ['picture' => $upload],
-        );
+        $fields = ['_csrf' => $this->csrfToken(), 'name' => $name, 'lifecycle_status' => $status];
+
+        if ($location !== null) {
+            $fields['origin_location'] = $location;
+        }
+
+        if ($region !== null) {
+            $fields['origin_region'] = $region;
+        }
+
+        $response = $this->request('POST', '/admin/drinks', $fields, ['picture' => $upload]);
         self::assertSame(303, $response->getStatusCode());
 
         return $this->lastDrinkId();

@@ -189,7 +189,7 @@ final class WebsiteController
         ServerRequestInterface $_request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $collection = GeoJsonFeed::fromHuntMap($this->huntMap())->toFeatureCollection();
+        $collection = GeoJsonFeed::fromHuntMap($this->huntMap(), $this->siteUrl)->toFeatureCollection();
 
         return $this->geoJson($response, $collection, 'public, max-age=60');
     }

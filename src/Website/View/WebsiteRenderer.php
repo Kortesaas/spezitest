@@ -423,8 +423,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p37">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p37" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p38">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p38" defer></script>',
         );
     }
 
@@ -442,8 +442,12 @@ final class WebsiteRenderer
 
             foreach ($point['drinks'] as $drink) {
                 $sub = $drink['manufacturer'] ?? $point['place'];
-                $drinks .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
-                    . '<span class="map__place">' . Html::e($sub) . '</span></li>';
+                $thumb = $drink['hasImage']
+                    ? '<img class="map__drink-thumb" src="/spezi/' . $drink['id'] . '/bild" alt="" loading="lazy" width="32" height="51">'
+                    : '';
+                $drinks .= '<li>' . $thumb
+                    . '<span class="map__drink-body"><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                    . '<span class="map__place">' . Html::e($sub) . '</span></span></li>';
             }
 
             $approx = $point['approximate']
@@ -455,7 +459,7 @@ final class WebsiteRenderer
             $entries .= '<section class="map__entry" id="ort-' . Html::e($point['postalCode']) . '">'
                 . '<h3 class="map__entry-title">' . Html::e($point['place']) . $approx
                 . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
-                . '<ul class="map__drinks">' . $drinks . '</ul>'
+                . '<ul class="map__drinks map__drinks--photo">' . $drinks . '</ul>'
                 . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['postalCode'])
                 . '</section>';
         }
