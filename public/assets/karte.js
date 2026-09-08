@@ -97,7 +97,7 @@
       '" target="_blank" rel="noopener nofollow">Apple&nbsp;Maps</a>';
     html += '<a href="https://www.google.com/maps/search/?api=1&query=' + q +
       '" target="_blank" rel="noopener nofollow">Google&nbsp;Maps</a>';
-    html += '<a class="map__dl" href="/karte/ort/' + encodeURIComponent(point.postalCode) +
+    html += '<a class="map__dl" href="/karte/ort/' + encodeURIComponent(point.key) +
       '.gpx" download>' + DL_ICON + 'GPX</a>';
     return html;
   }
@@ -115,6 +115,7 @@
     var head =
       '<p class="karte-pop__place">' +
       escapeHtml(point.place) +
+      (point.country ? ', ' + escapeHtml(point.country) : '') +
       (point.approximate ? ' <span class="karte-pop__approx" title="Ungefähre Lage">≈</span>' : '') +
       '</p>';
     var items = point.drinks
@@ -134,7 +135,7 @@
   }
 
   var latlngs = [];
-  var byPostalCode = {};
+  var byKey = {};
 
   markers.forEach(function (point) {
     var latlng = [point.lat, point.lon];
@@ -156,7 +157,7 @@
         { direction: 'top' }
       );
 
-    byPostalCode[point.postalCode] = { marker: marker, latlng: latlng };
+    byKey[point.key] = { marker: marker, latlng: latlng };
   });
 
   // Frame the drinks and lock that framing: zooming out or panning past it only
@@ -192,10 +193,11 @@
     }, function () {});
   });
 
-  // Deep link from a Spezi detail page: /karte#ort-69115 opens that marker.
+  // Deep link from a Spezi detail page: /karte#ort-69115 (or #ort-at-7122) opens
+  // that marker.
   function openFromHash() {
-    var match = /^#ort-(\d{5})$/.exec(window.location.hash || '');
-    var entry = match && byPostalCode[match[1]];
+    var match = /^#ort-(\d{5}|[a-z]{2}-\d{4})$/.exec(window.location.hash || '');
+    var entry = match && byKey[match[1]];
     if (entry) {
       map.setView(entry.latlng, Math.max(map.getZoom(), 9));
       entry.marker.openPopup();
@@ -385,7 +387,7 @@
       .sort(function (x, y) { return x.km - y.km; });
 
     ranked.forEach(function (row) {
-      var entry = document.getElementById('ort-' + row.point.postalCode);
+      var entry = document.getElementById('ort-' + row.point.key);
       if (!entry) { return; }
       list.appendChild(entry);
       var title = entry.querySelector('.map__entry-title');

@@ -11,7 +11,8 @@ use Spezitest\Website\Catalog\HuntMap;
  *
  * The set of pins is exactly the hunt map's: a drink is included only when its
  * lifecycle status is `identified` and its `origin_location` resolves to a
- * German postal-code coordinate (see {@see HuntMap}). Deleting, renaming,
+ * postal-code coordinate — German, Austrian, Swiss or Liechtenstein (see
+ * {@see HuntMap}). Deleting, renaming,
  * moving or changing the status of a drink in the admin therefore changes this
  * feed on the next request — there is no separate map data to keep in sync.
  *
@@ -51,6 +52,10 @@ final readonly class GeoJsonFeed
             }
 
             $place = trim($point['postalCode'] . ' ' . $point['place']);
+
+            if ($point['country'] !== null) {
+                $place .= ', ' . $point['country'];
+            }
 
             foreach ($point['drinks'] as $drink) {
                 $manufacturer = $drink['manufacturer'] ?? '';

@@ -8,19 +8,27 @@ use Spezitest\Website\Catalog\Geo\PostalGeocoder;
 
 /**
  * Places the still-wanted drinks — lifecycle `identified`, known to exist but
- * not yet in the crate — on a real map of Germany so the testers can see which
- * ones are near them.
+ * not yet in the crate — on a real map so the testers can see which ones are
+ * near them.
  *
- * Each drink is positioned from the German postal code in its `origin_location`
- * via {@see PostalGeocoder}; drinks sharing a postal code become one point with
- * a combined list. Drinks without a German postal code (foreign origins, blank
- * entries) are reported in {@see self::$unplaced} rather than dropped or guessed.
+ * Each drink is positioned from the postal code in its `origin_location` via
+ * {@see PostalGeocoder} — Germany, or Austria / Switzerland / Liechtenstein
+ * when a country prefix or `origin_region` says so. Drinks sharing a place
+ * become one point with a combined list. Drinks whose origin resolves to no
+ * mapped postal code (other foreign origins, blank entries) are reported in
+ * {@see self::$unplaced} rather than dropped or guessed.
  */
 final readonly class HuntMap
 {
+    /** Neighbour countries whose four-digit codes the map places. */
+    private const COUNTRY_NAMES = ['AT' => 'Österreich', 'CH' => 'Schweiz', 'LI' => 'Liechtenstein'];
+
     /**
      * @param list<array{
+     *     key: string,
      *     postalCode: string,
+     *     countryCode: string,
+     *     country: ?string,
      *     place: string,
      *     latitude: float,
      *     longitude: float,
@@ -43,7 +51,8 @@ final readonly class HuntMap
     ): self {
         /**
          * @var array<string, array{
-         *     postalCode: string, place: string, latitude: float, longitude: float,
+         *     key: string, postalCode: string, countryCode: string, country: ?string,
+         *     place: string, latitude: float, longitude: float,
          *     approximate: bool, count: int,
          *     drinks: list<array{id: int, name: string, slug: string, manufacturer: ?string, hasImage: bool}>
          * }> $grouped
@@ -53,9 +62,10 @@ final readonly class HuntMap
         $placed = 0;
 
         foreach ($collection->identified() as $drink) {
-            $point = $geocoder->locate($drink->originLocation);
+            $point = $geocoder->locate($drink->originLocation, $drink->originRegion);
+            $classification = PostalGeocoder::classify($drink->originLocation, $drink->originRegion);
 
-            if ($point === null) {
+            if ($point === null || $classification === null) {
                 $unplaced[] = [
                     'name' => $drink->name,
                     'slug' => $drink->slug(),
@@ -65,11 +75,15 @@ final readonly class HuntMap
                 continue;
             }
 
-            $postalCode = (string) PostalGeocoder::postalCode($drink->originLocation);
+            ['country' => $country, 'code' => $code] = $classification;
+            $key = PostalGeocoder::mapKey($classification);
             ++$placed;
 
-            $grouped[$postalCode] ??= [
-                'postalCode' => $postalCode,
+            $grouped[$key] ??= [
+                'key' => $key,
+                'postalCode' => $code,
+                'countryCode' => $country,
+                'country' => self::COUNTRY_NAMES[$country] ?? null,
                 'place' => self::placeName($drink->originLocation),
                 'latitude' => $point->latitude,
                 'longitude' => $point->longitude,
@@ -78,8 +92,8 @@ final readonly class HuntMap
                 'drinks' => [],
             ];
 
-            ++$grouped[$postalCode]['count'];
-            $grouped[$postalCode]['drinks'][] = [
+            ++$grouped[$key]['count'];
+            $grouped[$key]['drinks'][] = [
                 'id' => $drink->id,
                 'name' => $drink->name,
                 'slug' => $drink->slug(),
@@ -88,9 +102,9 @@ final readonly class HuntMap
             ];
         }
 
-        foreach ($grouped as $postalCode => $point) {
+        foreach ($grouped as $key => $point) {
             usort(
-                $grouped[$postalCode]['drinks'],
+                $grouped[$key]['drinks'],
                 static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']),
             );
         }
@@ -117,7 +131,8 @@ final readonly class HuntMap
      * The point data the browser map needs, ready for {@see json_encode()}.
      *
      * @return list<array{
-     *     lat: float, lon: float, place: string, postalCode: string, approximate: bool,
+     *     lat: float, lon: float, place: string, key: string, postalCode: string,
+     *     country: ?string, approximate: bool,
      *     drinks: list<array{name: string, slug: string, sub: string, image: ?string}>
      * }>
      */
@@ -141,7 +156,9 @@ final readonly class HuntMap
                 'lat' => $point['latitude'],
                 'lon' => $point['longitude'],
                 'place' => $point['place'],
+                'key' => $point['key'],
                 'postalCode' => $point['postalCode'],
+                'country' => $point['country'],
                 'approximate' => $point['approximate'],
                 'drinks' => $drinks,
             ];
@@ -187,15 +204,16 @@ final readonly class HuntMap
     }
 
     /**
-     * The waypoints for a single postal code (empty when it is not on the map).
+     * The waypoints for a single map key (empty when it is not on the map). The
+     * key is a bare German postal code or a namespaced foreign one (`at-7122`).
      *
      * @return list<array{latitude: float, longitude: float, name: string, description: ?string}>
      */
-    public function waypointsForPostalCode(string $postalCode): array
+    public function waypointsForKey(string $key): array
     {
         return $this->waypointsFrom(array_values(array_filter(
             $this->points,
-            static fn (array $point): bool => $point['postalCode'] === $postalCode,
+            static fn (array $point): bool => $point['key'] === $key,
         )));
     }
 
@@ -228,7 +246,9 @@ final readonly class HuntMap
     private static function placeName(?string $location): string
     {
         $location = trim((string) $location);
-        $withoutCode = preg_replace('/^\s*\d{5}\s*/', '', $location);
+        // Drop a leading country tag and the postal code: "A-5020 Salzburg" and
+        // "72768 Reutlingen" both leave just the town.
+        $withoutCode = preg_replace('/^\s*(?:(?:A|AT|CH|D|DE|FL|LI)[-\s]*)?\d{4,5}[-\s]*/i', '', $location);
 
         return $withoutCode === null || $withoutCode === '' ? $location : $withoutCode;
     }

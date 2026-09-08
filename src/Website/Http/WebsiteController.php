@@ -318,14 +318,14 @@ final class WebsiteController
         ResponseInterface $response,
         array $arguments,
     ): ResponseInterface {
-        $postalCode = $arguments['plz'] ?? '';
+        $key = $arguments['key'] ?? '';
 
-        if (preg_match('/^\d{5}$/', $postalCode) !== 1) {
+        if (preg_match('/^(?:\d{5}|[a-z]{2}-\d{4})$/', $key) !== 1) {
             return $response->withStatus(404);
         }
 
         $map = $this->huntMap();
-        $waypoints = $map->waypointsForPostalCode($postalCode);
+        $waypoints = $map->waypointsForKey($key);
 
         if ($waypoints === []) {
             return $response->withStatus(404);

@@ -17,7 +17,36 @@ final class HuntMapTest extends TestCase
         return new PostalGeocoder(
             ['74939' => [49.2964, 8.8225], '30419' => [52.4, 9.7]],
             ['749' => [49.2, 9.2]],
+            [],
+            ['AT' => ['5020' => [47.7994, 13.044, 'Salzburg']]],
         );
+    }
+
+    public function testPlacesANeighbourDrinkUnderACountryNamespacedKey(): void
+    {
+        $collection = new RatedDrinkCollection([
+            CatalogFixture::untested('Alpen Cola', 'identified', 'Alm AG', false, '2026-01-01 00:00:00', 'A-5020 Salzburg', 'Österreich'),
+            CatalogFixture::untested('Fremd Cola', 'identified', null, false, '2026-01-01 00:00:00', 'Beverly Hills', 'USA'),
+        ]);
+
+        $map = HuntMap::fromCollection($collection, $this->geocoder());
+
+        self::assertSame(1, $map->placed);
+        self::assertCount(1, $map->points);
+        self::assertSame('at-5020', $map->points[0]['key']);
+        self::assertSame('5020', $map->points[0]['postalCode']);
+        self::assertSame('Österreich', $map->points[0]['country']);
+        self::assertSame('Salzburg', $map->points[0]['place']);
+        self::assertSame(47.7994, $map->points[0]['latitude']);
+
+        self::assertSame('at-5020', $map->markers()[0]['key']);
+        self::assertSame('Österreich', $map->markers()[0]['country']);
+
+        // The non-neighbour foreign origin stays in the side list.
+        self::assertSame(['Fremd Cola'], array_column($map->unplaced, 'name'));
+
+        // The per-place GPX resolves by the namespaced key.
+        self::assertCount(1, $map->waypointsForKey('at-5020'));
     }
 
     public function testGroupsIdentifiedDrinksBySharedPostalCodeAndIgnoresOtherLifecycles(): void
@@ -43,10 +72,10 @@ final class HuntMapTest extends TestCase
         self::assertFalse($map->points[0]['approximate']);
     }
 
-    public function testDrinksWithoutAGermanPostalCodeAreListedAsUnplaced(): void
+    public function testDrinksWithoutAPlaceablePostalCodeAreListedAsUnplaced(): void
     {
         $collection = new RatedDrinkCollection([
-            CatalogFixture::untested('Österreicher', 'identified', null, false, '2026-01-01 00:00:00', 'A-5020 Salzburg', 'Österreich'),
+            CatalogFixture::untested('Überseer', 'identified', null, false, '2026-01-01 00:00:00', 'Beverly Hills', 'USA'),
             CatalogFixture::untested('Platzierbar', 'identified', null, false, '2026-01-01 00:00:00', '74939 Zuzenhausen'),
         ]);
 
@@ -54,8 +83,8 @@ final class HuntMapTest extends TestCase
 
         self::assertSame(1, $map->placed);
         self::assertCount(1, $map->unplaced);
-        self::assertSame('Österreicher', $map->unplaced[0]['name']);
-        self::assertSame('Österreich', $map->unplaced[0]['location']);
+        self::assertSame('Überseer', $map->unplaced[0]['name']);
+        self::assertSame('USA', $map->unplaced[0]['location']);
         self::assertSame(2, $map->total());
     }
 
@@ -111,11 +140,11 @@ final class HuntMapTest extends TestCase
         self::assertSame('Zwei A, Zwei B', $all[0]['description']);
         self::assertSame(49.2964, $all[0]['latitude']);
 
-        $one = $map->waypointsForPostalCode('30419');
+        $one = $map->waypointsForKey('30419');
         self::assertCount(1, $one);
         self::assertSame('Solo', $one[0]['name']);
         self::assertNull($one[0]['description']);
 
-        self::assertSame([], $map->waypointsForPostalCode('99999'));
+        self::assertSame([], $map->waypointsForKey('99999'));
     }
 }

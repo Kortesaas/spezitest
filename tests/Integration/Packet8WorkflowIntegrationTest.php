@@ -420,11 +420,12 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }
 
-    public function testHuntMapPlacesIdentifiedDrinksAndListsForeignOrigins(): void
+    public function testHuntMapPlacesDrinksFromGermanyAndNeighboursAndListsTheRest(): void
     {
         $this->login();
         $nahe = $this->createDrinkWithOrigin('Nahe Limo', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
-        $this->createDrinkWithOrigin('Ferne Limo', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->createDrinkWithOrigin('Alpen Limo', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->createDrinkWithOrigin('Übersee Limo', 'identified', 'Beverly Hills', 'USA');
         $this->createDrinkWithOrigin('Schon da', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
         $this->logout();
 
@@ -436,6 +437,10 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('id="karte-data"', $body);
         self::assertStringContainsString('Heidelberg', $body);
         self::assertStringContainsString('id="ort-69115"', $body);
+        // An Austrian origin is placed too, under a country-namespaced key.
+        self::assertStringContainsString('id="ort-at-5020"', $body);
+        self::assertStringContainsString('Salzburg · Österreich', $body);
+        self::assertStringContainsString('href="/karte/ort/at-5020.gpx"', $body);
         // "Open in maps" links that work in any browser; OpenStreetMap and Apple
         // Maps keep the Spezi name, Google Maps gets the exact coordinates. The
         // "geo:" link is added by JavaScript only on touch devices.
@@ -449,9 +454,9 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('href="/karte/spezikarte.gpx"', $body);
         // The acquired drink is not part of the hunt.
         self::assertStringNotContainsString('Schon da', $body);
-        // Foreign origin is listed but not on the map.
+        // An origin outside Germany and its neighbours is listed, not placed.
         self::assertStringContainsString('Nicht auf der Karte', $body);
-        self::assertStringContainsString('Ferne Limo', $body);
+        self::assertStringContainsString('Übersee Limo', $body);
 
         // The map stays first-party: tiles are served through our own route,
         // so the CSP still allows images only from 'self'.
@@ -503,7 +508,8 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $this->login();
         $eligible = $this->createDrinkWithOrigin('GeoJSON Sichtbar', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
         $this->createDrinkWithOrigin('GeoJSON Erworben', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
-        $this->createDrinkWithOrigin('GeoJSON Ausland', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->createDrinkWithOrigin('GeoJSON Alpen', 'identified', 'A-5020 Salzburg', 'Österreich');
+        $this->createDrinkWithOrigin('GeoJSON Übersee', 'identified', 'Beverly Hills', 'USA');
         $withPhoto = $this->createDrinkWithImage('GeoJSON Mit Bild', 'identified', '80331 München', 'Bayern');
         $this->logout();
 
@@ -541,9 +547,17 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertEqualsWithDelta(8.69, $longitude, 0.3);
         self::assertEqualsWithDelta(49.41, $latitude, 0.3);
 
-        // Not on the public map: an acquired drink and one without a usable origin.
+        // Not on the public map: an acquired drink, and an origin outside
+        // Germany and its neighbours.
         self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
-        self::assertArrayNotHasKey('GeoJSON Ausland', $byName);
+        self::assertArrayNotHasKey('GeoJSON Übersee', $byName);
+
+        // An Austrian origin is placed, with its country in the "Ort" line.
+        self::assertArrayHasKey('GeoJSON Alpen', $byName);
+        [$atLon, $atLat] = $byName['GeoJSON Alpen']['geometry']['coordinates'];
+        self::assertEqualsWithDelta(13.04, $atLon, 0.3);
+        self::assertEqualsWithDelta(47.80, $atLat, 0.3);
+        self::assertSame('5020 Salzburg, Österreich', $byName['GeoJSON Alpen']['properties']['place']);
 
         // A drink with a package photo: the description embeds the picture in
         // uMap syntax, lists the place, and links back to the drink page.

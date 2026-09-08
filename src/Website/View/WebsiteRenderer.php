@@ -230,10 +230,11 @@ final class WebsiteRenderer
         }
 
         if ($drink->lifecycleStatus === 'identified') {
-            $postalCode = PostalGeocoder::postalCode($drink->originLocation);
+            $classification = PostalGeocoder::classify($drink->originLocation, $drink->originRegion);
 
-            if ($postalCode !== null) {
-                $hero .= '<p><a class="link-arrow" href="/karte#ort-' . Html::e($postalCode) . '">Auf der Karte ansehen</a></p>';
+            if ($classification !== null) {
+                $key = PostalGeocoder::mapKey($classification);
+                $hero .= '<p><a class="link-arrow" href="/karte#ort-' . Html::e($key) . '">Auf der Karte ansehen</a></p>';
             }
         }
 
@@ -343,10 +344,11 @@ final class WebsiteRenderer
     }
 
     /**
-     * The hunt map: every still-wanted drink placed on a real map of Germany by
-     * the postal code in its origin, so a tester passing through can see what is
-     * available nearby. The map is progressive enhancement — the list beside it
-     * carries every drink and link with JavaScript disabled.
+     * The hunt map: every still-wanted drink placed on a real map by the postal
+     * code in its origin — Germany and the neighbour countries — so a tester
+     * passing through can see what is available nearby. The map is progressive
+     * enhancement — the list beside it carries every drink and link with
+     * JavaScript disabled.
      */
     public function karte(HuntMap $map): string
     {
@@ -398,7 +400,7 @@ final class WebsiteRenderer
             . $toolbar
             . '<div class="karte">'
             . '<div class="karte__stage">'
-            . '<div id="karte-map" data-karte aria-label="Karte von Deutschland mit den Herkunftsorten der noch gesuchten Spezis">'
+            . '<div id="karte-map" data-karte aria-label="Karte mit den Herkunftsorten der noch gesuchten Spezis">'
             . '<noscript><p class="karte__noscript">Die interaktive Karte braucht JavaScript. '
             . 'Die vollständige Liste mit allen Orten steht daneben.</p></noscript></div>'
             . '<p class="karte__credit">Karte: © <a href="https://www.openstreetmap.org/copyright" rel="nofollow noopener">OpenStreetMap</a>-Mitwirkende'
@@ -423,8 +425,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p38">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p38" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p39">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p39" defer></script>',
         );
     }
 
@@ -455,12 +457,15 @@ final class WebsiteRenderer
                 : '';
 
             $pinLabel = HuntMap::pointLabel($point);
+            $place = $point['country'] !== null
+                ? $point['place'] . ' · ' . $point['country']
+                : $point['place'];
 
-            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['postalCode']) . '">'
-                . '<h3 class="map__entry-title">' . Html::e($point['place']) . $approx
+            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['key']) . '">'
+                . '<h3 class="map__entry-title">' . Html::e($place) . $approx
                 . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
                 . '<ul class="map__drinks map__drinks--photo">' . $drinks . '</ul>'
-                . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['postalCode'])
+                . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['key'])
                 . '</section>';
         }
 
@@ -494,7 +499,7 @@ final class WebsiteRenderer
         float $latitude,
         float $longitude,
         string $label,
-        string $postalCode,
+        string $key,
     ): string {
         $coords = number_format($latitude, 5, '.', '') . ',' . number_format($longitude, 5, '.', '');
         $pin = rawurlencode($label);
@@ -511,7 +516,7 @@ final class WebsiteRenderer
             . ' target="_blank" rel="noopener nofollow">Apple&nbsp;Maps</a>'
             . '<a href="https://www.google.com/maps/search/?api=1&amp;query=' . $coords . '"'
             . ' target="_blank" rel="noopener nofollow">Google&nbsp;Maps</a>'
-            . '<a class="map__dl" href="/karte/ort/' . Html::e($postalCode) . '.gpx" download>'
+            . '<a class="map__dl" href="/karte/ort/' . Html::e($key) . '.gpx" download>'
             . self::ICON_DOWNLOAD . 'GPX</a>'
             . '</p></details>';
     }
