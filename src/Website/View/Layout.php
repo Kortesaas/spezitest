@@ -86,7 +86,7 @@ final class Layout
             . ($path === null ? '<meta name="robots" content="noindex">' : '')
             . ($canonical === null ? '' : '<link rel="canonical" href="' . Html::e($canonical) . '">')
             . self::sharePreview($shareTitle, $summary, $canonical, $siteUrl, $imagePath, $ogType)
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p43">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p44">'
             . '<link rel="icon" href="/favicon.ico" sizes="32x32">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">'
@@ -99,7 +99,7 @@ final class Layout
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p43" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p44" defer></script>'
             . $bodyEndExtra
             . '</body></html>';
     }

@@ -328,11 +328,12 @@ final class WebsiteRenderer
                 . $this->testersSection($stats)
                 . $this->faceOffSection($stats)
                 . $this->priceLeistungSection($stats)
-                . $this->trendSection($stats)
+                . $this->testabendeSection($stats)
+                . $this->herkunftSection($stats)
                 . $this->originMapSection($map),
             'statistik',
             'Cola-Mix in Zahlen: die Verteilung der Wertungen, die Bestenlisten je Kriterium, '
-                . 'die drei Tester im Vergleich, Preis und Leistung und die Herkunft.',
+                . 'wir drei im Vergleich, Preis und Leistung und die Herkunft.',
             '/statistik',
         );
     }
@@ -381,7 +382,7 @@ final class WebsiteRenderer
         return '<section class="wrap section"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Bestenlisten</span>'
             . '<h2 class="display-3">Die Top 5 in jeder Kategorie</h2>'
-            . '<p class="meta">Sortiert nach dem Schnitt, den die drei Tester in dieser Kategorie vergeben haben. '
+            . '<p class="meta">Sortiert nach dem Schnitt, den wir zu dritt in dieser Kategorie vergeben haben. '
             . 'Die Noten gehen von 0 bis 10.</p></div>'
             . '<div class="stat-cols">' . $columns . '</div></div></section>';
     }
@@ -392,9 +393,9 @@ final class WebsiteRenderer
 
         foreach ($stats->testerProfiles as $profile) {
             $panels .= '<div class="panel stack">'
-                . '<div class="stack" style="gap:var(--sp-1)"><span class="tester__name">' . Html::e($profile['label']) . '</span>'
+                . '<div class="stat-lines"><span class="tester__name">' . Html::e($profile['label']) . '</span>'
                 . '<span class="tester__val">' . Html::gradeOrDash($profile['average'], 1) . '</span>'
-                . '<span class="meta">Einzelnote im Schnitt, von 0 bis 10</span></div>'
+                . '<span class="meta">Einzelnote im Schnitt</span></div>'
                 . $this->testerFavourite($profile['favourite'])
                 . '</div>';
         }
@@ -402,10 +403,10 @@ final class WebsiteRenderer
         $takeaway = $this->testerTakeaway($stats);
 
         return '<section class="section section--tint"><div class="wrap stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Die Tester</span>'
+            . '<div class="stack"><span class="eyebrow">Wir drei</span>'
             . '<h2 class="display-3">Manu, Fabi und Schorsch</h2>'
-            . '<p class="meta">Die durchschnittliche Einzelnote von jedem und seine Lieblings-Spezi. Das ist die, '
-            . 'der er selbst die höchste Gesamtwertung gegeben hat.</p></div>'
+            . '<p class="meta">Unser Notenschnitt und die Spezi, der jeder von uns die höchste eigene '
+            . 'Wertung gegeben hat.</p></div>'
             . '<div class="grid grid--3">' . $panels . '</div>'
             . ($takeaway === '' ? '' : '<p class="meta">' . $takeaway . '</p>')
             . '</div></section>';
@@ -420,7 +421,7 @@ final class WebsiteRenderer
 
         return '<div class="statpick">'
             . $this->statBottle($pick['id'], $pick['hasImage'], $pick['name'], 'pimg--thumb')
-            . '<div class="stack" style="gap:2px"><span class="eyebrow">Liebling</span>'
+            . '<div class="stat-lines"><span class="eyebrow">Liebling</span>'
             . '<a href="/spezi/' . Html::e($pick['slug']) . '">' . Html::e($pick['name']) . '</a>'
             . '<span class="meta">' . Html::gradeOfMax($pick['value'], Html::GESAMT_MAX, 0) . '</span></div></div>';
     }
@@ -472,13 +473,13 @@ final class WebsiteRenderer
             : 'nur ' . $this->punkte($agreed['spread']) . ' Unterschied, so einig wie selten';
 
         return '<section class="wrap section"><div class="stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Einig oder nicht</span>'
-            . '<h2 class="display-3">Der Zankapfel und die klare Sache</h2>'
-            . '<p class="meta">Die Zahlen zeigen, welche Gesamtwertung jeder Tester alleine vergeben hätte, '
+            . '<div class="stack"><span class="eyebrow">Streit oder Einigkeit</span>'
+            . '<h2 class="display-3">Wo wir uns einig waren und wo nicht</h2>'
+            . '<p class="meta">Die Zahlen zeigen, welche Gesamtwertung jeder von uns alleine vergeben hätte, '
             . 'von 0 bis 60.</p></div>'
             . '<div class="grid grid--2">'
-            . $this->faceCard('Größter Zankapfel', $divisive, $divisiveLine)
-            . $this->faceCard('Klare Sache', $agreed, $agreedLine)
+            . $this->faceCard('Größter Streitfall', $divisive, $divisiveLine)
+            . $this->faceCard('Da waren wir uns einig', $agreed, $agreedLine)
             . '</div></div></section>';
     }
 
@@ -506,56 +507,73 @@ final class WebsiteRenderer
         return '<div class="panel stack"><span class="eyebrow">' . $eyebrow . '</span>'
             . '<div class="statpick">'
             . $this->statBottle($row['id'], $row['hasImage'], $row['name'], 'pimg--thumb')
-            . '<div class="stack" style="gap:2px">'
+            . '<div class="stat-lines">'
             . '<a href="/spezi/' . Html::e($row['slug']) . '">' . Html::e($row['name']) . '</a>'
             . '<span class="meta">' . Html::e($spreadLine) . '</span></div></div>'
             . '<p class="meta">' . Html::e(implode(' · ', $parts)) . '</p></div>';
     }
 
-    private function trendSection(Statistics $stats): string
+    private function testabendeSection(Statistics $stats): string
     {
-        $timelineBlock = '';
-
-        if (count($stats->timeline) >= 2) {
-            $rows = '';
-
-            foreach ($stats->timeline as $entry) {
-                $average = $entry['averageGesamt'];
-                $rows .= '<div class="barchart__row"><span class="barchart__label">Stream ' . $entry['stream']
-                    . ' · ' . $entry['count'] . ' Spezis</span>'
-                    . '<span class="barchart__track"><i style="width:'
-                    . ($average !== null ? Html::barWidth($average, Html::GESAMT_MAX) : '0') . '%"></i></span>'
-                    . '<span class="barchart__val">' . Html::gradeOrDash($average, 1) . '</span></div>';
-            }
-
-            $timelineBlock = '<div class="stack-lg"><div class="stack"><span class="eyebrow">Verlauf</span>'
-                . '<h2 class="display-3">Über die Testabende</h2>'
-                . '<p class="meta">Die durchschnittliche Gesamtwertung von jedem Spezistream, der erste zuerst.</p></div>'
-                . '<div class="barchart barchart--wide">' . $rows . '</div></div>';
+        if (count($stats->timeline) < 2) {
+            return '';
         }
 
-        $herkunftBlock = '';
+        $maxCount = 0;
+
+        foreach ($stats->timeline as $entry) {
+            $maxCount = max($maxCount, $entry['count']);
+        }
+
         $scoreRows = '';
+        $countRows = '';
+
+        foreach ($stats->timeline as $entry) {
+            $average = $entry['averageGesamt'];
+            $scoreRows .= '<div class="barchart__row"><span class="barchart__label">Abend ' . $entry['stream'] . '</span>'
+                . '<span class="barchart__track"><i style="width:'
+                . ($average !== null ? Html::barWidth($average, Html::GESAMT_MAX) : '0') . '%"></i></span>'
+                . '<span class="barchart__val">' . Html::gradeOrDash($average, 1) . '</span></div>';
+
+            $countWidth = $maxCount > 0 ? (int) round($entry['count'] / $maxCount * 100) : 0;
+            $countRows .= '<div class="barchart__row"><span class="barchart__label">Abend ' . $entry['stream'] . '</span>'
+                . '<span class="barchart__track"><i style="width:' . $countWidth . '%"></i></span>'
+                . '<span class="barchart__val">' . $entry['count'] . '</span></div>';
+        }
+
+        return '<section class="wrap section"><div class="stack-lg">'
+            . '<div class="stack"><span class="eyebrow">Verlauf</span>'
+            . '<h2 class="display-3">Über die Testabende</h2>'
+            . '<p class="meta">Jeder Spezistream als eigener Balken, der erste zuerst.</p></div>'
+            . '<div class="split">'
+            . '<div class="stack"><h3 class="h4">Schnitt pro Abend</h3>'
+            . '<div class="barchart barchart--wide">' . $scoreRows . '</div></div>'
+            . '<div class="stack"><h3 class="h4">Spezis pro Abend</h3>'
+            . '<div class="barchart barchart--wide">' . $countRows . '</div></div>'
+            . '</div></div></section>';
+    }
+
+    private function herkunftSection(Statistics $stats): string
+    {
+        $rows = '';
 
         foreach (array_slice($stats->regionScores, 0, 6) as $region) {
-            $scoreRows .= '<div class="barchart__row"><span class="barchart__label">' . Html::e($region['region']) . '</span>'
+            $rows .= '<div class="barchart__row"><span class="barchart__label">' . Html::e($region['region']) . '</span>'
                 . '<span class="barchart__track"><i style="width:'
                 . Html::barWidth($region['averageGesamt'], Html::GESAMT_MAX) . '%"></i></span>'
                 . '<span class="barchart__val">' . Html::grade($region['averageGesamt'], 1) . '</span></div>';
         }
 
-        if ($scoreRows !== '') {
-            $herkunftBlock = '<div class="stack-lg"><div class="stack"><span class="eyebrow">Herkunft</span>'
-                . '<h2 class="display-3">Welche Region punktet</h2>'
-                . '<p class="meta">Nur Regionen mit mindestens drei getesteten Spezis, beste zuerst.</p></div>'
-                . '<div class="barchart barchart--wide">' . $scoreRows . '</div></div>';
-        }
-
-        if ($timelineBlock === '' && $herkunftBlock === '') {
+        if ($rows === '') {
             return '';
         }
 
-        return '<section class="wrap section"><div class="split">' . $timelineBlock . $herkunftBlock . '</div></section>';
+        return '<section class="section section--tint"><div class="wrap stack-lg">'
+            . '<div class="stack"><span class="eyebrow">Herkunft</span>'
+            . '<h2 class="display-3">Welche Region punktet</h2>'
+            . '<p class="meta">Notenschnitt der getesteten Spezis, nach Bundesland oder Land. '
+            . 'Nur Regionen mit mindestens drei Spezis, beste zuerst.</p></div>'
+            . '<div class="barchart barchart--wide">' . $rows . '</div></div></section>';
     }
 
     /**
@@ -620,7 +638,7 @@ final class WebsiteRenderer
             $elsewhere .= '<li>' . Html::e($entry['label']) . ' <span>' . $entry['count'] . '</span></li>';
         }
 
-        return '<section class="section section--tint"><div class="wrap stack-lg">'
+        return '<section class="section"><div class="wrap stack-lg">'
             . '<div class="cluster cluster--between"><div class="stack"><span class="eyebrow">Karte</span>'
             . '<h2 class="display-3">Woher die Spezis kommen</h2>'
             . '<p class="meta">Ein Punkt für jede PLZ-Region, die Größe zeigt die Anzahl. '
@@ -656,7 +674,8 @@ final class WebsiteRenderer
         [$heading, $lede, $countLabel, $title, $description, $path, $emptyTitle, $emptyBody] = match ($scope) {
             MapScope::All => [
                 'Wo die Spezis herkommen',
-                'Jede Spezi mit hinterlegtem Herkunftsort – schon getestet oder noch gesucht.',
+                'Jede Spezi mit hinterlegtem Herkunftsort. Mit den Tabs oben lässt sich die Karte auf '
+                    . 'getestete oder noch gesuchte Spezis eingrenzen.',
                 'Spezis',
                 'Karte',
                 'Karte aller Cola-Mix-Getränke im Test: wo jede Spezi herkommt.',
@@ -668,7 +687,7 @@ final class WebsiteRenderer
                 'Wo die getesteten Spezis herkommen',
                 'Jede Spezi, die schon im Test war, an ihrem Herkunftsort.',
                 'getestet',
-                'Getestete Spezis – Karte',
+                'Getestete Spezis auf der Karte',
                 'Karte der getesteten Cola-Mix-Getränke: wo jede geprüfte Spezi herkommt.',
                 '/karte/getestet',
                 'Noch keine getestete Spezi verortet',
@@ -678,7 +697,7 @@ final class WebsiteRenderer
                 'Wo die noch gesuchten Spezis wohnen',
                 'Jede Spezi, die wir kennen, aber noch nicht getestet haben.',
                 'noch gesucht',
-                'Gesuchte Spezis – Karte',
+                'Gesuchte Spezis auf der Karte',
                 'Karte aller noch gesuchten Cola-Mix-Getränke: wo die noch nicht getesteten Spezis herkommen.',
                 '/karte/gesucht',
                 'Nichts mehr gesucht',
@@ -733,9 +752,9 @@ final class WebsiteRenderer
             . $this->karteMapSection($map, 'spezi', '', false);
 
         return $this->karteShell(
-            $drink->name . ' – Herkunft',
+            'Wo ' . $drink->name . ' herkommt',
             $intro,
-            'Wo ' . $drink->name . ' herkommt – auf der Karte.',
+            'Wo ' . $drink->name . ' herkommt, auf der Karte.',
             '/karte/spezi/' . $drink->id,
         );
     }
@@ -761,10 +780,10 @@ final class WebsiteRenderer
 
         $gpxLink = $withSearch
             ? '<a class="btn btn--secondary btn--sm" href="/karte/spezikarte.gpx' . $query . '" download'
-                . ' title="GPX mit allen Orten – öffnet sich auf dem Handy in der Karten-App">'
+                . ' title="GPX mit allen Orten, öffnet sich auf dem Handy in der Karten-App">'
                 . self::ICON_DOWNLOAD . 'Alle Orte als GPX</a>'
             : '<a class="btn btn--secondary btn--sm" href="/karte/ort/' . Html::e($map->points[0]['key']) . '.gpx" download'
-                . ' title="GPX – öffnet sich auf dem Handy in der Karten-App">'
+                . ' title="GPX, öffnet sich auf dem Handy in der Karten-App">'
                 . self::ICON_DOWNLOAD . 'Als GPX</a>';
 
         $toolbar = '<div class="karte__toolbar">'
@@ -833,8 +852,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p43">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p43" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p44">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p44" defer></script>',
         );
     }
 
@@ -947,20 +966,21 @@ final class WebsiteRenderer
         $figures = '<div class="figure-row">'
             . $this->figure((string) $stats->pricedCount, 'mit Preis erfasst')
             . $this->figure(
-                $stats->averagePriceHalfLiter !== null ? Html::price((string) $stats->averagePriceHalfLiter) : '–',
-                'Ø Preis je 0,5 l',
+                $stats->averagePriceHalfLiter !== null ? Html::price((string) $stats->averagePriceHalfLiter) : 'k. A.',
+                'Preis je 0,5 l im Schnitt',
             )
             . $this->figure(
-                $stats->bestValue !== null ? Html::grade($stats->bestValue['score'] * 100, 0) : '–',
-                'beste Preis/Leistung · von 100',
+                $stats->bestValue !== null ? Html::grade($stats->bestValue['score'] * 100, 0) : 'k. A.',
+                'beste Preis/Leistung, von 100',
             )
             . '</div>';
 
         return '<section class="section section--tint" id="preis-leistung"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Preis / Leistung</span>'
             . '<h2 class="display-3">Welche Spezi ist ihr Geld wert?</h2>'
-            . '<p class="meta">Jeder Punkt ist eine getestete Spezi: Preis je 0,5 l gegen Gesamtwertung. Zum Nachschauen '
-            . 'antippen oder mit der Maus darüberfahren.</p></div>'
+            . '<p class="meta">Jeder Punkt ist eine getestete Spezi: Preis je 0,5 l gegen Gesamtwertung. Antippen '
+            . 'oder mit der Maus darüberfahren zeigt die Details. '
+            . '<a href="/ueber#methode">Wie die Zahl von 100 berechnet wird</a>.</p></div>'
             . $figures . $bestCaption . $this->priceScatterChart($stats)
             . '</div></section>';
     }
@@ -1400,14 +1420,21 @@ final class WebsiteRenderer
             . '<section class="section section--tint" id="methode"><div class="wrap split split--sidebar">'
             . '<div class="prose stack-lg"><div class="stack"><span class="eyebrow">Methode</span>'
             . '<h2 class="display-3">Wie getestet wird</h2></div>'
-            . '<p>Gleiche Temperatur, gleiches Glas. Jeder der drei Tester vergibt für Optik, Süffigkeit und '
+            . '<p>Gleiche Temperatur, gleiches Glas. Jeder von uns vergibt für Optik, Süffigkeit und '
             . 'Geschmack eine Note von 0 bis 10. Höher ist besser.</p>'
             . '<h3>Optik</h3><p>Farbe im Glas, Kohlensäure, Schaum, Flasche oder Dose.</p>'
             . '<h3>Süffigkeit</h3><p>Wie leicht sich das Glas leert. Süße, Säure, Abgang.</p>'
             . '<h3>Geschmack</h3><p>Verhältnis von Cola zu Orange, Aromatik, Eigenständigkeit.</p>'
             . '<h3>Gesamtwertung</h3><p>Gewichtet: Optik ×1, Süffigkeit ×2, Geschmack ×3. Ergebnis 0 bis 60.</p>'
-            . '<h3>Preis / Leistung</h3><p>Nur, wenn ein Preis erfasst wurde. Verglichen wird auf Basis '
-            . 'des Preises je 0,5 l.</p>'
+            . '<h3>Preis / Leistung</h3>'
+            . '<p>Nur für Spezis, bei denen wir einen Preis notiert haben. Damit unterschiedliche '
+            . 'Gebinde vergleichbar sind, rechnen wir jeden Preis auf 0,5 Liter um.</p>'
+            . '<p>Dann teilen wir die Gesamtwertung durch diesen Preis. Heraus kommen Wertungspunkte '
+            . 'pro Euro. Diesen Wert legen wir für alle bepreisten Spezis nebeneinander und verteilen ihn '
+            . 'auf eine Skala von 0 bis 100: Die Spezi mit dem besten Verhältnis bekommt 100, die mit dem '
+            . 'schlechtesten 0, alle anderen liegen dazwischen.</p>'
+            . '<p>Die Skala ist damit immer relativ zum aktuellen Testfeld. Kommt eine sehr günstige oder '
+            . 'sehr teure Spezi dazu, können sich die Zahlen der übrigen leicht verschieben.</p>'
             . '<p class="meta">Alle Flaschen kaufen wir selbst. Es gibt keine bezahlten Tests, keine '
             . 'Kooperationen und keine nachträglichen Änderungen an der Methodik. Auch dann nicht, wenn '
             . 'uns ein Ergebnis nicht passt.</p></div>'

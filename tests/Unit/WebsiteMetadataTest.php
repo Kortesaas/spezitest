@@ -98,12 +98,12 @@ final class WebsiteMetadataTest extends TestCase
         self::assertStringContainsString('<a href="/karte" aria-current="page">Alle</a>', $all);
 
         $tested = $this->renderer->karte($map, MapScope::Tested);
-        self::assertStringContainsString('<title>Getestete Spezis – Karte · Spezitest</title>', $tested);
+        self::assertStringContainsString('<title>Getestete Spezis auf der Karte · Spezitest</title>', $tested);
         self::assertStringContainsString('href="https://www.spezitest.de/karte/getestet">', $tested);
         self::assertStringContainsString('<a href="/karte/getestet" aria-current="page">Getestet</a>', $tested);
 
         $sought = $this->renderer->karte($map, MapScope::Sought);
-        self::assertStringContainsString('<title>Gesuchte Spezis – Karte · Spezitest</title>', $sought);
+        self::assertStringContainsString('<title>Gesuchte Spezis auf der Karte · Spezitest</title>', $sought);
         self::assertStringContainsString('href="https://www.spezitest.de/karte/gesucht">', $sought);
     }
 
@@ -114,7 +114,7 @@ final class WebsiteMetadataTest extends TestCase
 
         $html = $this->renderer->karteSpezi($map, $drink);
 
-        self::assertStringContainsString('<title>Herkunft Spezi – Herkunft · Spezitest</title>', $html);
+        self::assertStringContainsString('<title>Wo Herkunft Spezi herkommt · Spezitest</title>', $html);
         self::assertStringContainsString('<link rel="canonical" href="https://www.spezitest.de/karte/spezi/' . $drink->id . '">', $html);
         self::assertStringContainsString('Wo Herkunft Spezi herkommt', $html);
         self::assertStringNotContainsString('class="karte__tabs"', $html);

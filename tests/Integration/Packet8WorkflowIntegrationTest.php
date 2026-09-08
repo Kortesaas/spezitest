@@ -472,7 +472,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('Cola-Mix in Zahlen', $body);
         self::assertStringContainsString('Die Top 5 in jeder Kategorie', $body);
         self::assertStringContainsString('Manu, Fabi und Schorsch</h2>', $body);
-        self::assertStringContainsString('Der Zankapfel und die klare Sache', $body);
+        self::assertStringContainsString('Wo wir uns einig waren und wo nicht', $body);
         self::assertStringContainsString('Über die Testabende', $body);
         self::assertStringContainsString('Welche Region punktet', $body);
 
@@ -485,8 +485,9 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('Liebling', $body);
         self::assertStringContainsString('Hopfen Cola', $body);
 
-        // The divisive drink is the Zankapfel; the schematic map sits at the foot.
-        self::assertStringContainsString('Größter Zankapfel', $body);
+        // The divisive drink leads the Streitfall card; the schematic map sits at the foot.
+        self::assertStringContainsString('Größter Streitfall', $body);
+        self::assertStringContainsString('Spezis pro Abend', $body);
         self::assertStringContainsString('Streit Spezi', $body);
         self::assertStringContainsString('Woher die Spezis kommen', $body);
         // No red observation band, no manufacturer table, no AI em dashes.

@@ -527,9 +527,11 @@ table{border-collapse:collapse;width:100%}
 .lboard>a>.pimg{width:44px;aspect-ratio:1/1;padding:3px;border-radius:var(--radius-1)}
 .lboard__name{font-weight:var(--fw-bold);color:var(--text-strong);font-size:var(--fs-sm);line-height:1.25;overflow-wrap:anywhere}
 .lboard__val{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
+.stat-lines{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat-lines .tester__val{line-height:1;margin:2px 0}
+.stat-lines>a{font-weight:var(--fw-bold);color:var(--text-strong);text-decoration:none;overflow-wrap:anywhere}
+.stat-lines>a:hover{color:var(--red)}
 .statpick{display:flex;gap:var(--sp-3);align-items:center}
-.statpick>.stack>a{font-weight:var(--fw-bold);color:var(--text-strong);text-decoration:none}
-.statpick>.stack>a:hover{color:var(--red)}
 @media (min-width:768px){
   .figure-row{grid-template-columns:repeat(4,1fr)}
   .stat-cols{grid-template-columns:repeat(3,1fr);gap:var(--sp-7)}
