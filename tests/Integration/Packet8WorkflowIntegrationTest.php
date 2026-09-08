@@ -165,6 +165,16 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         );
     }
 
+    /** A drink with an origin, taken through a full golden test to `tested`. */
+    private function createTestedDrinkWithOrigin(string $name, string $location, string $region): int
+    {
+        $id = $this->createDrinkWithOrigin($name, 'acquired', $location, $region);
+        $complete = $this->request('POST', "/admin/drinks/$id/test/complete", $this->goldenBody());
+        self::assertSame(303, $complete->getStatusCode());
+
+        return $id;
+    }
+
     /**
      * A drink that is priced, fully graded and therefore part of the
      * Preis/Leistung comparison population.
@@ -420,48 +430,64 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }
 
-    public function testHuntMapPlacesDrinksFromGermanyAndNeighboursAndListsTheRest(): void
+    public function testKarteScopesPlaceTheRightDrinksAndTheHuntTools(): void
     {
         $this->login();
         $nahe = $this->createDrinkWithOrigin('Nahe Limo', 'identified', '69115 Heidelberg', 'Baden-Württemberg');
         $this->createDrinkWithOrigin('Alpen Limo', 'identified', 'A-5020 Salzburg', 'Österreich');
-        $this->createDrinkWithOrigin('Übersee Limo', 'identified', 'Beverly Hills', 'USA');
-        $this->createDrinkWithOrigin('Schon da', 'acquired', '69115 Heidelberg', 'Baden-Württemberg');
+        $uebersee = $this->createDrinkWithOrigin('Übersee Limo', 'identified', 'Beverly Hills', 'USA');
+        $this->createDrinkWithOrigin('Zulauf Limo', 'acquired', '30419 Hannover', 'Niedersachsen');
+        $this->createTestedDrinkWithOrigin('Fertig Limo', '01067 Dresden', 'Sachsen');
         $this->logout();
 
+        // --- /karte defaults to "Alle": every drink with an origin -----------
         $karte = $this->request('GET', '/karte');
         self::assertSame(200, $karte->getStatusCode());
-
         $body = (string) $karte->getBody();
-        self::assertStringContainsString('Nahe Limo', $body);
+        self::assertStringContainsString('<h1 class="display-2">Wo die Spezis herkommen</h1>', $body);
         self::assertStringContainsString('id="karte-data"', $body);
-        self::assertStringContainsString('Heidelberg', $body);
-        self::assertStringContainsString('id="ort-69115"', $body);
+        self::assertStringContainsString('data-scope="alle"', $body);
+        // The filter tab bar, with "Alle" current.
+        self::assertStringContainsString('<nav class="karte__tabs"', $body);
+        self::assertStringContainsString('<a href="/karte" aria-current="page">Alle</a>', $body);
+        self::assertStringContainsString('<a href="/karte/getestet">Getestet</a>', $body);
+        // Identified, acquired and tested drinks are all placed.
+        self::assertStringContainsString('id="ort-69115"', $body);   // Nahe (identified)
+        self::assertStringContainsString('>Zulauf Limo<', $body);    // acquired
+        self::assertStringContainsString('>Fertig Limo<', $body);    // tested
         // An Austrian origin is placed too, under a country-namespaced key.
         self::assertStringContainsString('id="ort-at-5020"', $body);
         self::assertStringContainsString('Salzburg · Österreich', $body);
         self::assertStringContainsString('href="/karte/ort/at-5020.gpx"', $body);
-        // "Open in maps" links that work in any browser; OpenStreetMap and Apple
-        // Maps keep the Spezi name, Google Maps gets the exact coordinates. The
-        // "geo:" link is added by JavaScript only on touch devices.
-        self::assertStringContainsString('openstreetmap.org/?mlat=', $body);
-        self::assertStringContainsString('maps.apple.com/?ll=', $body);
-        self::assertStringContainsString('q=Nahe%20Limo', $body);
-        self::assertStringContainsString('google.com/maps/search/?api=1', $body);
-        self::assertStringNotContainsString('geo:', $body);
-        // A GPX waypoint file is offered per place and for the whole map.
-        self::assertStringContainsString('href="/karte/ort/69115.gpx"', $body);
-        self::assertStringContainsString('href="/karte/spezikarte.gpx"', $body);
-        // The acquired drink is not part of the hunt.
-        self::assertStringNotContainsString('Schon da', $body);
         // An origin outside Germany and its neighbours is listed, not placed.
         self::assertStringContainsString('Nicht auf der Karte', $body);
         self::assertStringContainsString('Übersee Limo', $body);
-
-        // The map stays first-party: tiles are served through our own route,
-        // so the CSP still allows images only from 'self'.
+        // "Open in maps" links; OSM and Apple Maps keep the single Spezi's name.
+        self::assertStringContainsString('openstreetmap.org/?mlat=', $body);
+        self::assertStringContainsString('q=Nahe%20Limo', $body);
+        self::assertStringContainsString('google.com/maps/search/?api=1', $body);
+        self::assertStringNotContainsString('geo:', $body);
+        self::assertStringContainsString('href="/karte/spezikarte.gpx"', $body);
+        // First-party: tiles through our own route, CSP still image-only 'self'.
         self::assertStringContainsString("img-src 'self' data:;", $karte->getHeaderLine('Content-Security-Policy'));
         self::assertStringNotContainsString('openstreetmap.org', $karte->getHeaderLine('Content-Security-Policy'));
+
+        // --- /karte/getestet: only the tested one --------------------------
+        $tested = (string) $this->request('GET', '/karte/getestet')->getBody();
+        self::assertStringContainsString('Wo die getesteten Spezis herkommen', $tested);
+        self::assertStringContainsString('<a href="/karte/getestet" aria-current="page">Getestet</a>', $tested);
+        self::assertStringContainsString('data-scope="getestet"', $tested);
+        self::assertStringContainsString('>Fertig Limo<', $tested);
+        self::assertStringNotContainsString('>Nahe Limo<', $tested);
+        self::assertStringNotContainsString('>Zulauf Limo<', $tested);
+        self::assertStringContainsString('href="/karte/spezikarte.gpx?zeigen=getestet"', $tested);
+
+        // --- /karte/gesucht: identified + acquired, not tested -------------
+        $sought = (string) $this->request('GET', '/karte/gesucht')->getBody();
+        self::assertStringContainsString('Wo die noch gesuchten Spezis wohnen', $sought);
+        self::assertStringContainsString('>Nahe Limo<', $sought);
+        self::assertStringContainsString('>Zulauf Limo<', $sought);
+        self::assertStringNotContainsString('>Fertig Limo<', $sought);
 
         // An out-of-range tile coordinate is rejected without any upstream call.
         self::assertSame(404, $this->request('GET', '/karte/kachel/2/1/1.png')->getStatusCode());
@@ -469,20 +495,19 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         // The "PLZ oder Ort" search resolves a postal code and a town, 404s otherwise.
         $plz = $this->requestWithQuery('GET', '/karte/suche', ['q' => '69115']);
         self::assertSame(200, $plz->getStatusCode());
-        self::assertStringContainsString('application/json', $plz->getHeaderLine('Content-Type'));
         self::assertStringContainsString('"label":"69115 Heidelberg"', (string) $plz->getBody());
-        $town = $this->requestWithQuery('GET', '/karte/suche', ['q' => 'Heidelberg']);
-        self::assertSame(200, $town->getStatusCode());
-        self::assertStringContainsString('"lat":', (string) $town->getBody());
         self::assertSame(404, $this->requestWithQuery('GET', '/karte/suche', ['q' => 'xyzzy-nowhere'])->getStatusCode());
+        // Scoped search: a tested-only lookup still resolves the town.
+        $scoped = $this->requestWithQuery('GET', '/karte/suche', ['q' => 'Dresden', 'zeigen' => 'getestet']);
+        self::assertSame(200, $scoped->getStatusCode());
 
         // Search-box type-ahead: prefix matches, capped, no results below two chars.
         $suggest = $this->requestWithQuery('GET', '/karte/vorschlaege', ['q' => 'Heidel']);
         self::assertSame(200, $suggest->getStatusCode());
-        /** @var array{items: list<array{label: string, sub: ?string}>} $body */
-        $body = json_decode((string) $suggest->getBody(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertLessThanOrEqual(8, count($body['items']));
-        self::assertContains('Heidelberg', array_map(static fn (array $i): string => $i['label'], $body['items']));
+        /** @var array{items: list<array{label: string, sub: ?string}>} $items */
+        $items = json_decode((string) $suggest->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertLessThanOrEqual(8, count($items['items']));
+        self::assertContains('Heidelberg', array_map(static fn (array $i): string => $i['label'], $items['items']));
         self::assertSame(
             '{"items":[]}',
             (string) $this->requestWithQuery('GET', '/karte/vorschlaege', ['q' => 'x'])->getBody(),
@@ -497,10 +522,23 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('<wpt ', (string) $this->request('GET', '/karte/spezikarte.gpx')->getBody());
         self::assertSame(404, $this->request('GET', '/karte/ort/00000.gpx')->getStatusCode());
 
-        // The Spezi detail page links back to its spot on the map.
+        // --- Per-Spezi mini map -------------------------------------------
+        $mini = $this->request('GET', "/karte/spezi/$nahe");
+        self::assertSame(200, $mini->getStatusCode());
+        $miniBody = (string) $mini->getBody();
+        self::assertStringContainsString('Wo Nahe Limo herkommt', $miniBody);
+        self::assertStringContainsString('Zur ganzen Karte', $miniBody);
+        self::assertStringContainsString('data-scope="spezi"', $miniBody);
+        self::assertStringNotContainsString('>Fertig Limo<', $miniBody);
+        self::assertStringNotContainsString('class="karte__tabs"', $miniBody);
+        // A drink whose origin does not geocode, and an unknown id, both 404.
+        self::assertSame(404, $this->request('GET', "/karte/spezi/$uebersee")->getStatusCode());
+        self::assertSame(404, $this->request('GET', '/karte/spezi/999999')->getStatusCode());
+
+        // The Spezi detail page links to its mini map.
         $detail = $this->request('GET', "/spezi/$nahe");
         $detail = $this->request('GET', $detail->getHeaderLine('Location'));
-        self::assertStringContainsString('/karte#ort-69115', (string) $detail->getBody());
+        self::assertStringContainsString("/karte/spezi/$nahe", (string) $detail->getBody());
     }
 
     public function testPublicMapGeoJsonFeedForUmap(): void

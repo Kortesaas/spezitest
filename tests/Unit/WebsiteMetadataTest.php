@@ -6,6 +6,9 @@ namespace Spezitest\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Spezitest\Tests\Support\CatalogFixture;
+use Spezitest\Website\Catalog\Geo\PostalGeocoder;
+use Spezitest\Website\Catalog\HuntMap;
+use Spezitest\Website\Catalog\MapScope;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\View\WebsiteRenderer;
 
@@ -82,6 +85,40 @@ final class WebsiteMetadataTest extends TestCase
             $html,
         );
         self::assertStringNotContainsString('og:image:width', $html);
+    }
+
+    public function testKarteScopesEachHaveTheirOwnTitleCanonicalAndCurrentTab(): void
+    {
+        $drink = CatalogFixture::untested('Karten Spezi', 'identified', null, false, '2026-01-01 00:00:00', '01067 Dresden');
+        $map = HuntMap::fromDrinks([$drink], PostalGeocoder::default());
+
+        $all = $this->renderer->karte($map, MapScope::All);
+        self::assertStringContainsString('<title>Karte · Spezitest</title>', $all);
+        self::assertStringContainsString('<link rel="canonical" href="https://www.spezitest.de/karte">', $all);
+        self::assertStringContainsString('<a href="/karte" aria-current="page">Alle</a>', $all);
+
+        $tested = $this->renderer->karte($map, MapScope::Tested);
+        self::assertStringContainsString('<title>Getestete Spezis – Karte · Spezitest</title>', $tested);
+        self::assertStringContainsString('href="https://www.spezitest.de/karte/getestet">', $tested);
+        self::assertStringContainsString('<a href="/karte/getestet" aria-current="page">Getestet</a>', $tested);
+
+        $sought = $this->renderer->karte($map, MapScope::Sought);
+        self::assertStringContainsString('<title>Gesuchte Spezis – Karte · Spezitest</title>', $sought);
+        self::assertStringContainsString('href="https://www.spezitest.de/karte/gesucht">', $sought);
+    }
+
+    public function testKarteSpeziMiniMapTitlesAfterTheDrinkAndHasNoTabs(): void
+    {
+        $drink = CatalogFixture::untested('Herkunft Spezi', 'identified', 'Quelle AG', false, '2026-01-01 00:00:00', '01067 Dresden');
+        $map = HuntMap::fromDrinks([$drink], PostalGeocoder::default());
+
+        $html = $this->renderer->karteSpezi($map, $drink);
+
+        self::assertStringContainsString('<title>Herkunft Spezi – Herkunft · Spezitest</title>', $html);
+        self::assertStringContainsString('<link rel="canonical" href="https://www.spezitest.de/karte/spezi/' . $drink->id . '">', $html);
+        self::assertStringContainsString('Wo Herkunft Spezi herkommt', $html);
+        self::assertStringNotContainsString('class="karte__tabs"', $html);
+        self::assertStringContainsString('data-scope="spezi"', $html);
     }
 
     public function testNotFoundPageIsUnindexedAndCarriesNoCanonicalOrSchema(): void

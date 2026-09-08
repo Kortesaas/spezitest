@@ -295,7 +295,10 @@ it will show empty-state pages until the data is imported, which is expected.
 | `GET /spezi/109` | 301 → `/spezi/109-flotzinger-cola-mix` |
 | `GET /spezi/109/bild` | 200, `image/webp`, `X-Content-Type-Options: nosniff` |
 | `GET /assets/spezitest.css` | 200, `text/css` |
-| `GET /api/map/spezis.geojson` | 200, `application/geo+json`, `Access-Control-Allow-Origin: *`, a GeoJSON `FeatureCollection` |
+| `GET /karte` | 200, "Wo die Spezis herkommen", tab bar (Alle · Getestet · Noch gesucht) |
+| `GET /karte/getestet` · `GET /karte/gesucht` | 200, matching heading, that tab current |
+| `GET /karte/spezi/109` | 200, one-pin map "Wo … herkommt"; `GET /karte/spezi/999999` → 404 |
+| `GET /api/map/spezis.geojson` | 200, `application/geo+json`, `Access-Control-Allow-Origin: *`, a GeoJSON `FeatureCollection` of the identified drinks (unaffected by the `/karte` filter) |
 | `GET /api/map/test-spezis.geojson` | 200, same headers, three `TEST Spezi …` features (temporary — remove once uMap is verified) |
 | `GET /nonsense` | 404, branded page, no stack trace |
 | `GET /.env` | 404 |

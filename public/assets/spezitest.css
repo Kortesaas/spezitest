@@ -772,6 +772,10 @@ table{border-collapse:collapse;width:100%}
 .karte__credit a{color:var(--text-muted);text-decoration:underline}
 .karte__credit a:hover{color:var(--navy)}
 .karte__side{min-width:0}
+.karte__tabs{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-4)}
+.karte__tabs a{display:inline-flex;align-items:center;padding:var(--sp-1) var(--sp-3);border:var(--bw-strong) solid var(--navy);border-radius:var(--radius-pill);font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--navy);text-decoration:none;background:var(--white)}
+.karte__tabs a:hover{background:var(--navy-050)}
+.karte__tabs a[aria-current="page"]{background:var(--navy);color:var(--white)}
 .karte__toolbar{display:grid;gap:var(--sp-3);justify-items:start}
 .karte__toolbar-actions{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:start;width:100%}
 .karte__toolbar-buttons{display:flex;flex-wrap:wrap;gap:var(--sp-3)}

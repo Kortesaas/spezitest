@@ -153,6 +153,8 @@ final class AppFactory
             $group->get('/karte/spezikarte.gpx', [$controller, 'karteGpx']);
             $group->get('/karte/ort/{key:[0-9]{5}|[a-z]{2}-[0-9]{4}}.gpx', [$controller, 'karteGpxForPlace']);
             $group->get('/karte/kachel/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.png', [$controller, 'mapTile']);
+            $group->get('/karte/spezi/{id:[0-9]+}', [$controller, 'karteSpezi']);
+            $group->get('/karte/{scope:getestet|gesucht}', [$controller, 'karte']);
             $group->get('/impressum', [$controller, 'impressum']);
             $group->get('/datenschutz', [$controller, 'datenschutz']);
             $group->get('/ranking', [$controller, 'ranking']);

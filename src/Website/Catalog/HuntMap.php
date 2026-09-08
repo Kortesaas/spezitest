@@ -7,9 +7,10 @@ namespace Spezitest\Website\Catalog;
 use Spezitest\Website\Catalog\Geo\PostalGeocoder;
 
 /**
- * Places the still-wanted drinks — lifecycle `identified`, known to exist but
- * not yet in the crate — on a real map so the testers can see which ones are
- * near them.
+ * Places a set of drinks on a real map by where they come from. The caller
+ * chooses the set: the whole catalogue, just the tested ones, or the ones still
+ * to be tested ({@see MapScope}); the public GeoJSON feed keeps to the
+ * identified drinks via {@see self::fromCollection()}.
  *
  * Each drink is positioned from the postal code in its `origin_location` via
  * {@see PostalGeocoder} — Germany, or Austria / Switzerland / Liechtenstein
@@ -45,10 +46,26 @@ final readonly class HuntMap
     ) {
     }
 
+    /**
+     * The still-wanted drinks only ({@see RatedDrinkCollection::identified()}).
+     * The public GeoJSON feed uses this; the `/karte` page uses
+     * {@see self::fromDrinks()} with a scope-selected list.
+     */
     public static function fromCollection(
         RatedDrinkCollection $collection,
         PostalGeocoder $geocoder,
     ): self {
+        return self::fromDrinks($collection->identified(), $geocoder);
+    }
+
+    /**
+     * Place a given list of drinks — the caller decides which lifecycle states
+     * to include ({@see MapScope}).
+     *
+     * @param list<RatedDrink> $drinks
+     */
+    public static function fromDrinks(array $drinks, PostalGeocoder $geocoder): self
+    {
         /**
          * @var array<string, array{
          *     key: string, postalCode: string, countryCode: string, country: ?string,
@@ -61,7 +78,7 @@ final readonly class HuntMap
         $unplaced = [];
         $placed = 0;
 
-        foreach ($collection->identified() as $drink) {
+        foreach ($drinks as $drink) {
             $point = $geocoder->locate($drink->originLocation, $drink->originRegion);
             $classification = PostalGeocoder::classify($drink->originLocation, $drink->originRegion);
 

@@ -49,6 +49,26 @@ final class HuntMapTest extends TestCase
         self::assertCount(1, $map->waypointsForKey('at-5020'));
     }
 
+    public function testFromDrinksPlacesWhateverListItIsGivenRegardlessOfLifecycle(): void
+    {
+        $tested = CatalogFixture::tested(
+            'Getestete',
+            ['manu' => [5, 5, 5], 'fabi' => [5, 5, 5], 'schorsch' => [5, 5, 5]],
+            null,
+            null,
+        );
+        $acquired = CatalogFixture::untested('Gekaufte', 'acquired', null, false, '2026-01-01 00:00:00', '30419 Hannover');
+
+        // fromCollection() still only sees the identified drinks...
+        $collection = new RatedDrinkCollection([$tested, $acquired]);
+        self::assertSame(0, HuntMap::fromCollection($collection, $this->geocoder())->placed);
+
+        // ...but fromDrinks() places exactly the list handed to it.
+        $map = HuntMap::fromDrinks([$acquired], $this->geocoder());
+        self::assertSame(1, $map->placed);
+        self::assertSame('Gekaufte', $map->points[0]['drinks'][0]['name']);
+    }
+
     public function testGroupsIdentifiedDrinksBySharedPostalCodeAndIgnoresOtherLifecycles(): void
     {
         $collection = new RatedDrinkCollection([

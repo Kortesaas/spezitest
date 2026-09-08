@@ -33,6 +33,11 @@
     return;
   }
 
+  // Which filter the page is on ("alle" | "getestet" | "gesucht" | "spezi").
+  // Passed to the search / suggestion / GPX endpoints so they stay in step.
+  var scope = container.getAttribute('data-scope') || 'alle';
+  var scopeQuery = (scope === 'getestet' || scope === 'gesucht') ? '&zeigen=' + scope : '';
+
   var map = L.map(container, {
     scrollWheelZoom: false,
     minZoom: 5,
@@ -163,9 +168,17 @@
   // Frame the drinks and lock that framing: zooming out or panning past it only
   // reveals empty grey where there are no tiles.
   var homeBounds = L.latLngBounds(latlngs);
-  map.fitBounds(homeBounds, { padding: [24, 24] });
-  map.setMinZoom(map.getZoom());
-  map.setMaxBounds(homeBounds.pad(0.22));
+  if (markers.length > 1) {
+    map.fitBounds(homeBounds, { padding: [24, 24] });
+    map.setMinZoom(map.getZoom());
+    map.setMaxBounds(homeBounds.pad(0.22));
+  } else {
+    // Single-Spezi view: a close-up on the one pin, with its popup open.
+    map.setView(latlngs[0], 11);
+    map.setMinZoom(5);
+    var only = byKey[markers[0].key];
+    if (only) { only.marker.openPopup(); }
+  }
 
   // On an Android-style device, prepend the "geo:" link to each server-rendered
   // side-list entry too (it is left out of the HTML because it does nothing on
@@ -244,7 +257,7 @@
     var button = searchForm.querySelector('button');
     button.disabled = true;
 
-    fetch('/karte/suche?q=' + encodeURIComponent(term), { headers: { Accept: 'application/json' } })
+    fetch('/karte/suche?q=' + encodeURIComponent(term) + scopeQuery, { headers: { Accept: 'application/json' } })
       .then(function (response) {
         return response.ok ? response.json() : Promise.reject(response.status);
       })
@@ -329,7 +342,7 @@
       var term = input.value.trim();
       if (term.length < 2) { close(); return; }
       var token = ++latest;
-      fetch('/karte/vorschlaege?q=' + encodeURIComponent(term), { headers: { Accept: 'application/json' } })
+      fetch('/karte/vorschlaege?q=' + encodeURIComponent(term) + scopeQuery, { headers: { Accept: 'application/json' } })
         .then(function (r) { return r.ok ? r.json() : { items: [] }; })
         .then(function (data) { if (token === latest) { render((data && data.items) || []); } })
         .catch(close);

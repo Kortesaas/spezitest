@@ -73,6 +73,39 @@ final readonly class RatedDrinkCollection
     }
 
     /**
+     * Drinks that have not been through a test yet — still to be found
+     * (`identified`) or already in the crate but untasted (`acquired`) —
+     * ordered by name.
+     *
+     * @return list<RatedDrink>
+     */
+    public function untested(): array
+    {
+        $untested = array_values(array_filter(
+            $this->drinks,
+            static fn (RatedDrink $drink): bool => in_array($drink->lifecycleStatus, ['identified', 'acquired'], true),
+        ));
+
+        usort($untested, static fn (RatedDrink $a, RatedDrink $b): int => strcasecmp($a->name, $b->name));
+
+        return $untested;
+    }
+
+    /**
+     * Every drink, ordered by name — the widest map scope.
+     *
+     * @return list<RatedDrink>
+     */
+    public function byName(): array
+    {
+        $drinks = $this->drinks;
+
+        usort($drinks, static fn (RatedDrink $a, RatedDrink $b): int => strcasecmp($a->name, $b->name));
+
+        return $drinks;
+    }
+
+    /**
      * Tested drinks ordered by rank (best first); ties keep a stable order by name.
      *
      * @return list<RatedDrink>

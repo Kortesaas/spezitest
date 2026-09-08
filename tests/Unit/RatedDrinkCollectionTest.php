@@ -9,11 +9,31 @@ use Spezitest\Domain\Rating\PricePerformanceResult;
 use Spezitest\Domain\Rating\RatingCalculator;
 use Spezitest\Domain\Rating\TesterCode;
 use Spezitest\Domain\Rating\TesterRating;
+use Spezitest\Tests\Support\CatalogFixture;
 use Spezitest\Website\Catalog\RatedDrink;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 
 final class RatedDrinkCollectionTest extends TestCase
 {
+    public function testUntestedIsIdentifiedPlusAcquiredByNameAndByNameIsEverything(): void
+    {
+        $collection = new RatedDrinkCollection([
+            CatalogFixture::tested('Gamma', ['manu' => [5, 5, 5], 'fabi' => [5, 5, 5], 'schorsch' => [5, 5, 5]]),
+            CatalogFixture::untested('Beta', 'acquired'),
+            CatalogFixture::untested('Alpha', 'identified'),
+            CatalogFixture::untested('Delta', 'identified'),
+        ]);
+
+        self::assertSame(
+            ['Alpha', 'Beta', 'Delta'],
+            array_map(static fn (RatedDrink $d): string => $d->name, $collection->untested()),
+        );
+        self::assertSame(
+            ['Alpha', 'Beta', 'Delta', 'Gamma'],
+            array_map(static fn (RatedDrink $d): string => $d->name, $collection->byName()),
+        );
+    }
+
     public function testPricePerformanceRankedOrdersBestValueFirstAndExcludesDrinksWithoutAPrice(): void
     {
         $best = $this->drink(1, 'Best Value', 0.9);

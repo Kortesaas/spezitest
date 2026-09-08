@@ -17,6 +17,7 @@ use Spezitest\Website\Catalog\CatalogRepository;
 use Spezitest\Website\Catalog\Geo\LocationSearch;
 use Spezitest\Website\Catalog\Geo\PostalGeocoder;
 use Spezitest\Website\Catalog\HuntMap;
+use Spezitest\Website\Catalog\MapScope;
 use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Slug;
@@ -174,22 +175,63 @@ final class WebsiteController
         return $dates;
     }
 
-    public function karte(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
-    {
-        return $this->html($response, $this->renderer->karte($this->huntMap()));
+    /** @param array<string, string> $arguments */
+    public function karte(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments = [],
+    ): ResponseInterface {
+        $scope = MapScope::fromPath($arguments['scope'] ?? null);
+
+        return $this->html($response, $this->renderer->karte($this->huntMap($scope), $scope));
     }
 
     /**
-     * The live public map feed, as GeoJSON, for the uMap map viewer. It is the
-     * same set of pins as {@see karte()} — `identified` drinks whose origin
-     * resolves to a coordinate — rebuilt from the database on every request and
-     * cached briefly. See {@see GeoJsonFeed}.
+     * A mini map for a single Spezi — just its pin, so a reader on the drink
+     * page can see where it comes from.
+     *
+     * @param array<string, string> $arguments
+     */
+    public function karteSpezi(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $id = $arguments['id'] ?? '';
+
+        if (!ctype_digit($id)) {
+            return $this->notFound($response);
+        }
+
+        $drink = $this->catalogRepository()->ratedDrinks()->find((int) $id);
+
+        if ($drink === null) {
+            return $this->notFound($response);
+        }
+
+        $map = HuntMap::fromDrinks([$drink], PostalGeocoder::default());
+
+        if ($map->placed === 0) {
+            return $this->notFound($response);
+        }
+
+        return $this->html($response, $this->renderer->karteSpezi($map, $drink));
+    }
+
+    /**
+     * The live public map feed, as GeoJSON, for the uMap map viewer. Always the
+     * `identified` drinks whose origin resolves to a coordinate — the "still
+     * wanted" set, regardless of how the {@see karte()} page is filtered —
+     * rebuilt from the database on every request and cached briefly. See
+     * {@see GeoJsonFeed}.
      */
     public function mapSpezisGeoJson(
         ServerRequestInterface $_request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $collection = GeoJsonFeed::fromHuntMap($this->huntMap(), $this->siteUrl)->toFeatureCollection();
+        // Always the identified drinks, whatever the /karte page is filtered to.
+        $map = HuntMap::fromCollection($this->catalogRepository()->ratedDrinks(), PostalGeocoder::default());
+        $collection = GeoJsonFeed::fromHuntMap($map, $this->siteUrl)->toFeatureCollection();
 
         return $this->geoJson($response, $collection, 'public, max-age=60');
     }
@@ -247,9 +289,9 @@ final class WebsiteController
      * carrying the Spezi name, so a phone's "open with" sheet can hand it to any
      * map or GPS app. Read-only, built from the same data as the page.
      */
-    public function karteGpx(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    public function karteGpx(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $waypoints = $this->huntMap()->waypoints();
+        $waypoints = $this->huntMap($this->requestedMapScope($request))->waypoints();
 
         if ($waypoints === []) {
             return $response->withStatus(404);
@@ -268,7 +310,7 @@ final class WebsiteController
         $term = $request->getQueryParams()['q'] ?? '';
         $term = is_string($term) ? mb_substr($term, 0, 120) : '';
 
-        $hit = LocationSearch::default()->search($term, $this->huntMap());
+        $hit = LocationSearch::default()->search($term, $this->huntMap($this->requestedMapScope($request)));
 
         $status = $hit === null ? 404 : 200;
         $payload = $hit === null
@@ -296,7 +338,7 @@ final class WebsiteController
         $term = $request->getQueryParams()['q'] ?? '';
         $term = is_string($term) ? mb_substr($term, 0, 120) : '';
 
-        $items = LocationSearch::default()->suggest($term, $this->huntMap());
+        $items = LocationSearch::default()->suggest($term, $this->huntMap($this->requestedMapScope($request)));
 
         $response->getBody()->write((string) json_encode(
             ['items' => $items],
@@ -314,7 +356,7 @@ final class WebsiteController
      * @param array<string, string> $arguments
      */
     public function karteGpxForPlace(
-        ServerRequestInterface $_request,
+        ServerRequestInterface $request,
         ResponseInterface $response,
         array $arguments,
     ): ResponseInterface {
@@ -324,7 +366,7 @@ final class WebsiteController
             return $response->withStatus(404);
         }
 
-        $map = $this->huntMap();
+        $map = $this->huntMap($this->requestedMapScope($request));
         $waypoints = $map->waypointsForKey($key);
 
         if ($waypoints === []) {
@@ -348,12 +390,24 @@ final class WebsiteController
             ->withHeader('Cache-Control', 'public, max-age=3600');
     }
 
-    private function huntMap(): HuntMap
+    private function huntMap(MapScope $scope = MapScope::All): HuntMap
     {
-        return HuntMap::fromCollection(
-            $this->catalogRepository()->ratedDrinks(),
+        return HuntMap::fromDrinks(
+            $scope->selectDrinks($this->catalogRepository()->ratedDrinks()),
             PostalGeocoder::default(),
         );
+    }
+
+    /**
+     * The scope a map sub-request (search, suggestions, GPX) belongs to, from
+     * its `?zeigen=` parameter, so those stay in step with the tab the visitor
+     * is on. Defaults to {@see MapScope::All}.
+     */
+    private function requestedMapScope(ServerRequestInterface $request): MapScope
+    {
+        $value = $request->getQueryParams()['zeigen'] ?? null;
+
+        return MapScope::fromPath(is_string($value) ? $value : null);
     }
 
     /**

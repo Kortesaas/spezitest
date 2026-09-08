@@ -9,6 +9,7 @@ use Spezitest\Website\Catalog\CatalogPage;
 use Spezitest\Website\Catalog\CatalogQuery;
 use Spezitest\Website\Catalog\Geo\PostalGeocoder;
 use Spezitest\Website\Catalog\HuntMap;
+use Spezitest\Website\Catalog\MapScope;
 use Spezitest\Website\Catalog\OriginMap;
 use Spezitest\Website\Catalog\RatedDrink;
 use Spezitest\Website\Catalog\RatedDrinkCollection;
@@ -229,13 +230,8 @@ final class WebsiteRenderer
             $hero .= '<div class="notice"><span>Noch nicht getestet. Wertung und Einzelnoten folgen nach dem Spezistream.</span></div>';
         }
 
-        if ($drink->lifecycleStatus === 'identified') {
-            $classification = PostalGeocoder::classify($drink->originLocation, $drink->originRegion);
-
-            if ($classification !== null) {
-                $key = PostalGeocoder::mapKey($classification);
-                $hero .= '<p><a class="link-arrow" href="/karte#ort-' . Html::e($key) . '">Auf der Karte ansehen</a></p>';
-            }
+        if (PostalGeocoder::classify($drink->originLocation, $drink->originRegion) !== null) {
+            $hero .= '<p><a class="link-arrow" href="/karte/spezi/' . $drink->id . '">Auf der Karte ansehen</a></p>';
         }
 
         $hero .= '</div></div></section>';
@@ -344,52 +340,135 @@ final class WebsiteRenderer
     }
 
     /**
-     * The hunt map: every still-wanted drink placed on a real map by the postal
-     * code in its origin — Germany and the neighbour countries — so a tester
-     * passing through can see what is available nearby. The map is progressive
-     * enhancement — the list beside it carries every drink and link with
-     * JavaScript disabled.
+     * The map of where the Spezis come from, placed by the postal code in each
+     * origin (Germany and the neighbour countries). {@see MapScope} picks the
+     * set: everything, only the tested ones, or the ones still to be tested.
+     * Progressive enhancement — the list beside the map carries every drink and
+     * link with JavaScript disabled.
      */
-    public function karte(HuntMap $map): string
+    public function karte(HuntMap $map, MapScope $scope): string
     {
-        $identifiedCount = $map->total();
+        [$heading, $lede, $countLabel, $title, $description, $path, $emptyTitle, $emptyBody] = match ($scope) {
+            MapScope::All => [
+                'Wo die Spezis herkommen',
+                'Jede Spezi mit hinterlegtem Herkunftsort – schon getestet oder noch gesucht.',
+                'Spezis',
+                'Karte',
+                'Karte aller Cola-Mix-Getränke im Test: wo jede Spezi herkommt.',
+                '/karte',
+                'Noch nichts auf der Karte',
+                'Sobald eine Spezi einen Herkunftsort hat, erscheint sie hier.',
+            ],
+            MapScope::Tested => [
+                'Wo die getesteten Spezis herkommen',
+                'Jede Spezi, die schon im Test war, an ihrem Herkunftsort.',
+                'getestet',
+                'Getestete Spezis – Karte',
+                'Karte der getesteten Cola-Mix-Getränke: wo jede geprüfte Spezi herkommt.',
+                '/karte/getestet',
+                'Noch keine getestete Spezi verortet',
+                'Sobald eine getestete Spezi einen Herkunftsort hat, erscheint sie hier.',
+            ],
+            MapScope::Sought => [
+                'Wo die noch gesuchten Spezis wohnen',
+                'Jede Spezi, die wir kennen, aber noch nicht getestet haben.',
+                'noch gesucht',
+                'Gesuchte Spezis – Karte',
+                'Karte aller noch gesuchten Cola-Mix-Getränke: wo die noch nicht getesteten Spezis herkommen.',
+                '/karte/gesucht',
+                'Nichts mehr gesucht',
+                'Sobald eine Spezi bekannt, aber noch nicht getestet ist, erscheint sie hier.',
+            ],
+        };
 
         $intro = '<section class="wrap section"><div class="stack">'
             . '<span class="eyebrow eyebrow--accent">Karte</span>'
-            . '<h1 class="display-2">Wo die noch gesuchten Spezis wohnen</h1>'
-            . '<p class="lede">Jede identifizierte, aber noch nicht gekaufte Spezi sitzt hier an ihrem '
-            . 'Herkunftsort.</p></div>';
+            . '<h1 class="display-2">' . Html::e($heading) . '</h1>'
+            . '<p class="lede">' . Html::e($lede) . '</p>'
+            . $this->karteTabs($scope);
 
         if ($map->isEmpty()) {
-            $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Nichts mehr gesucht</p>'
-                . '<p>Sobald eine Spezi identifiziert, aber noch nicht erworben ist, erscheint sie hier.</p>'
-                . '</div></section>';
+            $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">'
+                . Html::e($emptyTitle) . '</p><p>' . Html::e($emptyBody) . '</p></div></section>';
 
-            return $this->shell('Karte', $intro, 'karte');
+            return $this->karteShell($title, $intro, $description, $path);
         }
 
         $intro .= '<div class="figure-row" style="margin-top:var(--sp-6)">'
-            . $this->figure((string) $identifiedCount, 'noch gesucht')
+            . $this->figure((string) $map->total(), $countLabel)
             . $this->figure((string) $map->placed, 'auf der Karte')
             . $this->figure((string) count($map->points), $this->pluralOrte(count($map->points)))
             . '</div></section>';
 
+        $query = $scope === MapScope::All ? '' : '?zeigen=' . $scope->value;
+        $body = $intro . $this->karteMapSection($map, $scope->value, $query, true);
+
+        return $this->karteShell($title, $body, $description, $path);
+    }
+
+    /**
+     * A one-pin map for a single Spezi, linked from its detail page so a reader
+     * can see where it comes from without the rest of the catalogue in the way.
+     */
+    public function karteSpezi(HuntMap $map, RatedDrink $drink): string
+    {
+        $point = $map->points[0];
+        $place = $point['country'] !== null ? $point['place'] . ' · ' . $point['country'] : $point['place'];
+        $origin = $drink->manufacturer !== null
+            ? Html::e($drink->manufacturer) . ' sitzt in <strong>' . Html::e($place) . '</strong>.'
+            : '<strong>' . Html::e($drink->name) . '</strong> kommt aus <strong>' . Html::e($place) . '</strong>.';
+
+        $intro = '<section class="wrap section"><div class="stack">'
+            . '<span class="eyebrow eyebrow--accent">Karte</span>'
+            . '<h1 class="display-2">Wo ' . Html::e($drink->name) . ' herkommt</h1>'
+            . '<p class="lede">' . $origin . '</p>'
+            . '<p><a class="link-arrow" href="/karte">Zur ganzen Karte</a> · '
+            . '<a class="link-arrow" href="/spezi/' . Html::e($drink->slug()) . '">Zur Spezi</a></p>'
+            . '</div></section>'
+            . $this->karteMapSection($map, 'spezi', '', false);
+
+        return $this->karteShell(
+            $drink->name . ' – Herkunft',
+            $intro,
+            'Wo ' . $drink->name . ' herkommt – auf der Karte.',
+            '/karte/spezi/' . $drink->id,
+        );
+    }
+
+    /**
+     * The toolbar + map + side list + data blob, shared by {@see self::karte()}
+     * and {@see self::karteSpezi()}. `$query` is appended to the GPX links so a
+     * download matches the current filter; `$withSearch` drops the "PLZ oder
+     * Ort" box for the single-Spezi view where it makes no sense.
+     */
+    private function karteMapSection(HuntMap $map, string $scopeAttr, string $query, bool $withSearch): string
+    {
+        $search = $withSearch
+            ? '<form class="karte__search search-wrap" data-karte-search role="search" hidden>'
+                . '<label class="visually-hidden" for="karte-q">PLZ oder Ort suchen</label>'
+                . '<input id="karte-q" name="q" type="search" placeholder="PLZ oder Ort" autocomplete="off"'
+                . ' maxlength="120" role="combobox" aria-expanded="false" aria-controls="karte-q-suggest"'
+                . ' aria-autocomplete="list">'
+                . '<button type="submit">' . self::ICON_SEARCH . '<span class="visually-hidden">Suchen</span></button>'
+                . '<ul class="suggest" id="karte-q-suggest" role="listbox" aria-label="Vorschläge" hidden></ul>'
+                . '</form>'
+            : '';
+
+        $gpxLink = $withSearch
+            ? '<a class="btn btn--secondary btn--sm" href="/karte/spezikarte.gpx' . $query . '" download'
+                . ' title="GPX mit allen Orten – öffnet sich auf dem Handy in der Karten-App">'
+                . self::ICON_DOWNLOAD . 'Alle Orte als GPX</a>'
+            : '<a class="btn btn--secondary btn--sm" href="/karte/ort/' . Html::e($map->points[0]['key']) . '.gpx" download'
+                . ' title="GPX – öffnet sich auf dem Handy in der Karten-App">'
+                . self::ICON_DOWNLOAD . 'Als GPX</a>';
+
         $toolbar = '<div class="karte__toolbar">'
             . '<div class="karte__toolbar-actions">'
-            . '<form class="karte__search search-wrap" data-karte-search role="search" hidden>'
-            . '<label class="visually-hidden" for="karte-q">PLZ oder Ort suchen</label>'
-            . '<input id="karte-q" name="q" type="search" placeholder="PLZ oder Ort" autocomplete="off"'
-            . ' maxlength="120" role="combobox" aria-expanded="false" aria-controls="karte-q-suggest"'
-            . ' aria-autocomplete="list">'
-            . '<button type="submit">' . self::ICON_SEARCH . '<span class="visually-hidden">Suchen</span></button>'
-            . '<ul class="suggest" id="karte-q-suggest" role="listbox" aria-label="Vorschläge" hidden></ul>'
-            . '</form>'
+            . $search
             . '<div class="karte__toolbar-buttons">'
             . '<button type="button" class="btn btn--secondary btn--sm" data-karte-near hidden>'
             . self::ICON_LOCATE . 'In meiner Nähe</button>'
-            . '<a class="btn btn--secondary btn--sm" href="/karte/spezikarte.gpx" download'
-            . ' title="GPX mit allen Orten – öffnet sich auf dem Handy in der Karten-App">'
-            . self::ICON_DOWNLOAD . 'Alle Orte als GPX</a>'
+            . $gpxLink
             . '</div>'
             . '</div>'
             . '<p class="karte__hint" data-karte-near-note hidden>Dein Standort wird nur in deinem Browser '
@@ -400,33 +479,57 @@ final class WebsiteRenderer
             . $toolbar
             . '<div class="karte">'
             . '<div class="karte__stage">'
-            . '<div id="karte-map" data-karte aria-label="Karte mit den Herkunftsorten der noch gesuchten Spezis">'
+            . '<div id="karte-map" data-karte data-scope="' . Html::e($scopeAttr) . '"'
+            . ' aria-label="Karte mit den Herkunftsorten der Spezis">'
             . '<noscript><p class="karte__noscript">Die interaktive Karte braucht JavaScript. '
             . 'Die vollständige Liste mit allen Orten steht daneben.</p></noscript></div>'
             . '<p class="karte__credit">Karte: © <a href="https://www.openstreetmap.org/copyright" rel="nofollow noopener">OpenStreetMap</a>-Mitwirkende'
             . ' · PLZ-Koordinaten: <a href="https://www.geonames.org/" rel="nofollow noopener">GeoNames</a> (CC BY 4.0)</p>'
             . '</div>'
             . '<div class="karte__side">'
-            . '<div class="karte__list map__list">' . $this->karteEntries($map) . '</div>'
+            . '<div class="karte__list map__list">' . $this->karteEntries($map, $query) . '</div>'
             . '</div></div></div></section>';
 
         $data = json_encode(
             ['markers' => $map->markers()],
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS,
         );
-        $blob = '<script type="application/json" id="karte-data">' . $data . '</script>';
 
+        return $mapSection . '<script type="application/json" id="karte-data">' . $data . '</script>';
+    }
+
+    private function karteTabs(MapScope $active): string
+    {
+        $out = '<nav class="karte__tabs" aria-label="Kartenfilter">';
+
+        /** @var list<array{0: string, 1: string, 2: MapScope}> $tabs */
+        $tabs = [
+            ['/karte', 'Alle', MapScope::All],
+            ['/karte/getestet', 'Getestet', MapScope::Tested],
+            ['/karte/gesucht', 'Noch gesucht', MapScope::Sought],
+        ];
+
+        foreach ($tabs as [$href, $label, $scope]) {
+            $current = $scope === $active ? ' aria-current="page"' : '';
+            $out .= '<a href="' . $href . '"' . $current . '>' . $label . '</a>';
+        }
+
+        return $out . '</nav>';
+    }
+
+    private function karteShell(string $title, string $body, string $description, string $path): string
+    {
         return $this->shell(
-            'Karte',
-            $intro . $mapSection . $blob,
+            $title,
+            $body,
             'karte',
-            'Karte aller noch gesuchten Cola-Mix-Getränke: wo die identifizierten, aber noch nicht erworbenen Spezis herkommen.',
-            '/karte',
+            $description,
+            $path,
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p40">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p40" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p41">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p41" defer></script>',
         );
     }
 
@@ -435,7 +538,7 @@ final class WebsiteRenderer
         return $count === 1 ? 'Ort' : 'Orte';
     }
 
-    private function karteEntries(HuntMap $map): string
+    private function karteEntries(HuntMap $map, string $gpxQuery = ''): string
     {
         $entries = '';
 
@@ -465,7 +568,7 @@ final class WebsiteRenderer
                 . '<h3 class="map__entry-title">' . Html::e($place) . $approx
                 . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
                 . '<ul class="map__drinks map__drinks--photo">' . $drinks . '</ul>'
-                . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['key'])
+                . $this->karteEntryActions($point['latitude'], $point['longitude'], $pinLabel, $point['key'], $gpxQuery)
                 . '</section>';
         }
 
@@ -500,6 +603,7 @@ final class WebsiteRenderer
         float $longitude,
         string $label,
         string $key,
+        string $gpxQuery = '',
     ): string {
         $coords = number_format($latitude, 5, '.', '') . ',' . number_format($longitude, 5, '.', '');
         $pin = rawurlencode($label);
@@ -516,7 +620,7 @@ final class WebsiteRenderer
             . ' target="_blank" rel="noopener nofollow">Apple&nbsp;Maps</a>'
             . '<a href="https://www.google.com/maps/search/?api=1&amp;query=' . $coords . '"'
             . ' target="_blank" rel="noopener nofollow">Google&nbsp;Maps</a>'
-            . '<a class="map__dl" href="/karte/ort/' . Html::e($key) . '.gpx" download>'
+            . '<a class="map__dl" href="/karte/ort/' . Html::e($key) . '.gpx' . Html::e($gpxQuery) . '" download>'
             . self::ICON_DOWNLOAD . 'GPX</a>'
             . '</p></details>';
     }
