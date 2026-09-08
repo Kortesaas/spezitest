@@ -62,4 +62,35 @@ final class PostalGeocoderTest extends TestCase
         self::assertGreaterThan(12.0, $point->longitude);
         self::assertLessThan(14.5, $point->longitude);
     }
+
+    public function testPlaceNameAndReverseLookupAndDigitPrefix(): void
+    {
+        $geocoder = new PostalGeocoder(
+            ['80331' => [48.13, 11.57, 'München'], '80333' => [48.14, 11.57, 'München'], '01067' => [51.06, 13.72, 'Dresden']],
+            [],
+            ['muenchen' => '80331', 'dresden' => '01067'],
+        );
+
+        self::assertSame('München', $geocoder->place('80331'));
+        self::assertNull($geocoder->place('99999'));
+        self::assertSame('80331', $geocoder->postalCodeFor('München'));
+        self::assertSame('80331', $geocoder->postalCodeFor('  münchen '));
+        self::assertNull($geocoder->postalCodeFor('Nirgendwo'));
+
+        $hits = $geocoder->startingWith('803');
+        self::assertSame(
+            [['code' => '80331', 'place' => 'München'], ['code' => '80333', 'place' => 'München']],
+            $hits,
+        );
+        self::assertSame([], $geocoder->startingWith('abc'));
+        self::assertCount(1, $geocoder->startingWith('803', 1));
+    }
+
+    public function testBundledTableCarriesTownNames(): void
+    {
+        $geocoder = PostalGeocoder::default();
+
+        self::assertSame('Berlin', $geocoder->place('10115'));
+        self::assertSame('München', $geocoder->place((string) $geocoder->postalCodeFor('München')));
+    }
 }

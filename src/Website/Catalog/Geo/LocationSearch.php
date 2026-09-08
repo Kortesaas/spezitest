@@ -53,9 +53,17 @@ final readonly class LocationSearch
         if ($postalCode !== null) {
             $point = $this->postalGeocoder->locate($term);
 
-            return $point === null
-                ? null
-                : ['latitude' => $point->latitude, 'longitude' => $point->longitude, 'label' => $postalCode];
+            if ($point === null) {
+                return null;
+            }
+
+            $place = $this->postalGeocoder->place($postalCode);
+
+            return [
+                'latitude' => $point->latitude,
+                'longitude' => $point->longitude,
+                'label' => $place === null ? $postalCode : $postalCode . ' ' . $place,
+            ];
         }
 
         $key = self::normalise($term);
@@ -85,15 +93,31 @@ final readonly class LocationSearch
     }
 
     /**
-     * Up to eight place names that start with what the visitor has typed, for
-     * the search-box type-ahead. Places that actually have a still-wanted Spezi
-     * come first; the rest are the shortest matching names from the town index
-     * (so "münch" leads with "München", not "Münchenbernsdorf").
+     * Up to eight matches for what the visitor has typed, for the search-box
+     * type-ahead. Digits suggest postal codes; text suggests place names —
+     * places that actually have a still-wanted Spezi first, then the shortest
+     * matching names from the town index (so "münch" leads with "München", not
+     * "Münchenbernsdorf"). Every suggestion carries its postal code as a hint.
      *
      * @return list<array{label: string, sub: ?string}>
      */
     public function suggest(string $term, HuntMap $map): array
     {
+        $term = trim($term);
+
+        if (preg_match('/^\d{2,5}$/', $term) === 1) {
+            $out = [];
+
+            foreach ($this->postalGeocoder->startingWith($term) as $hit) {
+                $out[] = [
+                    'label' => $hit['place'] === null ? $hit['code'] : $hit['code'] . ' ' . $hit['place'],
+                    'sub' => null,
+                ];
+            }
+
+            return $out;
+        }
+
         $key = self::normalise($term);
 
         if (strlen($key) < 2) {
@@ -107,7 +131,7 @@ final readonly class LocationSearch
         foreach ($map->points as $point) {
             if (str_starts_with(self::normalise($point['place']), $key) && !isset($seen[$point['place']])) {
                 $seen[$point['place']] = true;
-                $suggestions[] = ['label' => $point['place'], 'sub' => 'Spezi hier'];
+                $suggestions[] = ['label' => $point['place'], 'sub' => $this->hint($point['place'], 'Spezi hier')];
             }
         }
 
@@ -131,10 +155,18 @@ final readonly class LocationSearch
                 break;
             }
 
-            $suggestions[] = ['label' => $name, 'sub' => null];
+            $suggestions[] = ['label' => $name, 'sub' => $this->hint($name, null)];
         }
 
         return array_slice($suggestions, 0, 8);
+    }
+
+    private function hint(string $townName, ?string $prefix): ?string
+    {
+        $postalCode = $this->postalGeocoder->postalCodeFor($townName);
+        $parts = array_filter([$prefix, $postalCode === null ? null : 'PLZ ' . $postalCode]);
+
+        return $parts === [] ? null : implode(' · ', $parts);
     }
 
     /**

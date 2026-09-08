@@ -85,7 +85,11 @@ final class LocationSearchTest extends TestCase
     public function testSuggestListsPrefixMatchesWithSpeziPlacesFirst(): void
     {
         $search = new LocationSearch(
-            new PostalGeocoder(['74939' => [49.2964, 8.8225]], []),
+            new PostalGeocoder(
+                ['74939' => [49.2964, 8.8225, 'Münchsdorf'], '80331' => [48.1374, 11.5755, 'München']],
+                [],
+                ['muenchen' => '80331', 'muenchsdorf' => '74939'],
+            ),
             [
                 'muenchen' => [48.1374, 11.5755, 'München'],
                 'muenchberg' => [50.19, 11.79, 'Münchberg'],
@@ -106,7 +110,8 @@ final class LocationSearchTest extends TestCase
         self::assertSame('Münchsdorf', $labels[0], 'a Spezi place comes first');
         self::assertContains('München', $labels);
         self::assertNotContains('Münster', $labels);
-        self::assertSame('Spezi hier', $items[0]['sub']);
+        self::assertSame('Spezi hier · PLZ 74939', $items[0]['sub']);
+        self::assertSame('PLZ 80331', $items[(int) array_search('München', $labels, true)]['sub']);
 
         // Shortest matching name leads among the index hits.
         self::assertLessThan(
@@ -115,6 +120,22 @@ final class LocationSearchTest extends TestCase
         );
 
         self::assertSame([], $search->suggest('m', $map));
+    }
+
+    public function testSuggestOnDigitsListsPostalCodesWithTheirTown(): void
+    {
+        $search = new LocationSearch(
+            new PostalGeocoder(
+                ['80331' => [48.13, 11.57, 'München'], '80333' => [48.14, 11.57, 'München'], '81929' => [48.16, 11.66, 'München']],
+                [],
+            ),
+            [],
+        );
+
+        $items = $search->suggest('8033', $this->map());
+
+        self::assertSame(['80331 München', '80333 München'], array_map(static fn (array $i): string => $i['label'], $items));
+        self::assertNull($items[0]['sub']);
     }
 
     public function testBundledIndexLoadsAndFindsARealCity(): void

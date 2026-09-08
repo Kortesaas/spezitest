@@ -465,7 +465,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $plz = $this->requestWithQuery('GET', '/karte/suche', ['q' => '69115']);
         self::assertSame(200, $plz->getStatusCode());
         self::assertStringContainsString('application/json', $plz->getHeaderLine('Content-Type'));
-        self::assertStringContainsString('"label":"69115"', (string) $plz->getBody());
+        self::assertStringContainsString('"label":"69115 Heidelberg"', (string) $plz->getBody());
         $town = $this->requestWithQuery('GET', '/karte/suche', ['q' => 'Heidelberg']);
         self::assertSame(200, $town->getStatusCode());
         self::assertStringContainsString('"lat":', (string) $town->getBody());
