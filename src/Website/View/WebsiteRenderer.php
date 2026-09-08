@@ -304,7 +304,7 @@ final class WebsiteRenderer
             . '<span class="eyebrow eyebrow--accent">Statistik</span>'
             . '<h1 class="display-2">Cola-Mix in Zahlen</h1>'
             . '<p class="lede">Was die abgeschlossenen Testabende zeigen. Alle Werte kommen direkt aus den '
-            . 'Tests, nichts ist geschätzt.</p></div>';
+            . 'Tests.</p></div>';
 
         if ($stats->testedCount === 0) {
             $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Noch keine Auswertung</p>'
@@ -392,10 +392,14 @@ final class WebsiteRenderer
         $panels = '';
 
         foreach ($stats->testerProfiles as $profile) {
+            $average = $profile['average'] === null
+                ? Html::gradeOrDash(null, 1)
+                : 'Ø&nbsp;' . Html::grade($profile['average'], 1);
             $panels .= '<div class="panel stack">'
                 . '<div class="stat-lines"><span class="tester__name">' . Html::e($profile['label']) . '</span>'
-                . '<span class="tester__val">' . Html::gradeOrDash($profile['average'], 1) . '</span>'
-                . '<span class="meta">je Kriterium im Schnitt</span></div>'
+                . '<span class="tester__val">' . $average . '</span>'
+                . '<span class="meta">Punkte je Kriterium</span></div>'
+                . '<hr class="rule rule--hair">'
                 . $this->testerFavourite($profile['favourite'])
                 . '</div>';
         }
@@ -403,10 +407,11 @@ final class WebsiteRenderer
         $takeaway = $this->testerTakeaway($stats);
 
         return '<section class="section section--tint"><div class="wrap stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Wir drei</span>'
+            . '<div class="stack"><span class="eyebrow">Die Tester</span>'
             . '<h2 class="display-3">Manu, Fabi und Schorsch</h2>'
-            . '<p class="meta">Unser Punkteschnitt und die Spezi, der jeder von uns die höchste eigene '
-            . 'Wertung gegeben hat.</p></div>'
+            . '<p class="meta">Oben der Punkteschnitt über alle Wertungen, die dieser Tester vergeben hat. '
+            . 'Darunter, ganz unabhängig von dieser Zahl, seine Lieblingsspezi: die, der er selbst die '
+            . 'höchste Gesamtwertung von 0 bis 60 gegeben hat.</p></div>'
             . '<div class="grid grid--3">' . $panels . '</div>'
             . ($takeaway === '' ? '' : '<p class="meta">' . $takeaway . '</p>')
             . '</div></section>';
@@ -421,9 +426,9 @@ final class WebsiteRenderer
 
         return '<div class="statpick">'
             . $this->statBottle($pick['id'], $pick['hasImage'], $pick['name'], 'pimg--thumb')
-            . '<div class="stat-lines"><span class="eyebrow">Liebling</span>'
+            . '<div class="stat-lines"><span class="eyebrow">Lieblingsspezi</span>'
             . '<a href="/spezi/' . Html::e($pick['slug']) . '">' . Html::e($pick['name']) . '</a>'
-            . '<span class="meta">' . Html::gradeOfMax($pick['value'], Html::GESAMT_MAX, 0) . '</span></div></div>';
+            . '<span class="meta">seine Gesamtwertung dafür: ' . Html::gradeOfMax($pick['value'], Html::GESAMT_MAX, 0) . '</span></div></div>';
     }
 
     private function testerTakeaway(Statistics $stats): string
@@ -473,7 +478,7 @@ final class WebsiteRenderer
             : 'nur ' . $this->punkte($agreed['spread']) . ' Unterschied, so einig wie selten';
 
         return '<section class="wrap section"><div class="stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Streit oder Einigkeit</span>'
+            . '<div class="stack"><span class="eyebrow">Streit & Einigkeit</span>'
             . '<h2 class="display-3">Wo wir uns einig waren und wo nicht</h2>'
             . '<p class="meta">Die Zahlen zeigen, welche Gesamtwertung jeder von uns alleine vergeben hätte, '
             . 'von 0 bis 60.</p></div>'
@@ -544,7 +549,7 @@ final class WebsiteRenderer
         return '<section class="wrap section"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Verlauf</span>'
             . '<h2 class="display-3">Über die Testabende</h2>'
-            . '<p class="meta">Jeder Spezistream als eigener Balken, der erste zuerst.</p></div>'
+            . '<p class="meta">Ein paar Daten zu unseren Spezitests.</p></div>'
             . '<div class="split">'
             . '<div class="stack"><h3 class="h4">Schnitt pro Abend</h3>'
             . '<div class="barchart barchart--wide">' . $scoreRows . '</div></div>'
