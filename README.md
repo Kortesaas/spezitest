@@ -60,8 +60,9 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
 - **Public map feed** (`GET /api/map/spezis.geojson`): the same pins as `/karte`
   as a GeoJSON `FeatureCollection` — one `Point` per `identified` drink whose
   origin resolves to a coordinate, carrying the database id, the name, and — when
-  a package photo exists — a Markdown `description` that embeds the picture from
-  this site plus the bare `image` URL, so the uMap popup can show it.
+  a package photo exists — a `description` in uMap's own `{{url|width}}` syntax
+  that embeds the picture from this site (so the default uMap popup shows it with
+  no template setup) plus the bare `image` URL.
   Rebuilt from the database each request, cached 60 s, served with
   `Content-Type: application/geo+json` and `Access-Control-Allow-Origin: *` so a
   third-party viewer such as uMap can load it as a remote data layer; the

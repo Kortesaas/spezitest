@@ -544,14 +544,14 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
         self::assertArrayNotHasKey('GeoJSON Ausland', $byName);
 
-        // A drink with a package photo carries a Markdown description that embeds
-        // the picture straight from spezitest.de, plus the bare image URL.
+        // A drink with a package photo carries a uMap-syntax description that
+        // embeds the picture straight from spezitest.de, plus the bare image URL.
         self::assertArrayHasKey('GeoJSON Mit Bild', $byName);
         $imageUrl = 'https://www.spezitest.de/spezi/' . $withPhoto . '/bild';
         self::assertSame(
             [
                 'name' => 'GeoJSON Mit Bild',
-                'description' => '![GeoJSON Mit Bild](' . $imageUrl . ')',
+                'description' => '{{' . $imageUrl . '|240}}',
                 'image' => $imageUrl,
             ],
             $byName['GeoJSON Mit Bild']['properties'],

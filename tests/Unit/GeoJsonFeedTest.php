@@ -62,7 +62,7 @@ final class GeoJsonFeedTest extends TestCase
 
         $url = 'https://www.spezitest.de/spezi/' . $withPhoto->id . '/bild';
         self::assertSame(
-            ['name' => 'Foto Cola', 'description' => '![Foto Cola](' . $url . ')', 'image' => $url],
+            ['name' => 'Foto Cola', 'description' => '{{' . $url . '|240}}', 'image' => $url],
             $byName['Foto Cola'],
         );
         self::assertSame(['name' => 'Ohne Foto'], $byName['Ohne Foto']);

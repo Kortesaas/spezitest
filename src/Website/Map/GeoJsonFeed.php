@@ -16,11 +16,12 @@ use Spezitest\Website\Catalog\HuntMap;
  * feed on the next request — there is no separate map data to keep in sync.
  *
  * Each drink becomes one Point feature carrying its stable database id, its
- * name, and — when a package photo exists — a Markdown `description` that
- * embeds the picture straight from this site (so the uMap popup can show what
- * the tester is looking for) plus the bare `image` URL. Coordinates that are
- * somehow non-finite or outside the valid range are dropped so the output is
- * always well-formed GeoJSON.
+ * name, and — when a package photo exists — a `description` written in uMap's
+ * own text syntax (`{{url|width}}`) that embeds the picture straight from this
+ * site, so the default uMap popup shows what the tester is looking for with no
+ * template configuration. The bare `image` URL is included too for any other
+ * consumer. Coordinates that are somehow non-finite or outside the valid range
+ * are dropped so the output is always well-formed GeoJSON.
  */
 final readonly class GeoJsonFeed
 {
@@ -77,9 +78,10 @@ final readonly class GeoJsonFeed
             $properties = ['name' => $feature['name']];
 
             if ($feature['image'] !== null) {
-                // Markdown: uMap renders `description` in the popup, so the
-                // package photo shows up straight from spezitest.de.
-                $properties['description'] = '![' . $feature['name'] . '](' . $feature['image'] . ')';
+                // uMap image syntax ({{url|width}}): the default popup renders
+                // `description`, so the package photo shows up from spezitest.de
+                // with no popup-template setup.
+                $properties['description'] = '{{' . $feature['image'] . '|240}}';
                 $properties['image'] = $feature['image'];
             }
 
