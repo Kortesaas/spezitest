@@ -17,9 +17,9 @@ use Closure;
  * third-party request to the page and the privacy policy needs no tile-service
  * disclosure.
  *
- * Requests are bounded to Germany and its immediate surroundings at the zoom
- * levels the map actually uses, so the route cannot be turned into an open
- * world-wide tile proxy.
+ * Requests are bounded to Western and Central Europe at the zoom levels the map
+ * actually uses, so the route cannot be turned into an open world-wide tile
+ * proxy.
  */
 final class TileProxy
 {
@@ -29,16 +29,17 @@ final class TileProxy
 
     /**
      * Bounding box (lat/lon min-max) covering Germany, its neighbours and a
-     * map margin — wide enough that the visible area is always tiled, tight
-     * enough that the route is not a usable world-wide proxy.
+     * generous map margin — wide enough that a zoomed-out view of the whole
+     * catalogue is fully tiled with no grey edges, tight enough (Western and
+     * Central Europe only) that the route is not a usable world-wide proxy.
      */
-    private const LAT_MIN = 44.0;
+    private const LAT_MIN = 38.0;
 
-    private const LAT_MAX = 58.0;
+    private const LAT_MAX = 62.0;
 
-    private const LON_MIN = 2.0;
+    private const LON_MIN = -10.0;
 
-    private const LON_MAX = 19.0;
+    private const LON_MAX = 28.0;
 
     private const UPSTREAM = 'https://tile.openstreetmap.org/%d/%d/%d.png';
 

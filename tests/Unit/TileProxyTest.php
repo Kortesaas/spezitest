@@ -70,14 +70,26 @@ final class TileProxyTest extends TestCase
         self::assertNull($proxy->tile(13, 4300, 2800));
     }
 
-    public function testRejectsTilesOutsideTheGermanBoundingBox(): void
+    public function testRejectsTilesOutsideTheEuropeanBoundingBox(): void
     {
         $proxy = new TileProxy($this->cacheDir, function (): string {
-            self::fail('Tiles outside Germany must not reach the fetcher.');
+            self::fail('Tiles outside Western/Central Europe must not reach the fetcher.');
         });
 
         // z6 / x18 / y24 is over the mid-Atlantic.
         self::assertNull($proxy->tile(6, 18, 24));
+        // z6 / x40 / y21 is over Ukraine/Russia, east of the box.
+        self::assertNull($proxy->tile(6, 40, 21));
+    }
+
+    public function testCoversAZoomedOutViewOfTheWholeCatalogueWithoutGreyEdges(): void
+    {
+        $proxy = new TileProxy($this->cacheDir, static fn (): string => self::PNG);
+
+        // z5 tiles at the left and right edges of a Germany-framed view — grey
+        // before the box was widened past its neighbours.
+        self::assertSame(self::PNG, $proxy->tile(5, 15, 10));
+        self::assertSame(self::PNG, $proxy->tile(5, 18, 11));
     }
 
     public function testRejectsAnUpstreamResponseThatIsNotAPng(): void
