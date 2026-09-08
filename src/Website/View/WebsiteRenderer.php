@@ -302,9 +302,9 @@ final class WebsiteRenderer
     {
         $intro = '<section class="wrap section"><div class="stack">'
             . '<span class="eyebrow eyebrow--accent">Statistik</span>'
-            . '<h1 class="display-2">Was die Tests über Cola-Mix verraten</h1>'
-            . '<p class="lede">Alles aus echten Testabenden gerechnet: die Verteilung der Wertungen, '
-            . 'Bestenlisten je Kriterium, die drei Tester im Vergleich und wo sie sich uneinig sind.</p></div>';
+            . '<h1 class="display-2">Cola-Mix in Zahlen</h1>'
+            . '<p class="lede">Was die abgeschlossenen Testabende zeigen. Alle Werte kommen direkt aus den '
+            . 'Tests, nichts ist geschätzt.</p></div>';
 
         if ($stats->testedCount === 0) {
             $intro .= '<div class="empty" style="margin-top:var(--sp-6)"><p class="empty__title">Noch keine Auswertung</p>'
@@ -314,72 +314,46 @@ final class WebsiteRenderer
         }
 
         $intro .= '<div class="figure-row" style="margin-top:var(--sp-7)">'
-            . $this->figure((string) $stats->testedCount, 'getestet')
-            . $this->figure((string) $stats->total, 'im Katalog')
+            . $this->figure((string) $stats->testedCount, 'Spezis getestet')
+            . $this->figure(Html::gradeOrDash($stats->averageGesamt, 1), 'Punkte im Schnitt')
+            . $this->figure(Html::gradeOrDash($stats->bestGesamt, 1), 'beste Wertung')
             . $this->figure((string) $stats->lifecycleCounts['identified'], 'noch gesucht')
-            . $this->figure(Html::gradeOrDash($stats->averageGesamt), 'Ø Gesamtwertung')
             . '</div></section>';
 
         return $this->shell(
             'Statistik',
             $intro
                 . $this->distributionSection($stats)
-                . $this->statistikObservation($stats)
-                . $this->categoryLeaderboardsSection($stats)
+                . $this->categoryRankingsSection($stats)
                 . $this->testersSection($stats)
-                . $this->disagreementSection($stats)
-                . $this->timelineSection($stats)
-                . $this->herkunftSection($stats)
+                . $this->faceOffSection($stats)
                 . $this->priceLeistungSection($stats)
+                . $this->trendSection($stats)
                 . $this->originMapSection($map),
             'statistik',
-            'Auswertung der Spezistreams: Verteilung der Wertungen, Bestenlisten je Kriterium, '
-                . 'die Tester im Vergleich, Preis/Leistung und Herkunft.',
+            'Cola-Mix in Zahlen: die Verteilung der Wertungen, die Bestenlisten je Kriterium, '
+                . 'die drei Tester im Vergleich, Preis und Leistung und die Herkunft.',
             '/statistik',
         );
     }
 
     private function distributionSection(Statistics $stats): string
     {
-        $note = 'Anzahl Spezis je 10-Punkte-Bereich der Gesamtwertung (0–60).';
+        $note = 'So viele Spezis fallen in jeden Zehn-Punkte-Bereich der Gesamtwertung.';
 
-        if ($stats->medianGesamt !== null) {
-            $note .= ' Die Hälfte liegt über ' . Html::grade($stats->medianGesamt, 1) . '.';
+        if ($stats->averageGesamt !== null && $stats->bestGesamt !== null) {
+            $note .= ' Der Schnitt liegt bei ' . Html::grade($stats->averageGesamt, 1)
+                . ', die beste Wertung bei ' . Html::grade($stats->bestGesamt, 1) . '.';
         }
 
-        if ($stats->bestGesamt !== null) {
-            $note .= ' Bestwert ' . Html::grade($stats->bestGesamt, 1) . '.';
-        }
-
-        return '<section class="section section--tint"><div class="wrap split">'
-            . '<div class="stack-lg"><div class="stack"><span class="eyebrow">Verteilung</span>'
-            . '<h2 class="display-3">Wie die Wertungen liegen</h2><p class="meta">' . $note . '</p></div>'
-            . '<div class="barchart">' . $this->distributionRows($stats) . '</div></div>'
-            . '<div class="stack-lg"><div class="stack"><span class="eyebrow">Kriterien im Schnitt</span>'
-            . '<h2 class="display-3">Optik, Süffigkeit, Geschmack</h2>'
-            . '<p class="meta">Durchschnitt über alle Tests, 0 bis 10. In der Gesamtwertung zählt Geschmack dreifach, '
-            . 'Süffigkeit doppelt.</p></div>'
-            . '<div class="barchart">' . $this->categoryAverageRows($stats) . '</div></div>'
-            . '</div></section>';
+        return '<section class="section section--tint"><div class="wrap stack-lg">'
+            . '<div class="stack"><span class="eyebrow">Verteilung</span>'
+            . '<h2 class="display-3">Wie die Wertungen liegen</h2><p class="meta">' . $note
+            . ' Tipp auf eine Zeile, um die Namen zu sehen.</p></div>'
+            . '<div class="barchart">' . $this->distributionRows($stats) . '</div></div></section>';
     }
 
-    /** One computed sentence as a full-width band — the page's single red accent. */
-    private function statistikObservation(Statistics $stats): string
-    {
-        $top = $stats->disagreements[0] ?? null;
-
-        if ($top === null) {
-            return '';
-        }
-
-        return '<section class="band"><div class="wrap band__inner">'
-            . '<span class="eyebrow">Beobachtung</span>'
-            . '<p class="display-3">Am umstrittensten: <strong>' . Html::e($top['name']) . '</strong> – '
-            . Html::grade($top['spread'], 1) . ' Punkte zwischen der höchsten und der niedrigsten Einzelwertung.</p>'
-            . '</div></section>';
-    }
-
-    private function categoryLeaderboardsSection(Statistics $stats): string
+    private function categoryRankingsSection(Statistics $stats): string
     {
         $labels = ['optik' => 'Optik', 'sueffigkeit' => 'Süffigkeit', 'geschmack' => 'Geschmack'];
         $columns = '';
@@ -392,71 +366,63 @@ final class WebsiteRenderer
                 ++$position;
                 $rows .= '<a href="/spezi/' . Html::e($entry['slug']) . '">'
                     . '<span class="lboard__pos">' . $position . '</span>'
+                    . $this->statBottle($entry['id'], $entry['hasImage'], $entry['name'], '')
                     . '<span class="lboard__name">' . Html::e($entry['name']) . '</span>'
                     . '<span class="lboard__val">' . Html::grade($entry['value'], 1) . '</span></a>';
             }
 
+            $average = $stats->averageByCategory[$key];
             $columns .= '<div class="stack"><div class="cluster cluster--between" style="align-items:baseline">'
-                . '<h3 class="h3">' . $label . '</h3>'
-                . '<span class="meta">Ø ' . Html::gradeOrDash($stats->averageByCategory[$key], 1) . '</span></div>'
-                . '<div class="lboard">' . $rows . '</div></div>';
+                . '<h3 class="h4">' . $label . '</h3>'
+                . ($average === null ? '' : '<span class="meta">Schnitt ' . Html::grade($average, 1) . '</span>')
+                . '</div><div class="lboard">' . $rows . '</div></div>';
         }
 
         return '<section class="wrap section"><div class="stack-lg">'
             . '<div class="stack"><span class="eyebrow">Bestenlisten</span>'
-            . '<h2 class="display-3">Die Besten je Kriterium</h2>'
-            . '<p class="meta">Top 5 nach dem Kriteriums-Schnitt der drei Tester, jeweils von 10.</p></div>'
-            . '<div class="grid grid--3">' . $columns . '</div></div></section>';
+            . '<h2 class="display-3">Die Top 5 in jeder Kategorie</h2>'
+            . '<p class="meta">Sortiert nach dem Schnitt, den die drei Tester in dieser Kategorie vergeben haben. '
+            . 'Die Noten gehen von 0 bis 10.</p></div>'
+            . '<div class="stat-cols">' . $columns . '</div></div></section>';
     }
 
     private function testersSection(Statistics $stats): string
     {
-        $categoryLabels = ['optik' => 'Optik', 'sueffigkeit' => 'Süffigkeit', 'geschmack' => 'Geschmack'];
         $panels = '';
 
         foreach ($stats->testerProfiles as $profile) {
-            $bars = '';
-
-            foreach ($categoryLabels as $key => $label) {
-                $value = $profile['byCategory'][$key];
-                $bars .= '<div class="barchart__row"><span class="barchart__label">' . $label . '</span>'
-                    . '<span class="barchart__track"><i style="width:'
-                    . ($value !== null ? Html::barWidth($value, Html::CATEGORY_MAX) : '0') . '%"></i></span>'
-                    . '<span class="barchart__val">' . Html::gradeOrDash($value, 1) . '</span></div>';
-            }
-
             $panels .= '<div class="panel stack">'
                 . '<div class="stack" style="gap:var(--sp-1)"><span class="tester__name">' . Html::e($profile['label']) . '</span>'
                 . '<span class="tester__val">' . Html::gradeOrDash($profile['average'], 1) . '</span>'
-                . '<span class="meta">Ø Einzelnote (0–10)</span></div>'
-                . '<div class="barchart barchart--wide">' . $bars . '</div>'
-                . '<dl class="meta--dl meta--dl-stack">'
-                . '<dt>Liebling</dt><dd>' . $this->testerPick($profile['favourite']) . '</dd>'
-                . '<dt>Härtester Test</dt><dd>' . $this->testerPick($profile['harshest']) . '</dd>'
-                . '</dl></div>';
+                . '<span class="meta">Einzelnote im Schnitt, von 0 bis 10</span></div>'
+                . $this->testerFavourite($profile['favourite'])
+                . '</div>';
         }
 
         $takeaway = $this->testerTakeaway($stats);
 
         return '<section class="section section--tint"><div class="wrap stack-lg">'
             . '<div class="stack"><span class="eyebrow">Die Tester</span>'
-            . '<h2 class="display-3">Manu, Fabi und Schorsch im Vergleich</h2>'
-            . '<p class="meta">Jeder wertet Optik, Süffigkeit und Geschmack einzeln. „Liebling" und „härtester Test" '
-            . 'sind die Spezis mit der höchsten und der niedrigsten Einzelwertung dieses Testers (0–60).</p></div>'
+            . '<h2 class="display-3">Manu, Fabi und Schorsch</h2>'
+            . '<p class="meta">Die durchschnittliche Einzelnote von jedem und seine Lieblings-Spezi. Das ist die, '
+            . 'der er selbst die höchste Gesamtwertung gegeben hat.</p></div>'
             . '<div class="grid grid--3">' . $panels . '</div>'
             . ($takeaway === '' ? '' : '<p class="meta">' . $takeaway . '</p>')
             . '</div></section>';
     }
 
-    /** @param ?array{name: string, slug: string, value: float} $pick */
-    private function testerPick(?array $pick): string
+    /** @param ?array{name: string, slug: string, id: int, hasImage: bool, value: float} $pick */
+    private function testerFavourite(?array $pick): string
     {
         if ($pick === null) {
-            return 'k. A.';
+            return '';
         }
 
-        return '<a href="/spezi/' . Html::e($pick['slug']) . '">' . Html::e($pick['name']) . '</a> · '
-            . Html::gradeOfMax($pick['value'], Html::GESAMT_MAX, 0);
+        return '<div class="statpick">'
+            . $this->statBottle($pick['id'], $pick['hasImage'], $pick['name'], 'pimg--thumb')
+            . '<div class="stack" style="gap:2px"><span class="eyebrow">Liebling</span>'
+            . '<a href="/spezi/' . Html::e($pick['slug']) . '">' . Html::e($pick['name']) . '</a>'
+            . '<span class="meta">' . Html::gradeOfMax($pick['value'], Html::GESAMT_MAX, 0) . '</span></div></div>';
     }
 
     private function testerTakeaway(Statistics $stats): string
@@ -475,133 +441,207 @@ final class WebsiteRenderer
 
         $mildest = array_search(max($averages), $averages, true);
         $strictest = array_search(min($averages), $averages, true);
+        $line = '';
 
-        $line = $mildest !== false && $strictest !== false && $mildest !== $strictest
-            ? Html::e((string) $mildest) . ' wertet im Schnitt am mildesten, '
-                . Html::e((string) $strictest) . ' am strengsten.'
-            : '';
-
-        if ($stats->testerAgreement !== null) {
-            $line .= ' Am ähnlichsten werten ' . Html::e($stats->testerAgreement['pair'])
-                . ' – im Mittel nur ' . Html::grade($stats->testerAgreement['meanSpread'], 1) . ' Punkte auseinander.';
+        if ($mildest !== false && $strictest !== false && $mildest !== $strictest) {
+            $line = Html::e((string) $mildest) . ' wertet im Schnitt am mildesten, '
+                . Html::e((string) $strictest) . ' am strengsten.';
         }
 
-        return trim($line);
+        if ($stats->testerAgreement !== null) {
+            $pair = str_replace(' & ', ' und ', $stats->testerAgreement['pair']);
+            $line .= ($line === '' ? '' : ' ') . Html::e($pair) . ' liegen am nächsten beieinander, im Schnitt nur '
+                . Html::grade($stats->testerAgreement['meanSpread'], 1) . ' Punkte.';
+        }
+
+        return $line;
     }
 
-    private function disagreementSection(Statistics $stats): string
+    private function faceOffSection(Statistics $stats): string
     {
-        if (count($stats->disagreements) < 4) {
+        if (count($stats->disagreements) < 3) {
             return '';
         }
 
-        $mostDivisive = array_slice($stats->disagreements, 0, 5);
-        $mostAgreed = array_reverse(array_slice($stats->disagreements, -5));
+        $divisive = $stats->disagreements[0];
+        $agreed = $stats->disagreements[count($stats->disagreements) - 1];
+
+        $divisiveLine = $this->punkte($divisive['spread']) . ' zwischen der besten und der schlechtesten Wertung';
+        $agreedLine = (int) round($agreed['spread']) === 0
+            ? 'alle drei fast gleichauf'
+            : 'nur ' . $this->punkte($agreed['spread']) . ' Unterschied, so einig wie selten';
 
         return '<section class="wrap section"><div class="stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Uneinigkeit</span>'
-            . '<h2 class="display-3">Wo sich die Tester nicht einig sind</h2>'
-            . '<p class="meta">Jede Zahl ist die eigene Gesamtwertung eines Testers (0–60). Die Spanne ist der '
-            . 'Abstand zwischen der höchsten und der niedrigsten.</p></div>'
+            . '<div class="stack"><span class="eyebrow">Einig oder nicht</span>'
+            . '<h2 class="display-3">Der Zankapfel und die klare Sache</h2>'
+            . '<p class="meta">Die Zahlen zeigen, welche Gesamtwertung jeder Tester alleine vergeben hätte, '
+            . 'von 0 bis 60.</p></div>'
             . '<div class="grid grid--2">'
-            . '<div class="stack"><h3 class="h3">Am umstrittensten</h3><div class="spread">'
-            . $this->spreadRows($mostDivisive) . '</div></div>'
-            . '<div class="stack"><h3 class="h3">Am einigsten</h3><div class="spread">'
-            . $this->spreadRows($mostAgreed) . '</div></div>'
+            . $this->faceCard('Größter Zankapfel', $divisive, $divisiveLine)
+            . $this->faceCard('Klare Sache', $agreed, $agreedLine)
             . '</div></div></section>';
     }
 
+    /** "1 Punkt" / "20 Punkte", from a spread that is always a whole number here. */
+    private function punkte(float $value): string
+    {
+        $rounded = (int) round($value);
+
+        return $rounded === 1 ? '1 Punkt' : $rounded . ' Punkte';
+    }
+
     /**
-     * @param list<array{name: string, slug: string, gesamt: float, testerTotals: array<string, float>, spread: float}> $rows
+     * @param array{name: string, slug: string, id: int, hasImage: bool, gesamt: float, testerTotals: array<string, float>, spread: float} $row
      */
-    private function spreadRows(array $rows): string
+    private function faceCard(string $eyebrow, array $row, string $spreadLine): string
     {
         $labels = ['manu' => 'Manu', 'fabi' => 'Fabi', 'schorsch' => 'Schorsch'];
-        $html = '';
+        $parts = [];
 
-        foreach ($rows as $row) {
-            $parts = [];
+        foreach ($labels as $code => $label) {
+            $value = $row['testerTotals'][$code] ?? null;
+            $parts[] = $label . ' ' . ($value === null ? 'k. A.' : Html::grade($value, 0));
+        }
 
-            foreach ($labels as $code => $label) {
-                $value = $row['testerTotals'][$code] ?? null;
-                $parts[] = $label . ' ' . ($value === null ? '–' : Html::grade($value, 0));
+        return '<div class="panel stack"><span class="eyebrow">' . $eyebrow . '</span>'
+            . '<div class="statpick">'
+            . $this->statBottle($row['id'], $row['hasImage'], $row['name'], 'pimg--thumb')
+            . '<div class="stack" style="gap:2px">'
+            . '<a href="/spezi/' . Html::e($row['slug']) . '">' . Html::e($row['name']) . '</a>'
+            . '<span class="meta">' . Html::e($spreadLine) . '</span></div></div>'
+            . '<p class="meta">' . Html::e(implode(' · ', $parts)) . '</p></div>';
+    }
+
+    private function trendSection(Statistics $stats): string
+    {
+        $timelineBlock = '';
+
+        if (count($stats->timeline) >= 2) {
+            $rows = '';
+
+            foreach ($stats->timeline as $entry) {
+                $average = $entry['averageGesamt'];
+                $rows .= '<div class="barchart__row"><span class="barchart__label">Stream ' . $entry['stream']
+                    . ' · ' . $entry['count'] . ' Spezis</span>'
+                    . '<span class="barchart__track"><i style="width:'
+                    . ($average !== null ? Html::barWidth($average, Html::GESAMT_MAX) : '0') . '%"></i></span>'
+                    . '<span class="barchart__val">' . Html::gradeOrDash($average, 1) . '</span></div>';
             }
 
-            $html .= '<div class="spread__row">'
-                . '<span class="spread__name"><a href="/spezi/' . Html::e($row['slug']) . '">' . Html::e($row['name']) . '</a></span>'
-                . '<span class="spread__gap">Spanne ' . Html::grade($row['spread'], 0) . '</span>'
-                . '<span class="spread__testers">' . Html::e(implode(' · ', $parts)) . '</span></div>';
+            $timelineBlock = '<div class="stack-lg"><div class="stack"><span class="eyebrow">Verlauf</span>'
+                . '<h2 class="display-3">Über die Testabende</h2>'
+                . '<p class="meta">Die durchschnittliche Gesamtwertung von jedem Spezistream, der erste zuerst.</p></div>'
+                . '<div class="barchart barchart--wide">' . $rows . '</div></div>';
         }
 
-        return $html;
-    }
-
-    private function timelineSection(Statistics $stats): string
-    {
-        if (count($stats->timeline) < 2) {
-            return '';
-        }
-
-        $rows = '';
-
-        foreach ($stats->timeline as $entry) {
-            $average = $entry['averageGesamt'];
-            $rows .= '<div class="barchart__row"><span class="barchart__label">#' . $entry['stream']
-                . ' · ' . $entry['count'] . ' Spezis</span>'
-                . '<span class="barchart__track"><i style="width:'
-                . ($average !== null ? Html::barWidth($average, Html::GESAMT_MAX) : '0') . '%"></i></span>'
-                . '<span class="barchart__val">' . Html::gradeOrDash($average, 1) . '</span></div>';
-        }
-
-        $first = $stats->timeline[0]['runningAverage'];
-        $last = $stats->timeline[count($stats->timeline) - 1]['runningAverage'];
-        $trend = $first !== null && $last !== null
-            ? ' Der laufende Schnitt ' . ($last >= $first ? 'stieg' : 'sank')
-                . ' von ' . Html::grade($first, 1) . ' auf ' . Html::grade($last, 1) . '.'
-            : '';
-
-        return '<section class="section section--tint"><div class="wrap stack-lg">'
-            . '<div class="stack"><span class="eyebrow">Verlauf</span>'
-            . '<h2 class="display-3">Über die Testabende</h2>'
-            . '<p class="meta">Ø Gesamtwertung je Spezistream, ältester zuerst.' . $trend . '</p></div>'
-            . '<div class="barchart barchart--wide">' . $rows . '</div></div></section>';
-    }
-
-    private function herkunftSection(Statistics $stats): string
-    {
-        if ($stats->regionCounts === []) {
-            return '';
-        }
-
-        $counts = '';
-
-        foreach (array_slice($stats->regionCounts, 0, 10) as $region) {
-            $counts .= '<dt>' . Html::e($region['region']) . '</dt><dd>' . $region['count'] . '</dd>';
-        }
-
+        $herkunftBlock = '';
         $scoreRows = '';
 
-        foreach (array_slice($stats->regionScores, 0, 8) as $region) {
+        foreach (array_slice($stats->regionScores, 0, 6) as $region) {
             $scoreRows .= '<div class="barchart__row"><span class="barchart__label">' . Html::e($region['region']) . '</span>'
                 . '<span class="barchart__track"><i style="width:'
                 . Html::barWidth($region['averageGesamt'], Html::GESAMT_MAX) . '%"></i></span>'
                 . '<span class="barchart__val">' . Html::grade($region['averageGesamt'], 1) . '</span></div>';
         }
 
-        $scoreBlock = $scoreRows === ''
-            ? ''
-            : '<div class="stack-lg"><div class="stack"><span class="eyebrow">Welche Region punktet</span>'
-                . '<h2 class="display-3">Ø Wertung nach Herkunft</h2>'
+        if ($scoreRows !== '') {
+            $herkunftBlock = '<div class="stack-lg"><div class="stack"><span class="eyebrow">Herkunft</span>'
+                . '<h2 class="display-3">Welche Region punktet</h2>'
                 . '<p class="meta">Nur Regionen mit mindestens drei getesteten Spezis, beste zuerst.</p></div>'
                 . '<div class="barchart barchart--wide">' . $scoreRows . '</div></div>';
+        }
 
-        return '<section class="wrap section"><div class="split">'
-            . '<div class="stack-lg"><div class="stack"><span class="eyebrow">Herkunft</span>'
+        if ($timelineBlock === '' && $herkunftBlock === '') {
+            return '';
+        }
+
+        return '<section class="wrap section"><div class="split">' . $timelineBlock . $herkunftBlock . '</div></section>';
+    }
+
+    /**
+     * A bottle photo for a stat card. Not lazy-loaded: there are only a handful
+     * per column and it should be there the moment someone screenshots the page.
+     */
+    private function statBottle(int $id, bool $hasImage, string $name, string $modifier): string
+    {
+        $class = trim('pimg ' . $modifier);
+
+        if (!$hasImage) {
+            return '<figure class="' . $class . '"><div class="pimg__ph"><span>Kein Bild</span></div></figure>';
+        }
+
+        return '<figure class="' . $class . '"><img src="/spezi/' . $id . '/bild" alt="' . Html::e($name)
+            . '" width="240" height="240" decoding="async"></figure>';
+    }
+
+    /**
+     * The schematic origin map: an abstracted Germany with one dot per postal
+     * region. Sits at the foot of the statistics page; the interactive version
+     * lives at /karte. Without JavaScript every dot links to its own list entry.
+     */
+    private function originMapSection(OriginMap $map): string
+    {
+        if ($map->points === []) {
+            return '';
+        }
+
+        $dots = '';
+        $entries = '';
+
+        foreach ($map->points as $point) {
+            $radius = $map->radius($point['count']);
+            $label = $point['area'] . ': ' . $point['count'] . ' ' . ($point['count'] === 1 ? 'Spezi' : 'Spezis');
+            $dots .= '<a class="map__dot" href="#ort-' . Html::e($point['key']) . '"'
+                . ' data-map-dot="' . Html::e($point['key']) . '"'
+                . ' data-map-area="' . Html::e($point['area']) . '"'
+                . ' data-map-count="' . $point['count'] . '">'
+                . '<circle class="map__halo" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . ($radius + 6) . '"></circle>'
+                . '<circle class="map__pin" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . $radius . '"></circle>'
+                . '<title>' . Html::e($label) . '</title></a>';
+
+            $items = '';
+
+            foreach ($point['drinks'] as $drink) {
+                $items .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
+                    . '<span class="map__place">' . Html::e($drink['place']) . '</span>'
+                    . ($drink['gesamt'] !== null ? '<span class="map__grade">' . Html::grade($drink['gesamt']) . '</span>' : '')
+                    . '</li>';
+            }
+
+            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['key']) . '" data-map-entry="' . Html::e($point['key']) . '">'
+                . '<h3 class="map__entry-title">' . Html::e($point['area'])
+                . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
+                . '<ul class="map__drinks">' . $items . '</ul></section>';
+        }
+
+        $elsewhere = '';
+
+        foreach ($map->elsewhere as $entry) {
+            $elsewhere .= '<li>' . Html::e($entry['label']) . ' <span>' . $entry['count'] . '</span></li>';
+        }
+
+        return '<section class="section section--tint"><div class="wrap stack-lg">'
+            . '<div class="cluster cluster--between"><div class="stack"><span class="eyebrow">Karte</span>'
             . '<h2 class="display-3">Woher die Spezis kommen</h2>'
-            . '<p class="meta">Katalog-Einträge mit hinterlegtem Bundesland oder Land, häufigste zuerst.</p></div>'
-            . '<dl class="meta--dl meta--dl-rows">' . $counts . '</dl></div>'
-            . $scoreBlock
-            . '</div></section>';
+            . '<p class="meta">Ein Punkt für jede PLZ-Region, die Größe zeigt die Anzahl. '
+            . $map->placed . ' von ' . ($map->placed + $map->unplaced) . ' Einträgen sind verortet.</p></div>'
+            . '<a class="link-arrow" href="/karte">Zur interaktiven Karte</a></div>'
+            . '<div class="map">'
+            . '<figure class="map__canvas" data-map>'
+            . '<svg viewBox="' . $map->viewBox() . '" role="img" aria-label="Schematische Karte von Deutschland mit den Herkunftsregionen der Spezis" preserveAspectRatio="xMidYMid meet">'
+            . '<path class="map__land" d="' . $map->outlinePath() . '"></path>'
+            . $dots . '</svg>'
+            . '<figcaption class="map__legend"><span class="map__legend-dot"></span>'
+            . 'Punkt = PLZ-Region, Größe = Anzahl.</figcaption></figure>'
+            . '<div class="map__side map__scroller" data-map-scroller>'
+            . '<span class="map__more" aria-hidden="true"></span>'
+            . '<div class="map__readout" data-map-readout hidden></div>'
+            . '<div class="map__list" data-map-list>' . $entries
+            . ($elsewhere !== ''
+                ? '<section class="map__entry map__entry--rest"><h3 class="map__entry-title">Nicht verortet</h3>'
+                    . '<ul class="map__rest">' . $elsewhere . '</ul></section>'
+                : '')
+            . '</div></div></div></div></section>';
     }
 
     /**
@@ -793,8 +833,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p42">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p42" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p43">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p43" defer></script>',
         );
     }
 
@@ -1865,91 +1905,6 @@ final class WebsiteRenderer
         return $rows;
     }
 
-    private function categoryAverageRows(Statistics $stats): string
-    {
-        $labels = ['optik' => 'Optik', 'sueffigkeit' => 'Süffigkeit', 'geschmack' => 'Geschmack'];
-        $rows = '';
-
-        foreach ($labels as $key => $label) {
-            $value = $stats->averageByCategory[$key];
-            $rows .= '<div class="barchart__row"><span class="barchart__label">' . Html::e($label) . '</span>'
-                . '<span class="barchart__track"><i style="width:' . ($value !== null ? Html::barWidth($value, Html::CATEGORY_MAX) : '0') . '%"></i></span>'
-                . '<span class="barchart__val">' . Html::gradeOrDash($value, 1) . '</span></div>';
-        }
-
-        return $rows;
-    }
-
-    /**
-     * The origin map: an abstracted Germany in the Spezitest palette with one
-     * dot per postal region. Without JavaScript every dot is an anchor to its
-     * own entry in the list beside it; with JavaScript the list turns into a
-     * readout that follows the pointer.
-     */
-    private function originMapSection(OriginMap $map): string
-    {
-        if ($map->points === []) {
-            return '';
-        }
-
-        $dots = '';
-        $entries = '';
-
-        foreach ($map->points as $point) {
-            $radius = $map->radius($point['count']);
-            $label = $point['area'] . ': ' . $point['count'] . ' ' . ($point['count'] === 1 ? 'Spezi' : 'Spezis');
-            $dots .= '<a class="map__dot" href="#ort-' . Html::e($point['key']) . '"'
-                . ' data-map-dot="' . Html::e($point['key']) . '"'
-                . ' data-map-area="' . Html::e($point['area']) . '"'
-                . ' data-map-count="' . $point['count'] . '">'
-                . '<circle class="map__halo" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . ($radius + 6) . '"></circle>'
-                . '<circle class="map__pin" cx="' . $point['x'] . '" cy="' . $point['y'] . '" r="' . $radius . '"></circle>'
-                . '<title>' . Html::e($label) . '</title></a>';
-
-            $items = '';
-
-            foreach ($point['drinks'] as $drink) {
-                $items .= '<li><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
-                    . '<span class="map__place">' . Html::e($drink['place']) . '</span>'
-                    . ($drink['gesamt'] !== null ? '<span class="map__grade">' . Html::grade($drink['gesamt']) . '</span>' : '')
-                    . '</li>';
-            }
-
-            $entries .= '<section class="map__entry" id="ort-' . Html::e($point['key']) . '" data-map-entry="' . Html::e($point['key']) . '">'
-                . '<h3 class="map__entry-title">' . Html::e($point['area'])
-                . '<span class="map__entry-count">' . $point['count'] . '</span></h3>'
-                . '<ul class="map__drinks">' . $items . '</ul></section>';
-        }
-
-        $elsewhere = '';
-
-        foreach ($map->elsewhere as $entry) {
-            $elsewhere .= '<li>' . Html::e($entry['label']) . ' <span>' . $entry['count'] . '</span></li>';
-        }
-
-        return '<section class="section"><div class="wrap stack-lg">'
-            . '<div class="cluster cluster--between"><div class="stack"><span class="eyebrow">Herkunft</span>'
-            . '<h2 class="display-3">Schematisch über Deutschland verteilt</h2>'
-            . '<p class="meta">' . $map->placed . ' von ' . ($map->placed + $map->unplaced) . ' Einträgen verortet. '
-            . 'Jeder Punkt ist eine PLZ-Region.</p></div>'
-            . '<a class="link-arrow" href="/karte">Zur interaktiven Karte</a></div>'
-            . '<div class="map">'
-            . '<figure class="map__canvas" data-map>'
-            . '<svg viewBox="' . $map->viewBox() . '" role="img" aria-label="Schematische Karte von Deutschland mit den Herkunftsregionen der Spezis" preserveAspectRatio="xMidYMid meet">'
-            . '<path class="map__land" d="' . $map->outlinePath() . '"></path>'
-            . $dots . '</svg>'
-            . '<figcaption class="map__legend"><span class="map__legend-dot"></span>'
-            . 'Punkt = PLZ-Region, Größe = Anzahl.</figcaption></figure>'
-            . '<div class="map__side map__scroller" data-map-scroller>'
-            . '<span class="map__more" aria-hidden="true"></span>'
-            . '<div class="map__readout" data-map-readout hidden></div>'
-            . '<div class="map__list" data-map-list>' . $entries
-            . ($elsewhere !== ''
-                ? '<section class="map__entry map__entry--rest"><h3 class="map__entry-title">Nicht verortet</h3>'
-                    . '<ul class="map__rest">' . $elsewhere . '</ul></section>'
-                : '')
-            . '</div></div></div></div></section>';
-    }
 
     /**
      * The three category bars plus the weighted total. Each category bar can be

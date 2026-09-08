@@ -516,24 +516,24 @@ table{border-collapse:collapse;width:100%}
 .barchart__detail li{display:flex;justify-content:space-between;gap:var(--sp-3)}
 .barchart__detail a{color:var(--text-strong)}
 .barchart__detail span{font-variant-numeric:tabular-nums;color:var(--text-muted)}
-/* Statistik: wide-label bar charts, category leaderboards, tester-spread rows. */
+/* Statistik: wide-label bar charts, category top-fives with bottles, tester picks. */
 .barchart--wide .barchart__row{grid-template-columns:minmax(120px,42%) 1fr auto}
+.stat-cols{display:grid;gap:var(--sp-6);grid-template-columns:1fr}
 .lboard{display:grid}
-.lboard a{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-3);align-items:baseline;padding:var(--sp-2) 0;border-bottom:var(--bw-hair) solid var(--line-hairline);text-decoration:none;color:inherit}
+.lboard a{display:grid;grid-template-columns:1.6rem 44px minmax(0,1fr) auto;gap:var(--sp-2) var(--sp-3);align-items:center;padding:var(--sp-2) 0;border-bottom:var(--bw-hair) solid var(--line-hairline);text-decoration:none;color:inherit}
 .lboard a:last-child{border-bottom:0}
 .lboard a:hover .lboard__name{color:var(--red)}
-.lboard__pos{font-weight:var(--fw-bold);color:var(--text-muted);font-variant-numeric:tabular-nums;min-width:1.5ch}
-.lboard__name{font-weight:var(--fw-bold);color:var(--text-strong);overflow-wrap:anywhere}
+.lboard__pos{font-weight:var(--fw-bold);color:var(--text-muted);font-variant-numeric:tabular-nums;text-align:right}
+.lboard>a>.pimg{width:44px;aspect-ratio:1/1;padding:3px;border-radius:var(--radius-1)}
+.lboard__name{font-weight:var(--fw-bold);color:var(--text-strong);font-size:var(--fs-sm);line-height:1.25;overflow-wrap:anywhere}
 .lboard__val{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums}
-.spread{display:grid}
-.spread__row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px var(--sp-3);padding:var(--sp-3) 0;border-bottom:var(--bw-hair) solid var(--line-hairline)}
-.spread__row:last-child{border-bottom:0}
-.spread__name{font-weight:var(--fw-bold);color:var(--text-strong)}
-.spread__name a{color:inherit;text-decoration:none}
-.spread__name a:hover{color:var(--red)}
-.spread__gap{font-weight:var(--fw-bold);color:var(--text-strong);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-.spread__testers{grid-column:1/-1;font-size:var(--fs-sm);color:var(--text-muted);font-variant-numeric:tabular-nums}
-@media (min-width:768px){.figure-row{grid-template-columns:repeat(4,1fr)}}
+.statpick{display:flex;gap:var(--sp-3);align-items:center}
+.statpick>.stack>a{font-weight:var(--fw-bold);color:var(--text-strong);text-decoration:none}
+.statpick>.stack>a:hover{color:var(--red)}
+@media (min-width:768px){
+  .figure-row{grid-template-columns:repeat(4,1fr)}
+  .stat-cols{grid-template-columns:repeat(3,1fr);gap:var(--sp-7)}
+}
 
 /* Preis/Leistung scatter chart: one dot per priced test, price against
    Gesamtwertung. Reuses the origin map's .map__halo/.map__pin hover motion so

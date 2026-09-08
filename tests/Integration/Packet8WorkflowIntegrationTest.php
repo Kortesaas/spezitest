@@ -441,12 +441,12 @@ final class Packet8WorkflowIntegrationTest extends TestCase
 
         $statistik = $this->request('GET', '/statistik');
         self::assertSame(200, $statistik->getStatusCode());
-        self::assertStringContainsString('>getestet</p>', (string) $statistik->getBody());
+        self::assertStringContainsString('Spezis getestet', (string) $statistik->getBody());
 
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }
 
-    public function testStatistikPageShowsLeaderboardsTestersDisagreementsAndTimeline(): void
+    public function testStatistikPageShowsChampionsTestersAndFaceOff(): void
     {
         $this->login();
         $franken = [
@@ -468,25 +468,30 @@ final class Packet8WorkflowIntegrationTest extends TestCase
 
         $body = (string) $this->request('GET', '/statistik')->getBody();
 
-        self::assertStringContainsString('Die Besten je Kriterium', $body);
-        self::assertStringContainsString('Manu, Fabi und Schorsch im Vergleich', $body);
-        self::assertStringContainsString('Wo sich die Tester nicht einig sind', $body);
-        self::assertStringContainsString('Am umstrittensten', $body);
+        // Section headings of the reworked page.
+        self::assertStringContainsString('Cola-Mix in Zahlen', $body);
+        self::assertStringContainsString('Die Top 5 in jeder Kategorie', $body);
+        self::assertStringContainsString('Manu, Fabi und Schorsch</h2>', $body);
+        self::assertStringContainsString('Der Zankapfel und die klare Sache', $body);
         self::assertStringContainsString('Über die Testabende', $body);
-        self::assertStringContainsString('Ø Wertung nach Herkunft', $body);
-        self::assertStringContainsString('Liebling', $body);
-        self::assertStringContainsString('Härtester Test', $body);
-        // The divisive drink drives the observation band and tops the list.
-        self::assertStringContainsString('Streit Spezi', $body);
-        self::assertStringContainsString('Beobachtung', $body);
+        self::assertStringContainsString('Welche Region punktet', $body);
 
-        // The manufacturer table is gone; the abstract map sits after Preis/Leistung.
+        // Category top-fives: three columns, each row carries a bottle figure.
+        self::assertStringContainsString('class="stat-cols"', $body);
+        self::assertStringContainsString('class="lboard"', $body);
+        self::assertMatchesRegularExpression('~<div class="lboard">(?:.*?<figure class="pimg">){5}~s', $body);
+
+        // Tester panels name a Liebling; Hopfen Cola won Geschmack (perfect 10).
+        self::assertStringContainsString('Liebling', $body);
+        self::assertStringContainsString('Hopfen Cola', $body);
+
+        // The divisive drink is the Zankapfel; the schematic map sits at the foot.
+        self::assertStringContainsString('Größter Zankapfel', $body);
+        self::assertStringContainsString('Streit Spezi', $body);
+        self::assertStringContainsString('Woher die Spezis kommen', $body);
+        // No red observation band, no manufacturer table, no AI em dashes.
+        self::assertStringNotContainsString('class="band"', $body);
         self::assertStringNotContainsString('Mehrfach im Katalog', $body);
-        self::assertGreaterThan(
-            (int) strpos($body, '>Preis / Leistung<'),
-            (int) strpos($body, 'Schematisch über Deutschland verteilt'),
-        );
-        self::assertStringContainsString('Zur interaktiven Karte', $body);
     }
 
     public function testKarteScopesPlaceTheRightDrinksAndTheHuntTools(): void

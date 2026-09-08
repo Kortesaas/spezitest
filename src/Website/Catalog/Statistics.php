@@ -25,10 +25,10 @@ final readonly class Statistics
      * @param array{optik: ?float, sueffigkeit: ?float, geschmack: ?float} $averageByCategory
      * @param array{optik: ?array{name: string, value: float}, sueffigkeit: ?array{name: string, value: float}, geschmack: ?array{name: string, value: float}} $bestByCategory
      * @param array<string, ?float> $testerAverages Keyed by tester code.
-     * @param array{optik: list<array{name: string, slug: string, value: float}>, sueffigkeit: list<array{name: string, slug: string, value: float}>, geschmack: list<array{name: string, slug: string, value: float}>} $categoryLeaderboards
-     * @param list<array{code: string, label: string, average: ?float, byCategory: array{optik: ?float, sueffigkeit: ?float, geschmack: ?float}, favourite: ?array{name: string, slug: string, value: float}, harshest: ?array{name: string, slug: string, value: float}}> $testerProfiles
+     * @param array{optik: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>, sueffigkeit: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>, geschmack: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>} $categoryLeaderboards
+     * @param list<array{code: string, label: string, average: ?float, byCategory: array{optik: ?float, sueffigkeit: ?float, geschmack: ?float}, favourite: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}, harshest: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}}> $testerProfiles
      * @param ?array{pair: string, meanSpread: float} $testerAgreement
-     * @param list<array{name: string, slug: string, gesamt: float, testerTotals: array<string, float>, spread: float}> $disagreements sorted by spread, widest first
+     * @param list<array{name: string, slug: string, id: int, hasImage: bool, gesamt: float, testerTotals: array<string, float>, spread: float}> $disagreements sorted by spread, widest first
      * @param list<array{label: string, count: int, drinks: list<array{name: string, slug: string, gesamt: float}>}> $gesamtDistribution
      * @param list<array{region: string, count: int}> $regionCounts
      * @param list<array{region: string, count: int, averageGesamt: float}> $regionScores regions with at least three tested drinks, best average first
@@ -69,12 +69,12 @@ final readonly class Statistics
         $gesamtValues = [];
         $categoryValues = ['optik' => [], 'sueffigkeit' => [], 'geschmack' => []];
         $bestByCategory = ['optik' => null, 'sueffigkeit' => null, 'geschmack' => null];
-        /** @var array{optik: list<array{name: string, slug: string, value: float}>, sueffigkeit: list<array{name: string, slug: string, value: float}>, geschmack: list<array{name: string, slug: string, value: float}>} $categoryEntries */
+        /** @var array{optik: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>, sueffigkeit: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>, geschmack: list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>} $categoryEntries */
         $categoryEntries = ['optik' => [], 'sueffigkeit' => [], 'geschmack' => []];
         $testerTotals = [];
         /** @var array<string, array{optik: float, sueffigkeit: float, geschmack: float, count: int}> $testerCategorySums */
         $testerCategorySums = [];
-        /** @var array<string, array{fav: ?array{name: string, slug: string, value: float}, worst: ?array{name: string, slug: string, value: float}}> $testerPicks */
+        /** @var array<string, array{fav: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}, worst: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}}> $testerPicks */
         $testerPicks = [];
         /** @var array<string, list<float>> $pairSpreads */
         $pairSpreads = [];
@@ -111,7 +111,7 @@ final readonly class Statistics
 
             foreach ($byCategory as $category => $value) {
                 $categoryValues[$category][] = $value;
-                $categoryEntries[$category][] = ['name' => $drink->name, 'slug' => $slug, 'value' => $value];
+                $categoryEntries[$category][] = self::pick($drink, $value);
                 $current = $bestByCategory[$category];
 
                 if ($current === null || $value > $current['value']) {
@@ -147,7 +147,7 @@ final readonly class Statistics
 
                 $total = self::testerTotal($grades);
                 $totals[$code] = $total;
-                $pick = ['name' => $drink->name, 'slug' => $slug, 'value' => $total];
+                $pick = self::pick($drink, $total);
 
                 $picks = $testerPicks[$code] ?? ['fav' => null, 'worst' => null];
 
@@ -166,6 +166,8 @@ final readonly class Statistics
                 $disagreements[] = [
                     'name' => $drink->name,
                     'slug' => $slug,
+                    'id' => $drink->id,
+                    'hasImage' => $drink->hasImage,
                     'gesamt' => $gesamt,
                     'testerTotals' => $totals,
                     'spread' => max($totals) - min($totals),
@@ -290,8 +292,25 @@ final readonly class Statistics
     }
 
     /**
-     * @param list<array{name: string, slug: string, value: float}> $entries
-     * @return list<array{name: string, slug: string, value: float}>
+     * A drink reference plus a value — enough for the page to link it and show
+     * its bottle.
+     *
+     * @return array{name: string, slug: string, id: int, hasImage: bool, value: float}
+     */
+    private static function pick(RatedDrink $drink, float $value): array
+    {
+        return [
+            'name' => $drink->name,
+            'slug' => $drink->slug(),
+            'id' => $drink->id,
+            'hasImage' => $drink->hasImage,
+            'value' => $value,
+        ];
+    }
+
+    /**
+     * @param list<array{name: string, slug: string, id: int, hasImage: bool, value: float}> $entries
+     * @return list<array{name: string, slug: string, id: int, hasImage: bool, value: float}>
      */
     private static function topEntries(array $entries): array
     {
@@ -303,8 +322,8 @@ final readonly class Statistics
     /**
      * @param array<string, ?float> $testerAverages
      * @param array<string, array{optik: float, sueffigkeit: float, geschmack: float, count: int}> $categorySums
-     * @param array<string, array{fav: ?array{name: string, slug: string, value: float}, worst: ?array{name: string, slug: string, value: float}}> $picks
-     * @return list<array{code: string, label: string, average: ?float, byCategory: array{optik: ?float, sueffigkeit: ?float, geschmack: ?float}, favourite: ?array{name: string, slug: string, value: float}, harshest: ?array{name: string, slug: string, value: float}}>
+     * @param array<string, array{fav: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}, worst: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}}> $picks
+     * @return list<array{code: string, label: string, average: ?float, byCategory: array{optik: ?float, sueffigkeit: ?float, geschmack: ?float}, favourite: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}, harshest: ?array{name: string, slug: string, id: int, hasImage: bool, value: float}}>
      */
     private static function testerProfiles(array $testerAverages, array $categorySums, array $picks): array
     {
