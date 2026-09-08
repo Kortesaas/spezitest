@@ -176,6 +176,22 @@ final class Packet8WorkflowIntegrationTest extends TestCase
     }
 
     /**
+     * Completes a test for an already-`acquired` drink with explicit grades and
+     * a Spezistream number.
+     *
+     * @param array<string, array{int, int, int}> $grades
+     */
+    private function completeTest(int $id, array $grades, int $stream): void
+    {
+        $response = $this->request(
+            'POST',
+            "/admin/drinks/$id/test/complete",
+            $this->body($grades) + ['stream_reference' => (string) $stream],
+        );
+        self::assertSame(303, $response->getStatusCode());
+    }
+
+    /**
      * A drink that is priced, fully graded and therefore part of the
      * Preis/Leistung comparison population.
      *
@@ -428,6 +444,49 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringContainsString('>getestet</p>', (string) $statistik->getBody());
 
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
+    }
+
+    public function testStatistikPageShowsLeaderboardsTestersDisagreementsAndTimeline(): void
+    {
+        $this->login();
+        $franken = [
+            $this->createDrinkWithOrigin('Kirsch Kracherl', 'acquired', '90402 Nürnberg', 'Franken'),
+            $this->createDrinkWithOrigin('Malz Mix', 'acquired', '96047 Bamberg', 'Franken'),
+            $this->createDrinkWithOrigin('Hopfen Cola', 'acquired', '97070 Würzburg', 'Franken'),
+        ];
+        $streit = $this->createDrink('Streit Spezi', 'acquired');
+        $mild = $this->createDrink('Milde Limo', 'acquired');
+        $herb = $this->createDrink('Herbe Brause', 'acquired');
+
+        $this->completeTest($franken[0], ['manu' => [9, 7, 8], 'fabi' => [9, 7, 8], 'schorsch' => [9, 7, 8]], 1);
+        $this->completeTest($franken[1], ['manu' => [6, 6, 6], 'fabi' => [6, 6, 6], 'schorsch' => [6, 6, 6]], 1);
+        $this->completeTest($franken[2], ['manu' => [3, 3, 10], 'fabi' => [3, 3, 10], 'schorsch' => [3, 3, 10]], 1);
+        $this->completeTest($streit, ['manu' => [1, 1, 1], 'fabi' => [10, 10, 10], 'schorsch' => [1, 1, 1]], 2);
+        $this->completeTest($mild, ['manu' => [7, 7, 7], 'fabi' => [7, 7, 7], 'schorsch' => [7, 7, 7]], 2);
+        $this->completeTest($herb, ['manu' => [4, 4, 4], 'fabi' => [4, 4, 4], 'schorsch' => [2, 2, 2]], 2);
+        $this->logout();
+
+        $body = (string) $this->request('GET', '/statistik')->getBody();
+
+        self::assertStringContainsString('Die Besten je Kriterium', $body);
+        self::assertStringContainsString('Manu, Fabi und Schorsch im Vergleich', $body);
+        self::assertStringContainsString('Wo sich die Tester nicht einig sind', $body);
+        self::assertStringContainsString('Am umstrittensten', $body);
+        self::assertStringContainsString('Über die Testabende', $body);
+        self::assertStringContainsString('Ø Wertung nach Herkunft', $body);
+        self::assertStringContainsString('Liebling', $body);
+        self::assertStringContainsString('Härtester Test', $body);
+        // The divisive drink drives the observation band and tops the list.
+        self::assertStringContainsString('Streit Spezi', $body);
+        self::assertStringContainsString('Beobachtung', $body);
+
+        // The manufacturer table is gone; the abstract map sits after Preis/Leistung.
+        self::assertStringNotContainsString('Mehrfach im Katalog', $body);
+        self::assertGreaterThan(
+            (int) strpos($body, '>Preis / Leistung<'),
+            (int) strpos($body, 'Schematisch über Deutschland verteilt'),
+        );
+        self::assertStringContainsString('Zur interaktiven Karte', $body);
     }
 
     public function testKarteScopesPlaceTheRightDrinksAndTheHuntTools(): void

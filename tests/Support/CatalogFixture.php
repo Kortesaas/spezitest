@@ -8,6 +8,7 @@ use Spezitest\Domain\Rating\RatingCalculator;
 use Spezitest\Domain\Rating\TesterCode;
 use Spezitest\Domain\Rating\TesterRating;
 use Spezitest\Website\Catalog\RatedDrink;
+use Spezitest\Website\Catalog\StreamSegment;
 
 /**
  * Builders for {@see RatedDrink} value objects in unit tests. Rating results
@@ -29,6 +30,7 @@ final class CatalogFixture
         ?string $price = null,
         ?int $priceVolumeMl = 500,
         string $updatedAt = '2026-01-01 00:00:00',
+        ?int $stream = null,
     ): RatedDrink {
         $ratings = [];
         $testerGrades = [];
@@ -63,6 +65,7 @@ final class CatalogFixture
             '2026-01-01 00:00:00',
             null,
             $testerGrades,
+            $stream === null ? null : new StreamSegment($stream, null, null, null),
         );
     }
 
