@@ -685,7 +685,8 @@ final class WebsiteRenderer
             ],
             MapScope::Tested => [
                 'Wo die getesteten Spezis herkommen',
-                'Jede Spezi, die schon im Test war, an ihrem Herkunftsort.',
+                'Jede Spezi, die schon im Spezitest war, an ihrem Herkunftsort. Über die Tabs geht es zu '
+                    . 'allen oder den noch gesuchten.',
                 'getestet',
                 'Getestete Spezis auf der Karte',
                 'Karte der getesteten Cola-Mix-Getränke: wo jede geprüfte Spezi herkommt.',
@@ -695,7 +696,8 @@ final class WebsiteRenderer
             ],
             MapScope::Sought => [
                 'Wo die noch gesuchten Spezis wohnen',
-                'Jede Spezi, die wir kennen, aber noch nicht getestet haben.',
+                'Jede Spezi, die wir noch nicht getestet haben, an ihrem Herkunftsort. Über die Tabs geht '
+                    . 'es zu allen oder den getesteten.',
                 'noch gesucht',
                 'Gesuchte Spezis auf der Karte',
                 'Karte aller noch gesuchten Cola-Mix-Getränke: wo die noch nicht getesteten Spezis herkommen.',
@@ -708,7 +710,7 @@ final class WebsiteRenderer
         $intro = '<section class="wrap section"><div class="stack">'
             . '<span class="eyebrow eyebrow--accent">Karte</span>'
             . '<h1 class="display-2">' . Html::e($heading) . '</h1>'
-            . '<p class="lede">' . Html::e($lede) . '</p>'
+            . '<p class="lede" style="min-height:calc(2 * 1.55em)">' . Html::e($lede) . '</p>'
             . $this->karteTabs($scope);
 
         if ($map->isEmpty()) {
