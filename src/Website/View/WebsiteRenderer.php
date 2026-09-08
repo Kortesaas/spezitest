@@ -425,8 +425,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p39">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p39" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p40">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p40" defer></script>',
         );
     }
 
@@ -445,7 +445,7 @@ final class WebsiteRenderer
             foreach ($point['drinks'] as $drink) {
                 $sub = $drink['manufacturer'] ?? $point['place'];
                 $thumb = $drink['hasImage']
-                    ? '<img class="map__drink-thumb" src="/spezi/' . $drink['id'] . '/bild" alt="" loading="lazy" width="32" height="51">'
+                    ? '<img class="map__drink-thumb" src="/spezi/' . $drink['id'] . '/bild" alt="" loading="lazy" width="34" height="54">'
                     : '';
                 $drinks .= '<li>' . $thumb
                     . '<span class="map__drink-body"><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'

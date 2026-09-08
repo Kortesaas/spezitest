@@ -122,7 +122,7 @@
       .map(function (drink) {
         var sub = drink.sub ? '<span class="karte-pop__sub">' + escapeHtml(drink.sub) + '</span>' : '';
         var thumb = drink.image
-          ? '<img class="karte-pop__thumb" src="' + encodeURI(drink.image) + '" alt="" loading="lazy" width="40" height="64">'
+          ? '<img class="karte-pop__thumb" src="' + encodeURI(drink.image) + '" alt="" loading="lazy" width="44" height="70">'
           : '';
         return (
           '<li>' + thumb +
