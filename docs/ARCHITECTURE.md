@@ -32,6 +32,16 @@ The application factory owns route and middleware construction. This keeps the
 front controller small and permits HTTP-level tests without a production server
 or network access.
 
+The public `/spiele` hub and its three game routes are progressive, read-only
+browser features. PHP projects current catalogue records into the minimum JSON
+needed for each game; vanilla JavaScript keeps rounds, guesses, scores, timers,
+and opened cards only in page memory. There is no result endpoint, persistent
+browser storage, cookie, analytics hook, device-location request, or third-party
+game service. The origin game excludes approximate coordinates and loads map
+tiles through the existing bounded first-party proxy. The name quiz generates
+its fictional candidate pool locally, removes live catalogue collisions, and
+never writes generated names to the database.
+
 Admin database connections remain lazy: the public placeholder and login form
 do not connect to MariaDB. `AdminRuntime` supplies environment configuration,
 the session store, and a connection factory. HTTP controllers validate input,

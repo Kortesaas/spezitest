@@ -306,6 +306,7 @@ it will show empty-state pages until the data is imported, which is expected.
 | Admin login (HTTPS) | succeeds; dashboard shows 54 / 17 / 125 |
 | Admin: open a tested drink → Test bearbeiten | grades 0–10 shown, Gesamtwertung recomputed identically |
 | Admin: upload a JPEG/PNG on a drink | stored under `var/admin-images/`, visible on the public detail page |
+| `/spiele` and each of its three game cards | hub thumbnails load; a round can be completed without cookies, tracking, or external browser requests |
 | Provoke an error (e.g. wrong `DB_PASSWORD` briefly) | generic 500, no SQL/paths in the response; details only in the server log |
 
 Rating spot-check: Flötzinger Cola-Mix must remain rank 1 with Gesamtwertung

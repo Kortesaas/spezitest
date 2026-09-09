@@ -126,14 +126,14 @@ final class WebsiteRenderer
                 : '<div class="rank">' . $this->rankRows($top, 3) . '</div>')
             . '</div></section>';
 
-        $worst = array_slice(array_reverse($ranked), 0, 5);
+        $bottom = array_slice($ranked, -5);
         $tailSection = '<section class="section"><div class="wrap split split--sidebar">'
             . '<div class="stack-lg"><div class="cluster cluster--between">'
             . '<h2 class="display-3">Schlusslichter</h2>'
             . '<a class="link-arrow" href="/ranking">Ganzes Ranking</a></div>'
-            . ($worst === []
+            . ($bottom === []
                 ? '<div class="empty"><p class="empty__title">Noch nichts getestet</p></div>'
-                : '<div class="rank">' . $this->rankRows($worst, 0) . '</div>')
+                : '<div class="rank">' . $this->rankRows($bottom, 0) . '</div>')
             . '</div>'
             . '<aside><div class="panel card--strong sticky-side">'
             . '<span class="eyebrow eyebrow--accent">Noch gesucht</span>'
@@ -149,6 +149,291 @@ final class WebsiteRenderer
             'Cola-Mix und Spezi im Test: Katalog, Ranking und Statistik der Abteilung Spezitest.',
             '/',
         );
+    }
+
+    /** @param list<array{id: int, name: string, image: string}> $thumbnails */
+    public function games(array $thumbnails = []): string
+    {
+        $geoVisual = '<span class="game-card__visual game-card__visual--geo" aria-hidden="true">'
+            . '<span class="game-card__route"></span><span class="game-card__pin game-card__pin--start"></span>'
+            . '<span class="game-card__pin game-card__pin--finish"></span>'
+            . $this->gameThumbnail($thumbnails[0] ?? null, 'game-card__bottle game-card__bottle--hero')
+            . '</span>';
+        $memoryVisual = '<span class="game-card__visual game-card__visual--memory" aria-hidden="true">'
+            . '<span class="game-card__mini">' . $this->gameThumbnail($thumbnails[1] ?? null) . '</span>'
+            . '<span class="game-card__mini game-card__mini--back"><img src="/assets/spezitest-icon-memory.svg" alt=""></span>'
+            . '<span class="game-card__mini game-card__mini--back"><img src="/assets/spezitest-icon-memory.svg" alt=""></span>'
+            . '<span class="game-card__mini">' . $this->gameThumbnail($thumbnails[1] ?? null) . '</span>'
+            . '</span>';
+        $quizVisual = '<span class="game-card__visual game-card__visual--quiz" aria-hidden="true">'
+            . $this->gameThumbnail($thumbnails[2] ?? null, 'game-card__bottle game-card__bottle--quiz')
+            . '<span class="game-card__quiz-word game-card__quiz-word--real">ECHT</span>'
+            . '<span class="game-card__quiz-word game-card__quiz-word--fake">FAKE?</span>'
+            . '</span>';
+
+        $body = '<section class="wrap section"><div class="stack-lg">'
+            . '<div class="stack"><span class="eyebrow eyebrow--accent">Spezispiele</span>'
+            . '<h1 class="display-2">Drei Spiele für echte Spezialisten.</h1>'
+            . '<p class="lede">Wie gut kennst du dich wirklich mit Spezi aus? Rate Herkunftsorte, finde '
+            . 'Flaschenpaare und entscheide, welche Namen es tatsächlich gibt.</p></div>'
+            . '<div class="game-hub">'
+            . $this->gameHubCard(
+                '01',
+                'Wo kommt die Spezi her?',
+                'Wo wurde diese Flasche abgefüllt? Setze deinen Pin und sieh, wie nah du dran warst.',
+                '/spiele/herkunft',
+                'Karte öffnen',
+                $geoVisual,
+            )
+            . $this->gameHubCard(
+                '02',
+                'Flaschen Memory',
+                'Dreh die Flaschen um und finde alle Paare. Du bestimmst, wie voll der Kasten wird.',
+                '/spiele/memory',
+                'Memory spielen',
+                $memoryVisual,
+            )
+            . $this->gameHubCard(
+                '03',
+                'Echt oder eingespezt?',
+                'Klingt echt. Aber steht die Flasche auch wirklich bei uns im Katalog?',
+                '/spiele/echt-oder-fake',
+                'Namen raten',
+                $quizVisual,
+            )
+            . '</div>'
+            . '<p class="game-privacy">Die Spiele speichern keine Ergebnisse und senden keine Spielzüge an den Server. '
+            . 'Beim Neuladen beginnt alles von vorn.</p>'
+            . '</div></section>';
+
+        return $this->shell(
+            'Spiele',
+            $body,
+            'spiele',
+            'Spezitest Spiele mit Herkunftsraten, Flaschen Memory und echten oder erfundenen Namen.',
+            '/spiele',
+        );
+    }
+
+    /**
+     * @param list<array{id: int, name: string, image: string, location: string, latitude: float, longitude: float}> $rounds
+     */
+    public function geographyGame(array $rounds): string
+    {
+        $intro = $this->gameHeader(
+            'Herkunftsspiel',
+            'Wo kommt die Spezi her?',
+            'Eine Flasche, eine Karte, ein Tipp. Setze deinen Pin und finde heraus, wie nah du dran bist.',
+        );
+
+        if (count($rounds) < 5) {
+            $body = $intro . '<section class="wrap section"><div class="empty"><p class="empty__title">'
+                . 'Noch nicht genug exakt verortete Flaschen</p><p>Für das Spiel brauchen wir mindestens fünf '
+                . 'Spezis mit Bild und zuverlässiger Ortsangabe.</p></div></section>';
+        } else {
+            $body = $intro
+                . '<section class="wrap section" style="padding-top:0"><div class="game-app" data-game="geo">'
+                . '<div class="game-menu" data-geo-menu><span class="game-menu__mark" aria-hidden="true">◎</span>'
+                . '<div class="stack"><span class="eyebrow eyebrow--accent">Dein Spiel</span><h2 class="display-3">Wie möchtest du spielen?</h2>'
+                . '<p>Spiele fünf Flaschen am Stück oder rate einfach so lange weiter, wie du möchtest.</p></div>'
+                . '<div class="game-mode-grid"><button class="game-mode" type="button" data-geo-mode="five">'
+                . '<span class="game-mode__number">5</span><span><strong>Fünf Runden</strong><small>Eine komplette Partie</small></span></button>'
+                . '<button class="game-mode" type="button" data-geo-mode="endless">'
+                . '<span class="game-mode__number">∞</span><span><strong>Endlos spielen</strong><small>Einfach weiterraten</small></span></button></div>'
+                . '</div>'
+                . '<div data-geo-stage hidden>'
+                . '<div class="game-stage-head"><div class="game-hud"><strong data-geo-progress>Runde 1</strong>'
+                . '<span data-geo-score>0 Punkte</span></div><button class="game-quiet" type="button" data-geo-exit>Modus wechseln</button></div>'
+                . '<div class="game-progress" aria-hidden="true"><span data-geo-meter></span></div>'
+                . '<div class="geo-game">'
+                . '<div class="geo-game__bottle"><span class="eyebrow">Wo ist diese Spezi zuhause?</span>'
+                . '<img data-geo-image alt="Zu erratende Spezi-Flasche" width="320" height="512">'
+                . '<p data-geo-name></p></div>'
+                . '<div class="geo-game__map-wrap"><div class="geo-game__map-frame"><div id="geo-game-map" data-geo-map tabindex="0" '
+                . 'aria-label="Karte: durch Klicken einen Herkunftsort auswählen"></div>'
+                . '<div class="game-actions game-actions--primary">'
+                . '<button class="btn btn--primary" type="button" data-geo-confirm disabled>Pin bestätigen</button>'
+                . '<button class="btn btn--secondary" type="button" data-geo-next hidden>Nächste Flasche</button>'
+                . '</div></div>'
+                . '<p class="game-help">Ein Klick setzt deinen Pin. Mit der Tastatur verschiebst du die Karte und bestätigst mit Enter.</p></div>'
+                . '</div>'
+                . '<div class="game-result" data-geo-result aria-live="polite">Setze deinen Pin auf die Karte.</div>'
+                . '</div>'
+                . '<div class="game-finish stack" data-geo-finish hidden aria-live="polite"></div>'
+                . '</div>' . $this->gamePrivacyNote(true) . '</section>'
+                . $this->gameDataScript(['rounds' => $rounds]);
+        }
+
+        return $this->shell(
+            'Wo kommt die Spezi her?',
+            $body,
+            'spiele',
+            'Das Spezitest-Herkunftsspiel: Flasche ansehen, Ort markieren und Entfernung erfahren.',
+            '/spiele/herkunft',
+            [],
+            null,
+            'website',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p46">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/spiele.js?v=p4" defer></script>',
+        );
+    }
+
+    /** @param list<array{id: int, name: string, image: string}> $cards */
+    public function memoryGame(array $cards): string
+    {
+        $body = $this->gameHeader(
+            'Flaschen Memory',
+            'Finde jedes Flaschenpaar',
+            'Merke dir, wo jede Flasche steht. Die Schwierigkeit bestimmt nur die Größe des Spielfelds.',
+        );
+
+        if (count($cards) < 15) {
+            $body .= '<section class="wrap section"><div class="empty"><p class="empty__title">'
+                . 'Noch nicht genug Flaschen</p><p>Für alle Schwierigkeitsstufen brauchen wir mindestens 15 Bilder.</p></div></section>';
+        } else {
+            $body .= '<section class="wrap section" style="padding-top:0"><div class="game-app game-app--memory" data-game="memory">'
+                . '<div class="game-toolbar">'
+                . '<div class="segmented" aria-label="Schwierigkeitsgrad">'
+                . '<button type="button" data-memory-level="easy" aria-pressed="true">Leicht</button>'
+                . '<button type="button" data-memory-level="medium" aria-pressed="false">Mittel</button>'
+                . '<button type="button" data-memory-level="hard" aria-pressed="false">Schwer</button>'
+                . '</div><button class="shuffle-button" type="button" data-memory-restart><span aria-hidden="true">↻</span> Neu mischen</button>'
+                . '<div class="memory-score"><span><small>Gefunden</small><strong data-memory-pairs>0 / 6</strong></span>'
+                . '<span><small>Züge</small><strong data-memory-moves>0</strong></span>'
+                . '<span><small>Zeit</small><strong data-memory-time>0:00</strong></span></div>'
+                . '</div>'
+                . '<div class="memory-board" data-memory-board><div class="memory-shuffle" data-memory-shuffle hidden>'
+                . '<img src="/assets/spezitest-icon-memory.svg" alt=""><strong>Flaschen werden gemischt</strong></div>'
+                . '<div class="memory-grid" data-memory-grid data-level="easy" aria-label="Memory Spielfeld"></div>'
+                . '<div class="memory-complete" data-memory-complete hidden role="alertdialog" aria-labelledby="memory-done">'
+                . '<div class="memory-complete__card"><img src="/assets/spezitest-icon-memory.svg" alt="" width="52" height="52">'
+                . '<strong class="memory-complete__title" id="memory-done">Geschafft</strong>'
+                . '<span class="meta" data-memory-summary></span>'
+                . '<button class="btn btn--primary" type="button" data-memory-again>Wiederholen</button></div></div></div>'
+                . '<p class="visually-hidden" data-memory-result aria-live="polite"></p>'
+                . '</div>' . $this->gamePrivacyNote(false) . '</section>'
+                . $this->gameDataScript(['cards' => $cards]);
+        }
+
+        return $this->shell(
+            'Flaschen Memory',
+            $body,
+            'spiele',
+            'Klassisches Spezitest-Flaschenmemory in drei Schwierigkeitsstufen.',
+            '/spiele/memory',
+            [],
+            null,
+            'website',
+            '',
+            '<script src="/assets/spiele.js?v=p4" defer></script>',
+        );
+    }
+
+    /**
+     * @param list<array{id: int, name: string, slug: string, image: ?string}> $real
+     * @param list<string> $fake
+     */
+    public function realOrFakeGame(array $real, array $fake): string
+    {
+        $body = $this->gameHeader(
+            'Namensquiz',
+            'Echt oder eingespezt?',
+            'Kennst du die echten Marken oder klingt für dich einfach alles glaubwürdig?',
+        );
+
+        if (count($real) < 5 || count($fake) < 5) {
+            $body .= '<section class="wrap section"><div class="empty"><p class="empty__title">'
+                . 'Noch nicht genug Namen</p><p>Das Quiz braucht mindestens fünf echte und fünf erfundene Namen.</p></div></section>';
+        } else {
+            $body .= '<section class="wrap section" style="padding-top:0"><div class="game-app game-app--quiz" data-game="real-fake">'
+                . '<div class="game-stage-head"><div class="game-hud"><strong data-quiz-progress>1 / 10</strong>'
+                . '<span data-quiz-score>0 richtig</span></div></div><div class="game-progress"><span data-quiz-meter></span></div>'
+                . '<div class="name-quiz" data-quiz-card>'
+                . '<span class="name-quiz__spark name-quiz__spark--one" aria-hidden="true">✦</span>'
+                . '<span class="name-quiz__spark name-quiz__spark--two" aria-hidden="true">?</span>'
+                . '<span class="eyebrow">Gibt es diese Spezi?</span><h2 class="display-3" data-quiz-name></h2>'
+                . '<div class="name-quiz__choices">'
+                . '<button class="quiz-choice quiz-choice--real" type="button" data-quiz-answer="real"><span aria-hidden="true">✓</span><strong>Echt</strong></button>'
+                . '<button class="quiz-choice quiz-choice--fake" type="button" data-quiz-answer="fake"><span aria-hidden="true">?</span><strong>Erfunden</strong></button>'
+                . '<button class="btn btn--primary btn--lg name-quiz__restart" type="button" data-quiz-restart hidden>Neue Runde</button>'
+                . '</div><div class="name-quiz__reveal" data-quiz-reveal hidden>'
+                . '<img data-quiz-image alt="" width="120" height="192" hidden><div class="stack-sm">'
+                . '<strong data-quiz-verdict></strong><p data-quiz-explanation></p>'
+                . '<a class="link-arrow" data-quiz-link hidden>Im Katalog ansehen</a></div></div>'
+                . '</div>'
+                . '<p class="visually-hidden" data-quiz-result aria-live="polite"></p>'
+                . '</div>' . $this->gamePrivacyNote(false) . '</section>'
+                . $this->gameDataScript(['real' => $real, 'fake' => $fake]);
+        }
+
+        return $this->shell(
+            'Echt oder eingespezt?',
+            $body,
+            'spiele',
+            'Das Spezitest-Namensquiz: echte Cola-Mix-Namen von glaubwürdig erfundenen unterscheiden.',
+            '/spiele/echt-oder-fake',
+            [],
+            null,
+            'website',
+            '',
+            '<script src="/assets/spiele.js?v=p4" defer></script>',
+        );
+    }
+
+    private function gameHubCard(
+        string $number,
+        string $title,
+        string $copy,
+        string $href,
+        string $label,
+        string $visual,
+    ): string
+    {
+        return '<a class="game-card" href="' . Html::e($href) . '">' . $visual
+            . '<span class="game-card__body"><span class="game-card__num">'
+            . Html::e($number) . '</span><span class="stack"><span class="game-card__title">' . Html::e($title)
+            . '</span><span class="game-card__copy">' . Html::e($copy) . '</span>'
+            . '<span class="link-arrow">' . Html::e($label) . '</span></span></span></a>';
+    }
+
+    /** @param array{id: int, name: string, image: string}|null $drink */
+    private function gameThumbnail(?array $drink, string $class = ''): string
+    {
+        if ($drink === null) {
+            return '<span class="game-card__fallback ' . Html::e($class) . '">S</span>';
+        }
+
+        return '<img class="' . Html::e($class) . '" src="' . Html::e($drink['image'])
+            . '" alt="" loading="lazy" width="180" height="288">';
+    }
+
+    private function gameHeader(string $eyebrow, string $title, string $copy): string
+    {
+        return '<section class="wrap section game-intro"><div class="game-intro__copy stack">'
+            . '<p><a class="link-arrow" href="/spiele">Alle Spiele</a></p>'
+            . '<span class="eyebrow eyebrow--accent">' . Html::e($eyebrow) . '</span>'
+            . '<h1 class="display-2">' . Html::e($title) . '</h1><p class="lede">' . Html::e($copy) . '</p>'
+            . '</div><span class="game-intro__bubble game-intro__bubble--one" aria-hidden="true"></span>'
+            . '<span class="game-intro__bubble game-intro__bubble--two" aria-hidden="true"></span></section>';
+    }
+
+    private function gamePrivacyNote(bool $mentionsMap): string
+    {
+        return '<p class="game-privacy">Deine Spielzüge und Ergebnisse bleiben nur im Arbeitsspeicher dieses Tabs und '
+            . 'werden weder gespeichert noch an uns übertragen.'
+            . ($mentionsMap ? ' Die Kartenbilder lädt dein Browser ausschließlich von Spezitest.' : '')
+            . '</p>';
+    }
+
+    /** @param array<string, mixed> $data */
+    private function gameDataScript(array $data): string
+    {
+        $json = json_encode(
+            $data,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS,
+        );
+
+        return '<script type="application/json" id="spiel-data">' . $json . '</script>';
     }
 
     public function catalog(CatalogPage $page): string
@@ -670,7 +955,7 @@ final class WebsiteRenderer
     /**
      * The map of where the Spezis come from, placed by the postal code in each
      * origin (Germany and the neighbour countries). {@see MapScope} picks the
-     * set: everything, only the tested ones, or the ones still to be tested.
+     * set: everything, only the tested ones, or the ones still being sought.
      * Progressive enhancement — the list beside the map carries every drink and
      * link with JavaScript disabled.
      */
@@ -701,14 +986,14 @@ final class WebsiteRenderer
             ],
             MapScope::Sought => [
                 'Wo die noch gesuchten Spezis wohnen',
-                'Jede Spezi, die wir noch nicht getestet haben, an ihrem Herkunftsort. Über die Tabs geht '
+                'Jede Spezi, die wir noch nicht besitzen, an ihrem Herkunftsort. Über die Tabs geht '
                     . 'es zu allen oder den getesteten.',
                 'noch gesucht',
                 'Gesuchte Spezis auf der Karte',
-                'Karte aller noch gesuchten Cola-Mix-Getränke: wo die noch nicht getesteten Spezis herkommen.',
+                'Karte aller noch gesuchten Cola-Mix-Getränke: wo die noch nicht beschafften Spezis herkommen.',
                 '/karte/gesucht',
                 'Nichts mehr gesucht',
-                'Sobald eine Spezi bekannt, aber noch nicht getestet ist, erscheint sie hier.',
+                'Sobald eine Spezi bekannt ist, wir sie aber noch nicht besitzen, erscheint sie hier.',
             ],
         };
 
@@ -859,8 +1144,8 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p45">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p45" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p46">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p46" defer></script>',
         );
     }
 
@@ -1638,6 +1923,13 @@ final class WebsiteRenderer
             . '<div><h2>Suche</h2>'
             . '<p>Die Vorschläge, die beim Tippen im Katalog erscheinen, beantwortet unser eigener Server. '
             . 'Ihre Suchbegriffe gehen an niemanden sonst und werden nicht dauerhaft gespeichert.</p></div>'
+
+            . '<div><h2>Spiele</h2>'
+            . '<p>Die öffentlichen Spiele laufen vollständig in Ihrem Browser. Spielzüge, aufgedeckte Karten, '
+            . 'Punktestände und Zeiten bleiben nur im Arbeitsspeicher des geöffneten Tabs, werden nicht an uns '
+            . 'übertragen und beim Neuladen verworfen. Die Spiele verwenden weder Cookies noch den lokalen '
+            . 'Browserspeicher oder die Standortfunktion Ihres Geräts. Kartenbilder werden über Spezitest '
+            . 'ausgeliefert; Ihr Browser verbindet sich dafür nicht direkt mit einem Kartenanbieter.</p></div>'
 
             . '<div><h2>Links zu YouTube</h2>'
             . '<p>Wir verlinken unsere Aufzeichnungen bei YouTube, betten aber keine Videos ein. Solange Sie '

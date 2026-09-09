@@ -155,6 +155,10 @@ final class AppFactory
             $group->get('/karte/kachel/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.png', [$controller, 'mapTile']);
             $group->get('/karte/spezi/{id:[0-9]+}', [$controller, 'karteSpezi']);
             $group->get('/karte/{scope:getestet|gesucht}', [$controller, 'karte']);
+            $group->get('/spiele', [$controller, 'games']);
+            $group->get('/spiele/herkunft', [$controller, 'geographyGame']);
+            $group->get('/spiele/memory', [$controller, 'memoryGame']);
+            $group->get('/spiele/echt-oder-fake', [$controller, 'realOrFakeGame']);
             $group->get('/impressum', [$controller, 'impressum']);
             $group->get('/datenschutz', [$controller, 'datenschutz']);
             $group->get('/ranking', [$controller, 'ranking']);

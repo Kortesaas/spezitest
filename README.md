@@ -20,7 +20,8 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   `/` (home), `/spezis` (search / filter / sort browser with an incremental
   `Mehr laden` and a first/window/last pager), `/spezi/{id-or-slug}`
   (detail with tester and category scores), `/ranking`, `/statistik`, `/karte`,
-  `/streams` (every Spezistream with a jump mark per Spezi) and `/ueber`, plus
+  `/streams` (every Spezistream with a jump mark per Spezi), `/spiele` and
+  `/ueber`, plus
   a branded 404. Product images are served through a controlled
   read-only route (`/spezi/{id}/bild`); missing images get a branded
   placeholder.
@@ -28,10 +29,18 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   date and video address; every test knows which evening it was tasted in and
   at which point in the recording, so the public detail page can link straight
   into the video at that timestamp. Closing an evening produces its report.
+- **Three first-party browser games** under `/spiele`: an origin guessing game
+  with five rounds or endless practice, classic bottle Memory in three board
+  sizes, and a ten-round real-or-invented name quiz. The quiz draws fictional
+  names from a large deterministic pool shaped from catalogue naming patterns
+  and excludes collisions with current real names. Game state exists only in
+  the open tab: there are no cookies, browser storage, score submissions,
+  geolocation requests, analytics, or third-party game services. Origin-game
+  tiles use the existing first-party map proxy.
 - **The map** (`/karte`): the Spezis placed on an interactive map by the postal
   code in each origin. `/karte` shows everything; `/karte/getestet` narrows it
-  to the tested ones and `/karte/gesucht` to the ones still to be tested
-  (`identified` + `acquired`) — three crawlable pages, switched by a tab bar
+  to the tested ones and `/karte/gesucht` to the ones still being sought
+  (`identified` only; acquired drinks are already possessed) — three crawlable pages, switched by a tab bar
   that works without JavaScript. `/karte/spezi/{id}` is a one-pin mini map for a
   single Spezi, linked from its detail page. The public GeoJSON feed
   (`/api/map/spezis.geojson`) is unaffected by the filter — it always carries

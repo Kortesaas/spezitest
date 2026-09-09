@@ -34,7 +34,7 @@ enum MapScope: string
         return match ($this) {
             self::All => $collection->byName(),
             self::Tested => $collection->tested(),
-            self::Sought => $collection->untested(),
+            self::Sought => $collection->identified(),
         };
     }
 }

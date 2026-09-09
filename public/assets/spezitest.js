@@ -23,6 +23,31 @@
     toggle.setAttribute('aria-expanded', String(willOpen));
   });
 
+  // "Mehr" navigation menu. Hover and keyboard focus are handled in CSS; this
+  // adds click/tap toggling, Escape, and outside-click dismissal.
+  var moreNav = document.querySelector('.nav__more');
+  if (moreNav) {
+    var moreButton = moreNav.querySelector('.nav__more-btn');
+    var setMoreOpen = function (open) {
+      moreNav.classList.toggle('is-open', open);
+      moreButton.setAttribute('aria-expanded', String(open));
+    };
+    moreButton.addEventListener('click', function () {
+      setMoreOpen(!moreNav.classList.contains('is-open'));
+    });
+    document.addEventListener('click', function (event) {
+      if (!moreNav.contains(event.target)) {
+        setMoreOpen(false);
+      }
+    });
+    moreNav.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && moreNav.classList.contains('is-open')) {
+        setMoreOpen(false);
+        moreButton.focus();
+      }
+    });
+  }
+
   // Row-level status selects submit themselves; a noscript button covers the
   // no-JavaScript case.
   document.addEventListener('change', function (event) {

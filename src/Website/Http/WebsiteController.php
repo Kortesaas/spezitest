@@ -23,6 +23,8 @@ use Spezitest\Website\Catalog\RatedDrinkCollection;
 use Spezitest\Website\Catalog\Slug;
 use Spezitest\Website\Catalog\Statistics;
 use Spezitest\Website\Catalog\StreamEpisode;
+use Spezitest\Website\Games\FakeNameGenerator;
+use Spezitest\Website\Games\GameCatalog;
 use Spezitest\Website\Map\GeoJsonFeed;
 use Spezitest\Website\Map\GpxDocument;
 use Spezitest\Website\Map\TileProxy;
@@ -57,6 +59,38 @@ final class WebsiteController
     public function home(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
     {
         return $this->html($response, $this->renderer->home($this->catalogRepository()->ratedDrinks()));
+    }
+
+    public function games(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $thumbnails = array_slice(GameCatalog::memory($this->catalogRepository()->ratedDrinks()), 0, 4);
+
+        return $this->html($response, $this->renderer->games($thumbnails));
+    }
+
+    public function geographyGame(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $rounds = GameCatalog::geography(
+            $this->catalogRepository()->ratedDrinks(),
+            PostalGeocoder::default(),
+        );
+
+        return $this->html($response, $this->renderer->geographyGame($rounds));
+    }
+
+    public function memoryGame(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $cards = GameCatalog::memory($this->catalogRepository()->ratedDrinks());
+
+        return $this->html($response, $this->renderer->memoryGame($cards));
+    }
+
+    public function realOrFakeGame(ServerRequestInterface $_request, ResponseInterface $response): ResponseInterface
+    {
+        $real = GameCatalog::realNames($this->catalogRepository()->ratedDrinks());
+        $fake = FakeNameGenerator::pool(array_column($real, 'name'));
+
+        return $this->html($response, $this->renderer->realOrFakeGame($real, $fake));
     }
 
     public function catalog(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

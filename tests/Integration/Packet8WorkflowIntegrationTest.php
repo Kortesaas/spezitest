@@ -443,6 +443,17 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame(200, $statistik->getStatusCode());
         self::assertStringContainsString('Spezis getestet', (string) $statistik->getBody());
 
+        $games = $this->request('GET', '/spiele');
+        self::assertSame(200, $games->getStatusCode());
+        $gamesBody = (string) $games->getBody();
+        self::assertStringContainsString('Wo kommt die Spezi her?', $gamesBody);
+        self::assertStringContainsString('Flaschen Memory', $gamesBody);
+        self::assertStringContainsString('Echt oder eingespezt?', $gamesBody);
+        self::assertLessThan(strpos($gamesBody, '>Über</a>'), strpos($gamesBody, '>Spiele</a>'));
+        self::assertSame(200, $this->request('GET', '/spiele/herkunft')->getStatusCode());
+        self::assertSame(200, $this->request('GET', '/spiele/memory')->getStatusCode());
+        self::assertSame(200, $this->request('GET', '/spiele/echt-oder-fake')->getStatusCode());
+
         self::assertSame(200, $this->request('GET', '/ueber')->getStatusCode());
     }
 
@@ -547,11 +558,11 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringNotContainsString('>Zulauf Limo<', $tested);
         self::assertStringContainsString('href="/karte/spezikarte.gpx?zeigen=getestet"', $tested);
 
-        // --- /karte/gesucht: identified + acquired, not tested -------------
+        // --- /karte/gesucht: identified only, already acquired is excluded -
         $sought = (string) $this->request('GET', '/karte/gesucht')->getBody();
         self::assertStringContainsString('Wo die noch gesuchten Spezis wohnen', $sought);
         self::assertStringContainsString('>Nahe Limo<', $sought);
-        self::assertStringContainsString('>Zulauf Limo<', $sought);
+        self::assertStringNotContainsString('>Zulauf Limo<', $sought);
         self::assertStringNotContainsString('>Fertig Limo<', $sought);
 
         // An out-of-range tile coordinate is rejected without any upstream call.

@@ -16,8 +16,13 @@ final class Layout
         'spezis' => ['/spezis', 'Spezis'],
         'ranking' => ['/ranking', 'Ranking'],
         'statistik' => ['/statistik', 'Statistik'],
-        'streams' => ['/streams', 'Streams'],
         'karte' => ['/karte', 'Karte'],
+    ];
+
+    /** Secondary destinations, grouped under the "Mehr" menu on desktop. */
+    private const NAV_MORE = [
+        'streams' => ['/streams', 'Streams'],
+        'spiele' => ['/spiele', 'Spiele'],
         'ueber' => ['/ueber', 'Über'],
     ];
 
@@ -86,7 +91,7 @@ final class Layout
             . ($path === null ? '<meta name="robots" content="noindex">' : '')
             . ($canonical === null ? '' : '<link rel="canonical" href="' . Html::e($canonical) . '">')
             . self::sharePreview($shareTitle, $summary, $canonical, $siteUrl, $imagePath, $ogType)
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p45">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p46">'
             . '<link rel="icon" href="/favicon.ico" sizes="32x32">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">'
@@ -99,7 +104,7 @@ final class Layout
             . self::header($active)
             . '<main id="main">' . $main . '</main>'
             . self::footer()
-            . '<script src="/assets/spezitest.js?v=p45" defer></script>'
+            . '<script src="/assets/spezitest.js?v=p46" defer></script>'
             . $bodyEndExtra
             . '</body></html>';
     }
@@ -168,6 +173,22 @@ final class Layout
             $mobile .= '<a href="' . $href . '"' . $current . '>' . Html::e($label) . '</a>';
         }
 
+        $moreItems = '';
+        $moreActive = false;
+
+        foreach (self::NAV_MORE as $key => [$href, $label]) {
+            $current = $key === $active ? ' aria-current="page"' : '';
+            $moreActive = $moreActive || $key === $active;
+            $moreItems .= '<a href="' . $href . '"' . $current . '>' . Html::e($label) . '</a>';
+            $mobile .= '<a href="' . $href . '"' . $current . '>' . Html::e($label) . '</a>';
+        }
+
+        $desktop .= '<div class="nav__more"' . ($moreActive ? ' data-current' : '') . '>'
+            . '<button type="button" class="nav__more-btn" aria-expanded="false" aria-controls="nav-more"'
+            . ($moreActive ? ' aria-current="page"' : '') . '>Mehr</button>'
+            . '<div class="nav__more-menu" id="nav-more">' . $moreItems . '</div>'
+            . '</div>';
+
         return '<header class="site-header"><div class="wrap site-header__inner">'
             . '<a class="brand" href="/"><img src="/assets/spezitest-logo-color.svg" alt="Spezitest" width="150" height="35"></a>'
             . '<nav class="nav" aria-label="Hauptnavigation">' . $desktop . '</nav>'
@@ -189,7 +210,7 @@ final class Layout
             . '<div><h3>Katalog</h3><ul class="stack-sm">'
             . '<li><a href="/spezis">Alle Spezis</a></li><li><a href="/ranking">Ranking</a></li>'
             . '<li><a href="/statistik">Statistik</a></li><li><a href="/streams">Streams</a></li>'
-            . '<li><a href="/karte">Karte</a></li></ul></div>'
+            . '<li><a href="/karte">Karte</a></li><li><a href="/spiele">Spiele</a></li></ul></div>'
             . '<div><h3>Projekt</h3><ul class="stack-sm">'
             . '<li><a href="/ueber">Über Spezitest</a></li><li><a href="/ueber#methode">Testmethode</a></li><li><a href="/ueber#tester">Tester</a></li></ul></div>'
             . '<div><h3>Rechtliches</h3><ul class="stack-sm">'

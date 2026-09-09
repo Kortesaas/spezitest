@@ -23,6 +23,10 @@ final class SitemapBuilderTest extends TestCase
         self::assertStringContainsString('<?xml version="1.0" encoding="UTF-8"?>', $xml);
         self::assertStringContainsString('<loc>https://www.spezitest.de/</loc>', $xml);
         self::assertStringContainsString('<loc>https://www.spezitest.de/ranking</loc>', $xml);
+        self::assertStringContainsString('<loc>https://www.spezitest.de/spiele</loc>', $xml);
+        self::assertStringContainsString('<loc>https://www.spezitest.de/spiele/herkunft</loc>', $xml);
+        self::assertStringContainsString('<loc>https://www.spezitest.de/spiele/memory</loc>', $xml);
+        self::assertStringContainsString('<loc>https://www.spezitest.de/spiele/echt-oder-fake</loc>', $xml);
         self::assertMatchesRegularExpression('~<loc>https://www\.spezitest\.de/spezi/\d+-spezi-nord</loc>~', $xml);
         self::assertMatchesRegularExpression('~<loc>https://www\.spezitest\.de/spezi/\d+-spezi-sued</loc>~', $xml);
     }

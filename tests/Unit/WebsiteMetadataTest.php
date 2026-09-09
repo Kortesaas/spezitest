@@ -75,6 +75,40 @@ final class WebsiteMetadataTest extends TestCase
         self::assertStringContainsString('<meta property="og:type" content="website">', $html);
     }
 
+    public function testHomePageConclusionListPutsTheWeakestDrinkAtTheBottom(): void
+    {
+        $ratings = static fn (int $grade): array => [
+            'manu' => [$grade, $grade, $grade],
+            'fabi' => [$grade, $grade, $grade],
+            'schorsch' => [$grade, $grade, $grade],
+        ];
+        $html = $this->renderer->home(new RatedDrinkCollection([
+            CatalogFixture::tested('Testsieger', $ratings(10), rank: 1),
+            CatalogFixture::tested('Fünftletzte', $ratings(5), rank: 2),
+            CatalogFixture::tested('Viertletzte', $ratings(4), rank: 3),
+            CatalogFixture::tested('Drittletzte', $ratings(3), rank: 4),
+            CatalogFixture::tested('Vorletzte', $ratings(2), rank: 5),
+            CatalogFixture::tested('Schlusslicht', $ratings(1), rank: 6),
+        ]));
+
+        $sectionStart = strpos($html, '<h2 class="display-3">Schlusslichter</h2>');
+        $sectionEnd = strpos($html, '<span class="eyebrow eyebrow--accent">Noch gesucht</span>');
+        self::assertIsInt($sectionStart);
+        self::assertIsInt($sectionEnd);
+        $section = substr($html, $sectionStart, $sectionEnd - $sectionStart);
+
+        self::assertStringNotContainsString('Testsieger', $section);
+        $positions = array_map(
+            static fn (string $name): int|false => strpos($section, '<span class="rank__name">' . $name . '</span>'),
+            ['Fünftletzte', 'Viertletzte', 'Drittletzte', 'Vorletzte', 'Schlusslicht'],
+        );
+        self::assertNotContains(false, $positions);
+        self::assertSame($positions, array_values(array_unique($positions)));
+        $sorted = $positions;
+        sort($sorted);
+        self::assertSame($sorted, $positions);
+    }
+
     public function testSpeziWithAPhotoSharesThatPhotoNotTheGenericCard(): void
     {
         $drink = CatalogFixture::untested('Foto Spezi', hasImage: true);
@@ -119,6 +153,77 @@ final class WebsiteMetadataTest extends TestCase
         self::assertStringContainsString('Wo Herkunft Spezi herkommt', $html);
         self::assertStringNotContainsString('class="karte__tabs"', $html);
         self::assertStringContainsString('data-scope="spezi"', $html);
+    }
+
+    public function testGamesHubHasInteractiveBottleThumbnailsAndCurrentNavigation(): void
+    {
+        $html = $this->renderer->games([
+            ['id' => 41, 'name' => 'Erste Flasche', 'image' => '/spezi/41/bild'],
+            ['id' => 42, 'name' => 'Zweite Flasche', 'image' => '/spezi/42/bild'],
+            ['id' => 43, 'name' => 'Dritte Flasche', 'image' => '/spezi/43/bild'],
+        ]);
+
+        self::assertStringContainsString('<a href="/spiele" aria-current="page">Spiele</a>', $html);
+        self::assertStringContainsString('class="game-card__visual game-card__visual--geo"', $html);
+        self::assertStringContainsString('class="game-card__visual game-card__visual--memory"', $html);
+        self::assertStringContainsString('class="game-card__visual game-card__visual--quiz"', $html);
+        self::assertStringContainsString('src="/assets/spezitest-icon-memory.svg"', $html);
+        self::assertStringContainsString('src="/spezi/41/bild"', $html);
+        self::assertStringContainsString('href="/spiele/echt-oder-fake"', $html);
+    }
+
+    public function testGamePagesEmbedOnlyTheDataNeededByTheirBrowserGame(): void
+    {
+        $geo = [];
+        $memory = [];
+
+        for ($id = 1; $id <= 15; $id++) {
+            $memory[] = ['id' => $id, 'name' => "Flasche $id", 'image' => "/spezi/$id/bild"];
+            if ($id <= 5) {
+                $geo[] = $memory[$id - 1] + [
+                    'location' => '12345 Musterstadt',
+                    'latitude' => 50.1,
+                    'longitude' => 8.6,
+                ];
+            }
+        }
+
+        $geoHtml = $this->renderer->geographyGame($geo);
+        $memoryHtml = $this->renderer->memoryGame($memory);
+        $quizHtml = $this->renderer->realOrFakeGame([
+            ['id' => 1, 'name' => 'Eins Cola-Mix', 'slug' => '1-eins-cola-mix', 'image' => '/spezi/1/bild'],
+            ['id' => 2, 'name' => 'Zwei Cola-Mix', 'slug' => '2-zwei-cola-mix', 'image' => null],
+            ['id' => 3, 'name' => 'Drei Cola-Mix', 'slug' => '3-drei-cola-mix', 'image' => null],
+            ['id' => 4, 'name' => 'Vier Cola-Mix', 'slug' => '4-vier-cola-mix', 'image' => null],
+            ['id' => 5, 'name' => 'Fünf Cola-Mix', 'slug' => '5-fuenf-cola-mix', 'image' => null],
+        ], ['Auenperle Mix', 'Berggold Spezi', 'Flussgold Colamix', 'Hofperle ColaMix', 'Quellbub Cola-Mix']);
+
+        self::assertStringContainsString('data-game="geo"', $geoHtml);
+        self::assertStringContainsString('Fünf Runden', $geoHtml);
+        self::assertStringContainsString('Endlos spielen', $geoHtml);
+        self::assertStringContainsString('<p data-geo-name></p>', $geoHtml);
+        self::assertStringNotContainsString('geo-game__crosshair', $geoHtml);
+        self::assertStringContainsString('data-game="memory"', $memoryHtml);
+        self::assertStringContainsString('data-memory-level="hard"', $memoryHtml);
+        self::assertStringContainsString('data-memory-shuffle', $memoryHtml);
+        self::assertStringContainsString('/assets/spezitest-icon-memory.svg', $memoryHtml);
+        self::assertStringContainsString('data-game="real-fake"', $quizHtml);
+        self::assertStringContainsString('data-quiz-card', $quizHtml);
+        self::assertStringNotContainsString('Zehn Namen warten auf dein Urteil', $quizHtml);
+        self::assertStringContainsString('class="quiz-choice quiz-choice--real"', $quizHtml);
+        self::assertStringNotContainsString('data-quiz-next', $quizHtml);
+        self::assertStringContainsString('Auenperle Mix', $quizHtml);
+        self::assertStringNotContainsString('localStorage', $geoHtml . $memoryHtml . $quizHtml);
+    }
+
+    public function testPrivacyPageExplainsThatGamesDoNotPersistOrSubmitPlayData(): void
+    {
+        $html = $this->renderer->datenschutz();
+
+        self::assertStringContainsString('<h2>Spiele</h2>', $html);
+        self::assertStringContainsString('weder Cookies noch den lokalen Browserspeicher', $html);
+        self::assertStringContainsString('nicht an uns übertragen', $html);
+        self::assertStringContainsString('nicht direkt mit einem Kartenanbieter', $html);
     }
 
     public function testNotFoundPageIsUnindexedAndCarriesNoCanonicalOrSchema(): void

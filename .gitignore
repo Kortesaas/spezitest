@@ -12,6 +12,7 @@
 /node_modules/
 /dist/
 /build/
+/tmp/
 
 # Runtime-generated data
 /storage/cache/

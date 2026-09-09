@@ -33,6 +33,6 @@ final class MapScopeTest extends TestCase
 
         self::assertSame(['Gekaufte', 'Gesuchte', 'Getestete'], array_map($name, MapScope::All->selectDrinks($collection)));
         self::assertSame(['Getestete'], array_map($name, MapScope::Tested->selectDrinks($collection)));
-        self::assertSame(['Gekaufte', 'Gesuchte'], array_map($name, MapScope::Sought->selectDrinks($collection)));
+        self::assertSame(['Gesuchte'], array_map($name, MapScope::Sought->selectDrinks($collection)));
     }
 }
