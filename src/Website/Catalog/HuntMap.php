@@ -13,16 +13,21 @@ use Spezitest\Website\Catalog\Geo\PostalGeocoder;
  * identified drinks via {@see self::fromCollection()}.
  *
  * Each drink is positioned from the postal code in its `origin_location` via
- * {@see PostalGeocoder} — Germany, or Austria / Switzerland / Liechtenstein
- * when a country prefix or `origin_region` says so. Drinks sharing a place
+ * {@see PostalGeocoder} — Germany, or Austria / Switzerland / Liechtenstein /
+ * Sweden when a country prefix or `origin_region` says so. Drinks sharing a place
  * become one point with a combined list. Drinks whose origin resolves to no
  * mapped postal code (other foreign origins, blank entries) are reported in
  * {@see self::$unplaced} rather than dropped or guessed.
  */
 final readonly class HuntMap
 {
-    /** Neighbour countries whose four-digit codes the map places. */
-    private const COUNTRY_NAMES = ['AT' => 'Österreich', 'CH' => 'Schweiz', 'LI' => 'Liechtenstein'];
+    /** Foreign countries the map places, by their classification code. */
+    private const COUNTRY_NAMES = [
+        'AT' => 'Österreich',
+        'CH' => 'Schweiz',
+        'LI' => 'Liechtenstein',
+        'SE' => 'Schweden',
+    ];
 
     /**
      * @param list<array{
@@ -263,10 +268,22 @@ final readonly class HuntMap
     private static function placeName(?string $location): string
     {
         $location = trim((string) $location);
-        // Drop a leading country tag and the postal code: "A-5020 Salzburg" and
-        // "72768 Reutlingen" both leave just the town.
-        $withoutCode = preg_replace('/^\s*(?:(?:A|AT|CH|D|DE|FL|LI)[-\s]*)?\d{4,5}[-\s]*/i', '', $location);
+        // Drop a leading country tag and the postal code: "A-5020 Salzburg",
+        // "SE-352 46 Växjö" and "72768 Reutlingen" all leave just the town.
+        $withoutCode = preg_replace(
+            '/^\s*(?:(?:A|AT|CH|D|DE|FL|LI|SE)[-\s]*)?(?:\d{3}\s\d{2}|\d{4,5})[-\s]*/i',
+            '',
+            $location,
+        );
+        $place = $withoutCode === null || $withoutCode === '' ? $location : $withoutCode;
 
-        return $withoutCode === null || $withoutCode === '' ? $location : $withoutCode;
+        // Drop a trailing country ("Växjö, Schweden") — the map adds it back itself.
+        $place = (string) preg_replace(
+            '/,\s*(?:Schweden|Sweden|Sverige|Österreich|Oesterreich|Schweiz|Liechtenstein)\s*$/iu',
+            '',
+            $place,
+        );
+
+        return trim($place);
     }
 }

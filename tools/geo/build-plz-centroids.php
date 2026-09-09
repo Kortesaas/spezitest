@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 /**
  * Regenerates src/Website/Catalog/Geo/postal-centroids.php from the GeoNames
- * postal-code dumps for Germany, Austria, Switzerland and Liechtenstein.
+ * postal-code dumps for Germany, Austria, Switzerland, Liechtenstein and Sweden.
  *
  * The dumps are NOT tracked in this repository. Download them fresh when you
  * need to regenerate the table:
  *
- *   for c in DE AT CH LI; do
+ *   for c in DE AT CH LI SE; do
  *     curl -sSLO "https://download.geonames.org/export/zip/$c.zip"
  *     unzip -o "$c.zip" "$c.txt"
  *   done
- *   php tools/geo/build-plz-centroids.php DE.txt AT.txt CH.txt LI.txt
+ *   php tools/geo/build-plz-centroids.php DE.txt AT.txt CH.txt LI.txt SE.txt
  *
- * The first file must be Germany; the rest are the foreign neighbours and may
+ * The first file must be Germany; the rest are the foreign entries and may
  * be omitted. Source: GeoNames (https://www.geonames.org/), licensed CC BY 4.0.
  * The public map page credits GeoNames as required by that licence.
  *
@@ -30,10 +30,11 @@ declare(strict_types=1);
  *  - 'prefix'  : German three-digit Leitregion prefix → [lat, lon] fallback.
  *  - 'byName'  : normalised German town name → one representative code, for the
  *                search box.
- *  - 'foreign' : country code (AT/CH/LI) → four-digit code → [lat, lon, place].
- *                No prefix fallback and no name index — these feeds are small
- *                and clean, and the map labels foreign pins from the drink's
- *                own origin string anyway.
+ *  - 'foreign' : country code → postal key → [lat, lon, place]. AT/CH/LI keep
+ *                the four-digit code; Sweden is aggregated to the three-digit
+ *                prefix (the postal town) because its code list is huge. No
+ *                prefix fallback and no name index — the map labels foreign
+ *                pins from the drink's own origin string anyway.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -234,31 +235,55 @@ foreach ($prefixAccumulator as $key => $sum) {
 
 ksort($byName, SORT_STRING);
 
-// --- Foreign neighbours (Austria, Switzerland, Liechtenstein) -----------
+// --- Foreign neighbours (Austria, Switzerland, Liechtenstein, Sweden) ---
+
+// AT/CH/LI keep their full four-digit code. Sweden shares Germany's five-digit
+// format and has ~19k codes, so it is aggregated to the three-digit prefix,
+// which is the postal town — enough for a map pin and it keeps the table small.
+$foreignKeyBy = ['AT' => 4, 'CH' => 4, 'LI' => 4, 'SE' => 3];
 
 /** @var array<string, array<string, array{0: float, 1: float, 2: string}>> $foreign */
 $foreign = [];
 
 foreach (array_slice($sources, 1) as $path) {
-    // GeoNames names the file by ISO country code (AT.txt, CH.txt, LI.txt).
+    // GeoNames names the file by ISO country code (AT.txt, CH.txt, LI.txt, SE.txt).
     $country = strtoupper(substr(basename($path), 0, 2));
 
-    if (!in_array($country, ['AT', 'CH', 'LI'], true)) {
-        fwrite(STDERR, "Skipping {$path}: expected AT.txt, CH.txt or LI.txt.\n");
+    if (!isset($foreignKeyBy[$country])) {
+        fwrite(STDERR, "Skipping {$path}: expected AT.txt, CH.txt, LI.txt or SE.txt.\n");
         continue;
     }
 
-    $codes = $readDump($path, '/^\d{4}$/');
-    ksort($codes, SORT_STRING);
+    $keyLength = $foreignKeyBy[$country];
+    // Swedish codes are written "352 46"; drop the space before matching.
+    $pattern = $keyLength === 3 ? '/^\d{3} ?\d{2}$/' : '/^\d{4}$/';
 
-    foreach ($codes as $postalCode => $sum) {
-        $postalCode = (string) $postalCode;
+    /** @var array<string, array{lat: float, lon: float, n: int, names: array<string, int>, district: array<string, int>}> $grouped */
+    $grouped = [];
+
+    foreach ($readDump($path, $pattern) as $rawCode => $sum) {
+        $key = substr(str_replace(' ', '', (string) $rawCode), 0, $keyLength);
+        $grouped[$key] ??= ['lat' => 0.0, 'lon' => 0.0, 'n' => 0, 'names' => [], 'district' => []];
+        $grouped[$key]['lat'] += $sum['lat'];
+        $grouped[$key]['lon'] += $sum['lon'];
+        $grouped[$key]['n'] += $sum['n'];
+
+        foreach (['names', 'district'] as $bucket) {
+            foreach ($sum[$bucket] as $name => $count) {
+                $grouped[$key][$bucket][$name] = ($grouped[$key][$bucket][$name] ?? 0) + $count;
+            }
+        }
+    }
+
+    ksort($grouped, SORT_STRING);
+
+    foreach ($grouped as $key => $sum) {
         $fromPlaceName = count($sum['names']) <= 3 && $sum['names'] !== [];
         $town = $fromPlaceName
             ? ($mostCommon($sum['names']) ?? '')
             : ($mostCommon($sum['district']) ?? ($mostCommon($sum['names']) ?? ''));
 
-        $foreign[$country][$postalCode] = [
+        $foreign[$country][$key] = [
             round($sum['lat'] / $sum['n'], 4),
             round($sum['lon'] / $sum['n'], 4),
             $town,
@@ -311,7 +336,9 @@ $generated = "<?php\n\n"
     . " * holds [latitude, longitude, place name]; 'prefix' by the three-digit\n"
     . " * Leitregion prefix and holds [latitude, longitude], a fallback centre;\n"
     . " * 'byName' maps a normalised German town name to one representative code;\n"
-    . " * 'foreign' is keyed by country code (AT/CH/LI) then four-digit postal code.\n"
+    . " * 'foreign' is keyed by country code then postal key: AT/CH/LI by the\n"
+    . " * four-digit code, SE by the three-digit prefix (the postal town), each\n"
+    . " * holding [latitude, longitude, place name].\n"
     . " * Coordinates are rounded to four decimal places (~11 m).\n"
     . " */\n\n"
     . "return [\n"

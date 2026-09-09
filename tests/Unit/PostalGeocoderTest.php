@@ -111,6 +111,51 @@ final class PostalGeocoderTest extends TestCase
         self::assertNull(PostalGeocoder::classify(null));
     }
 
+    public function testSwedishFiveDigitCodesAreNotMistakenForGermanOnes(): void
+    {
+        // The "SE-" prefix is unambiguous, with or without the internal space.
+        self::assertSame(['country' => 'SE', 'code' => '35246'], PostalGeocoder::classify('SE-35246 Växjö'));
+        self::assertSame(['country' => 'SE', 'code' => '35246'], PostalGeocoder::classify('SE-352 46 Växjö'));
+
+        // A bare five-digit code is Swedish only when something names Sweden:
+        // the region column, or the tail of the location string itself.
+        self::assertSame(['country' => 'SE', 'code' => '35246'], PostalGeocoder::classify('35246 Växjö', 'Schweden'));
+        self::assertSame(['country' => 'SE', 'code' => '35246'], PostalGeocoder::classify('35246 Växjö, Schweden'));
+
+        // Without that hint the very same digits stay German.
+        self::assertSame(['country' => 'DE', 'code' => '35246'], PostalGeocoder::classify('35246 Irgendwo'));
+
+        // The map groups Swedish drinks by the three-digit postal town.
+        self::assertSame('se-352', PostalGeocoder::mapKey(['country' => 'SE', 'code' => '35246']));
+    }
+
+    public function testLocatesSwedishCodesFromTheThreeDigitPrefixTable(): void
+    {
+        $geocoder = new PostalGeocoder(
+            ['10115' => [52.53, 13.38]],
+            [],
+            [],
+            ['SE' => ['352' => [56.8777, 14.8091, 'Växjö']]],
+        );
+
+        $point = $geocoder->locate('SE-35246 Växjö', 'Schweden');
+        self::assertNotNull($point);
+        self::assertSame(56.8777, $point->latitude);
+        self::assertSame(14.8091, $point->longitude);
+        self::assertFalse($point->approximate);
+
+        self::assertNull($geocoder->locate('SE-99999 Nirgendwo', 'Schweden'));
+    }
+
+    public function testBundledTableCarriesSweden(): void
+    {
+        $vaexjoe = PostalGeocoder::default()->locate('SE-35246 Växjö', 'Schweden');
+
+        self::assertNotNull($vaexjoe);
+        self::assertEqualsWithDelta(56.88, $vaexjoe->latitude, 0.2);
+        self::assertEqualsWithDelta(14.81, $vaexjoe->longitude, 0.2);
+    }
+
     public function testLocatesNeighbourCodesFromTheForeignTable(): void
     {
         $geocoder = new PostalGeocoder(

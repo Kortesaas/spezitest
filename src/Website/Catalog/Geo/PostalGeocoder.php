@@ -17,15 +17,18 @@ use RuntimeException;
  * Germany is the default — a five-digit code, optionally with a `D-` prefix.
  * Austria (`A-`/`AT-`), Switzerland (`CH-`) and Liechtenstein (`FL-`) are
  * recognised by their prefix, or by a bare four-digit code when `origin_region`
- * names the country. Anything else — other foreign entries, blanks — resolves
- * to null and the map lists them separately.
+ * names the country. Sweden (`SE-`) shares Germany's five-digit format, so it
+ * needs the `SE-` prefix or an `origin_region` of "Schweden" to be told apart;
+ * its table is keyed by the three-digit prefix, which pins the postal town.
+ * Anything else — other foreign entries, blanks — resolves to null and the map
+ * lists them separately.
  *
  * The German table also carries each code's town name and a name → code map,
  * used by the search box; the foreign tables are coordinates only.
  */
 final readonly class PostalGeocoder
 {
-    /** Words in `origin_region` that pin down a neighbour country. */
+    /** Words in `origin_region` that pin down a mapped foreign country. */
     private const REGION_COUNTRY = [
         'oesterreich' => 'AT',
         'austria' => 'AT',
@@ -34,7 +37,17 @@ final readonly class PostalGeocoder
         'svizzera' => 'CH',
         'switzerland' => 'CH',
         'liechtenstein' => 'LI',
+        'schweden' => 'SE',
+        'sweden' => 'SE',
+        'sverige' => 'SE',
     ];
+
+    /**
+     * Foreign countries whose table is keyed by a shortened postal code rather
+     * than the full one. Sweden's five-digit codes are dense; the three-digit
+     * prefix is the postal town, which is all the map needs.
+     */
+    private const FOREIGN_KEY_LENGTH = ['SE' => 3];
 
     /**
      * Words in `origin_region` that name a country we do not map. A five-digit
@@ -45,14 +58,14 @@ final readonly class PostalGeocoder
         'usa', 'vereinigtestaaten', 'frankreich', 'france', 'italien', 'italia', 'italy',
         'niederlande', 'netherlands', 'belgien', 'belgium', 'luxemburg', 'luxembourg',
         'daenemark', 'denmark', 'polen', 'poland', 'tschechien', 'czechia',
-        'grossbritannien', 'england', 'spanien', 'spain', 'schweden', 'sweden',
+        'grossbritannien', 'england', 'spanien', 'spain',
     ];
 
     /**
      * @param array<int|string, array{0: float, 1: float, 2?: string}> $exact German codes, keyed by five-digit postal code
      * @param array<int|string, array{0: float, 1: float}> $prefix keyed by three-digit Leitregion prefix
      * @param array<string, string> $byName normalised German town name → one representative postal code
-     * @param array<string, array<int|string, array{0: float, 1: float, 2?: string}>> $foreign country code (AT/CH/LI) → four-digit code → coordinate
+     * @param array<string, array<int|string, array{0: float, 1: float, 2?: string}>> $foreign country code → postal key → coordinate (AT/CH/LI keyed by the four-digit code, SE by the three-digit prefix)
      */
     public function __construct(
         private array $exact,
@@ -98,7 +111,7 @@ final readonly class PostalGeocoder
         ['country' => $country, 'code' => $code] = $classification;
 
         if ($country !== 'DE') {
-            $row = $this->foreign[$country][$code] ?? null;
+            $row = $this->foreign[$country][self::foreignKey($country, $code)] ?? null;
 
             return $row === null ? null : new GeoPoint($row[0], $row[1], false);
         }
@@ -181,8 +194,10 @@ final readonly class PostalGeocoder
      * The country and postal code a location string resolves to, or null.
      *
      * "72768 Reutlingen" → DE/72768, "A-5020 Salzburg" → AT/5020, "CH-8001
-     * Zürich" → CH/8001. A bare four-digit code needs `origin_region` to name
-     * the country ("5020 Salzburg" + "Österreich" → AT/5020). A code may run
+     * Zürich" → CH/8001, "SE-35246 Växjö" → SE/35246. A bare four-digit code
+     * needs `origin_region` to name the country ("5020 Salzburg" + "Österreich"
+     * → AT/5020); a bare five-digit code is German unless `origin_region` says
+     * "Schweden" ("35246 Växjö" + "Schweden" → SE/35246). A code may run
      * straight into the town name; a longer digit run (a stray phone number) is
      * rejected.
      *
@@ -196,6 +211,14 @@ final readonly class PostalGeocoder
 
         $value = ltrim($originLocation);
 
+        // The country can also sit at the end of the location itself
+        // ("35246 Växjö, Schweden"); fall back to that when no region is given.
+        $regionHint = $originRegion;
+
+        if (($regionHint === null || trim($regionHint) === '') && str_contains($value, ',')) {
+            $regionHint = trim((string) substr($value, (int) strrpos($value, ',') + 1));
+        }
+
         if (preg_match('/^(?:A|AT)[-\s]*(\d{4})(?!\d)/i', $value, $matches) === 1) {
             return ['country' => 'AT', 'code' => $matches[1]];
         }
@@ -208,8 +231,20 @@ final readonly class PostalGeocoder
             return ['country' => 'LI', 'code' => $matches[1]];
         }
 
+        // Sweden: "SE-35246 Växjö" or the "SE-352 46 Växjö" spaced form.
+        if (preg_match('/^SE[-\s]*(\d{3})[-\s]?(\d{2})(?!\d)/i', $value, $matches) === 1) {
+            return ['country' => 'SE', 'code' => $matches[1] . $matches[2]];
+        }
+
         if (preg_match('/^(?:D|DE)?[-\s]*(\d{5})(?!\d)/i', $value, $matches) === 1) {
-            if (self::countryFromRegion($originRegion) !== null || self::namesUnmappedCountry($originRegion)) {
+            $regionCountry = self::countryFromRegion($regionHint);
+
+            // Sweden is the one mapped neighbour that also uses five digits.
+            if ($regionCountry === 'SE') {
+                return ['country' => 'SE', 'code' => $matches[1]];
+            }
+
+            if ($regionCountry !== null || self::namesUnmappedCountry($regionHint)) {
                 return null; // a foreign code that only looks German
             }
 
@@ -217,7 +252,7 @@ final readonly class PostalGeocoder
         }
 
         if (preg_match('/^(\d{4})(?!\d)/', $value, $matches) === 1) {
-            $country = self::countryFromRegion($originRegion);
+            $country = self::countryFromRegion($regionHint);
 
             return $country === null || $country === 'DE' ? null : ['country' => $country, 'code' => $matches[1]];
         }
@@ -227,16 +262,31 @@ final readonly class PostalGeocoder
 
     /**
      * The hunt map's grouping key for a classified location: a bare German
-     * postal code, or a country-namespaced foreign one (`at-7122`) because a
-     * four-digit code is not unique across AT and CH.
+     * postal code, or a country-namespaced foreign one (`at-7122`, `se-352`)
+     * because a short code is not unique across countries. Sweden groups by the
+     * three-digit postal town, matching its centroid table.
      *
      * @param array{country: string, code: string} $classification
      */
     public static function mapKey(array $classification): string
     {
-        return $classification['country'] === 'DE'
-            ? $classification['code']
-            : strtolower($classification['country']) . '-' . $classification['code'];
+        if ($classification['country'] === 'DE') {
+            return $classification['code'];
+        }
+
+        return strtolower($classification['country'])
+            . '-' . self::foreignKey($classification['country'], $classification['code']);
+    }
+
+    /**
+     * The key a foreign postal code takes in its country table — the full code
+     * for AT/CH/LI, the three-digit prefix for Sweden.
+     */
+    private static function foreignKey(string $country, string $code): string
+    {
+        $length = self::FOREIGN_KEY_LENGTH[$country] ?? strlen($code);
+
+        return substr($code, 0, $length);
     }
 
     /**

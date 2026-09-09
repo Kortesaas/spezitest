@@ -18,7 +18,10 @@ final class HuntMapTest extends TestCase
             ['74939' => [49.2964, 8.8225], '30419' => [52.4, 9.7]],
             ['749' => [49.2, 9.2]],
             [],
-            ['AT' => ['5020' => [47.7994, 13.044, 'Salzburg']]],
+            [
+                'AT' => ['5020' => [47.7994, 13.044, 'Salzburg']],
+                'SE' => ['352' => [56.8777, 14.8091, 'Växjö']],
+            ],
         );
     }
 
@@ -47,6 +50,22 @@ final class HuntMapTest extends TestCase
 
         // The per-place GPX resolves by the namespaced key.
         self::assertCount(1, $map->waypointsForKey('at-5020'));
+    }
+
+    public function testPlacesASwedishDrinkInSwedenRatherThanGermany(): void
+    {
+        $collection = new RatedDrinkCollection([
+            CatalogFixture::untested('Nord Cola', 'identified', 'ERT Godis', false, '2026-01-01 00:00:00', 'SE-35246 Växjö', 'Schweden'),
+        ]);
+
+        $map = HuntMap::fromCollection($collection, $this->geocoder());
+
+        self::assertSame(1, $map->placed);
+        self::assertSame('se-352', $map->points[0]['key']);
+        self::assertSame('Schweden', $map->points[0]['country']);
+        self::assertSame('Växjö', $map->points[0]['place']);
+        self::assertSame(56.8777, $map->points[0]['latitude']);
+        self::assertSame([], $map->unplaced);
     }
 
     public function testFromDrinksPlacesWhateverListItIsGivenRegardlessOfLifecycle(): void
