@@ -41,6 +41,7 @@ __pycache__/
 /var/share-card.html
 /var/icons/
 /var/tile-cache/
+/var/local-backups/
 
 # IDE and operating-system files
 .DS_Store

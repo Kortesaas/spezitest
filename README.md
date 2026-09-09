@@ -408,6 +408,17 @@ belong in migrations or the seed. The reviewed procedure uses a disabled-after-
 use Plesk Scheduled Task for migrations and phpMyAdmin for the seed; it never
 exposes an HTTP migration endpoint.
 
+## Continuous integration and deployment
+
+`.github/workflows/ci.yml` runs `composer check`, the MariaDB 10.11 integration
+suite, and the Python legacy-import tests on every pull request and every push
+to `main`. `.github/workflows/deploy.yml` builds the existing production
+artifact and uploads it to the Plesk host over explicit FTPS after CI succeeds
+on `main`, mirroring only the managed code directories and never touching
+`.env`, `var/`, or the database. The branching model, required GitHub secrets
+and settings, the migration hold, and the rollback procedure are documented in
+[`docs/CICD.md`](docs/CICD.md).
+
 ## Legacy audit tooling
 
 The two source workbooks are local, ignored migration material beneath
