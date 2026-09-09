@@ -111,3 +111,19 @@ jobs:
 
       - name: Legacy-import tests (Python 3, stdlib only)
         run: composer test:legacy-import
+
+  ftps-deploy-e2e:
+    name: ftps-deploy-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fast static checks first (no server), then the full end-to-end test:
+      # a disposable vsftpd with explicit FTPS + a self-signed cert, driven by
+      # the SAME tools/deploy/lftp-deploy.sh that production uses.
+      - name: Static safety checks for the deploy path
+        run: sh tools/ci/check-deploy-workflow.sh
+
+      - name: End-to-end FTPS deployment test (disposable vsftpd)
+        run: bash tools/ci/ftps-deploy-e2e.sh

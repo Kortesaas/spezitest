@@ -246,7 +246,7 @@ jobs:
           path: dist/spezitest-*.tar.gz
           retention-days: 14
 
-      - name: Deploy over explicit FTPS (lftp, per-directory mirror)
+      - name: Deploy over explicit FTPS
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
@@ -256,81 +256,20 @@ jobs:
           LFTP_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
           # Optional repo variable. Leave unset for strict certificate validation.
           DEPLOY_TLS_VERIFY: ${{ vars.DEPLOY_TLS_VERIFY }}
+          DEPLOY_LOCAL_DIR: deploy-root
         run: |
           set -euo pipefail   # deliberately NOT set -x: never echo the password
-
-          # --- Why earlier runs failed -----------------------------------
-          # (1) A GitHub secret pasted through the UI often keeps a trailing
-          #     newline/CR. Substituted into an lftp URL it became
-          #     ftp://<host>\n:<port>; lftp split on the newline and ran the
-          #     leftover ":<port>" as a command -> "Unknown command ':<port>'".
-          # (2) lftp's "-f <file>" is a SEPARATE invocation mode: it cannot be
-          #     combined with -u/--env-password/<site> on the same command line.
-          #     "lftp -u ... --env-password <url> -f <script>" made lftp pass the
-          #     trailing "-f" to the implicit open -> "open: invalid option -- 'f'".
-          #
-          # Fix for both: sanitise + character-whitelist host/port/user, put the
-          # "open" command (with the URL built from those clean values) INSIDE the
-          # script, and invoke lftp only as:  lftp --norc -f "$script".
-          host="$(printf '%s' "${DEPLOY_HOST:-}"     | tr -d '[:space:]')"
-          port="$(printf '%s' "${DEPLOY_PORT:-}"     | tr -d '[:space:]')"
-          user="$(printf '%s' "${DEPLOY_USERNAME:-}" | tr -d '[:space:]')"
-          : "${host:?DEPLOY_HOST secret is empty}"
-          : "${port:?DEPLOY_PORT secret is empty}"
-          : "${user:?DEPLOY_USERNAME secret is empty}"
-          : "${LFTP_PASSWORD:?DEPLOY_PASSWORD secret is empty}"
-          # Character whitelists: nothing here can carry an lftp command, a quote,
-          # whitespace, or a newline into the generated script.
-          case "$host" in *[!A-Za-z0-9.-]*)   echo "::error::DEPLOY_HOST has unexpected characters after trimming"; exit 1 ;; esac
-          case "$port" in ''|*[!0-9]*)        echo "::error::DEPLOY_PORT must be numeric"; exit 1 ;; esac
-          case "$user" in *[!A-Za-z0-9._@-]*) echo "::error::DEPLOY_USERNAME has unexpected characters after trimming"; exit 1 ;; esac
-
           command -v lftp >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq lftp; }
 
-          verify="${DEPLOY_TLS_VERIFY:-true}"
-          url="ftp://${host}:${port}"     # explicit FTPS is ftp:// + ssl-force, on port 21
-          echo "Connecting over explicit FTPS on port ${port} (verify-certificate=${verify})"
+          # Exact same generator + invocation the CI end-to-end test exercises.
+          # It sanitises/validates host/port/user, generates the lftp script
+          # (one `open`, no password, no separators, allowlist only), and runs
+          # `lftp --norc -f "$script"`.
+          bash tools/deploy/lftp-deploy.sh
 
-          script="$(mktemp)"
-          trap 'rm -f "$script"' EXIT
-          # Script holds NO credentials; ephemeral runner-only file, removed on
-          # exit. `set cmd:fail-exit yes` makes the first failed lftp command
-          # abort the session with a non-zero exit; `set -e` then fails the step,
-          # so UPLOAD_OK is never written and the marker-tag step never runs.
-          {
-            echo "set cmd:fail-exit yes"
-            echo "set net:max-retries 2"
-            echo "set net:timeout 20"
-            echo "set net:reconnect-interval-base 5"
-            echo "set ftp:ssl-force true"          # refuse a plaintext session
-            echo "set ftp:ssl-protect-data true"
-            echo "set ftp:ssl-protect-list true"
-            echo "set ssl:verify-certificate ${verify}"
-            # Connect here, in script mode. Password is taken from $LFTP_PASSWORD
-            # by --env-password - it is never written to this file.
-            echo "open -u \"${user}\" --env-password \"${url}\""
-            # Connection + auth + TLS check before any transfer. 'pwd' forces the
-            # control connection to open; it does not list or mirror the root.
-            echo "pwd"
-            echo "echo == FTPS session established; starting uploads =="
-            # Managed code directories only: upload and prune stale files INSIDE
-            # each named directory. The remote root is never listed or mirrored.
-            for d in public src config bin database vendor; do
-              echo "mirror -R --delete --no-perms --verbose --exclude-glob .DS_Store deploy-root/${d}/ ./${d}/"
-            done
-            # Individual top-level runtime files: upload only, never delete.
-            for f in composer.json composer.lock README.md .env.production.example; do
-              echo "put -O ./ deploy-root/${f}"
-            done
-            echo "echo == all uploads completed =="
-            echo "bye"
-          } > "$script"
-
-          # Script-mode only: no host/user/site/password on the command line.
-          lftp --norc -f "$script"
-
-          echo "FTPS deploy finished."
-          echo "UPLOAD_OK=1" >> "$GITHUB_ENV"   # gates the marker-tag step
+          # Reached only if lftp exited 0 (set -e). This is the gate: the
+          # marker-tag and summary steps require env.UPLOAD_OK == '1'.
+          echo "UPLOAD_OK=1" >> "$GITHUB_ENV"
 
       - name: Create or move the production-deployed marker tag
         # Only after the FTPS step signalled that every upload succeeded.

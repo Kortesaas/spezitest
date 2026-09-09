@@ -5,7 +5,7 @@ This repository is public and runs on **GitHub Free**. Two workflows live in
 
 | Workflow | File | Runs when | Does |
 | --- | --- | --- | --- |
-| **CI** | `ci.yml` | every pull request; every push to `main`; manual | Composer install, `composer check` (PHPStan max + unit tests + initial-data verify), integration tests against a MariaDB 10.11 service container, and the Python legacy-import tests. Fails fast. |
+| **CI** | `ci.yml` | every pull request; every push to `main`; manual | `build-and-test` job: deploy-path static checks, `composer check` (PHPStan max + unit + initial-data verify), MariaDB 10.11 integration tests, Python legacy-import tests. `ftps-deploy-e2e` job: end-to-end FTPS deploy against a disposable vsftpd. Fails fast. |
 | **Deploy to production** | `deploy.yml` | manually once to **adopt** the live server; then automatically after **CI succeeds on `main`**; manually again for rollback / migration releases | Builds the existing production artifact (`tools/build-release.sh`) and uploads it over **explicit FTPS** to the `spezitest-deploy` account, mirroring only the managed code directories. Never touches the database, `.env`, or `var/`. |
 
 Nothing deploys until the secrets below are set and `main`'s branch protection
@@ -113,41 +113,74 @@ so the following are structurally safe — not merely "excluded":
 > Implicit-FTPS hosts: `lftp` with `ftp:ssl-force true` refuses a plaintext
 > session, so a misconfigured port fails loudly instead of downgrading.
 
-The deploy step runs lftp in **script mode only** — `lftp --norc -f <script>`,
-with no host/user/site/password on the command line. The generated script
-carries the connection command itself:
+### One deployment implementation
+
+All FTPS deployment logic lives in **`tools/deploy/lftp-deploy.sh`** — there is
+no second copy. It is called, unchanged, by:
+
+| Caller | Purpose |
+| --- | --- |
+| `.github/workflows/deploy.yml` | production deploy |
+| `tools/ci/ftps-deploy-e2e.sh` | CI end-to-end test against a disposable server |
+| `tools/ci/check-deploy-workflow.sh` | static checks (`--print-script`, no network) |
+
+The helper sanitises/validates its inputs (whitespace-trimmed;
+`DEPLOY_HOST` `[A-Za-z0-9.-]`, `DEPLOY_PORT` digits, `DEPLOY_USERNAME`
+`[A-Za-z0-9._@-]`, `DEPLOY_TLS_VERIFY` a boolean), generates the lftp script,
+and runs **`lftp --norc -f "$script"`** — script mode only, no
+host/user/site/password on the command line. Generated script:
 
 ```
 set cmd:fail-exit yes
-set ftp:ssl-force true
+set ftp:ssl-force true          # explicit FTPS; a plaintext session is refused
 set ftp:ssl-protect-data true
 set ftp:ssl-protect-list true
 set ssl:verify-certificate true
 open -u "<username>" --env-password "ftp://<host>:<port>"
-pwd
-mirror -R --delete ... deploy-root/<dir>/ ./<dir>/     (x6 allowlisted dirs)
-put -O ./ deploy-root/<file>                            (x4 allowlisted files)
+pwd                             # TLS/auth check; does not list or mirror the root
+echo == FTPS session established - starting uploads ==    # plain text: no ';' '&&' '||'
+mirror -R --delete --no-perms --exclude-glob .DS_Store "<local>/<dir>/" "./<dir>/"   # x6
+put -O "./" "<local>/<file>"                                                         # x4
+echo == all uploads completed ==
+bye
 ```
 
-`host`, `port` and `username` are whitespace-trimmed and character-whitelisted
-(`[A-Za-z0-9.-]`, digits, `[A-Za-z0-9._@-]`) before the script is written, so
-none of them can carry a quote, space, newline, or lftp command into it. The
-password is read from `$LFTP_PASSWORD` by `--env-password` and never appears in
-the script, on a command line, or in logs.
+Every value interpolated into a line is either a fixed literal or one of the
+character-whitelisted inputs, so no line can gain a `;` / `&&` / `||` /
+backtick / `$(` / newline. The password is read from `$LFTP_PASSWORD` via
+`--env-password` and never appears in the script, on a command line, or in logs.
 
-`pwd` right after `open` is a TLS/auth check that does **not** list or mirror the
-remote root. The step sets an `UPLOAD_OK` marker only after every mirror and file
-upload succeeds; the `production-deployed` tag step and the summary step are
-guarded on `success() && env.UPLOAD_OK == '1'`, so a partial upload can never
-advance the tag.
+`DEPLOY_TLS_CA_FILE` (optional, **unset in production** — system trust store) adds
+one `set ssl:ca-file "..."` line; the CI test uses it to trust its self-signed
+certificate while keeping `verify-certificate = true`.
 
-> **Troubleshooting:**
-> - `Unknown command ':<port>'` — the `DEPLOY_HOST` / `DEPLOY_PORT` secret has a
->   trailing newline. Re-enter it without one. The step now trims and validates
->   both, failing fast with a clear message.
-> - `open: invalid option -- 'f'` — `lftp -f <file>` is a distinct invocation
->   mode and cannot be combined with `-u` / `--env-password` / a site argument.
->   The step now puts `open` inside the script and calls `lftp --norc -f`.
+The helper exits non-zero on the first failed lftp command (`cmd:fail-exit`).
+`deploy.yml` writes `UPLOAD_OK=1` only after it returns 0; the
+`production-deployed` tag step and the summary step are guarded on
+`success() && env.UPLOAD_OK == '1'`, so a partial upload can never advance the
+tag.
+
+### End-to-end test (`ftps-deploy-e2e` CI job)
+
+`tools/ci/ftps-deploy-e2e.sh` stands up a disposable **vsftpd** with explicit
+FTPS and a self-signed cert, pre-populates a fake app root (`.env`, `var/`,
+stale files inside `public/` and `src/`), runs the **same helper**, and asserts:
+the 6 dirs + 4 files deploy, stale files inside managed dirs are pruned, `.env`
+and `var/` are byte-for-byte unchanged, no unrelated root entry is touched,
+`UPLOAD_OK` is set only on success, and wrong-password / unreachable /
+mid-transfer failures all return non-zero with `UPLOAD_OK` unset. It also
+asserts the generated script directly (one `open`, no password, no separators,
+allowlist only, no `.env`/`var/`/root reference). No production secrets or host.
+
+> **Troubleshooting history:**
+> - `Unknown command ':<port>'` — a `DEPLOY_HOST` secret with a trailing newline
+>   split the lftp URL. The helper now trims + validates host/port.
+> - `open: invalid option -- 'f'` — `lftp -f <file>` cannot be combined with
+>   `-u`/`--env-password`/a site arg. `open` is inside the script; the call is
+>   `lftp --norc -f`.
+> - `Unknown command 'starting'` — a `;` in the `echo` status line is an lftp
+>   command separator. Status text is now separator-free and the static checker
+>   rejects `;` / `&&` / `||` in any generated line.
 
 ---
 
@@ -305,7 +338,8 @@ Add branch protection rule**):
     without a PR and CI.
   - Dismiss stale approvals on new commits: on.
 - **Require status checks to pass:** on.
-  - Add the check named **`build-and-test`** (from the **CI** workflow).
+  - Add the checks **`build-and-test`** and **`ftps-deploy-e2e`** (both from the
+    **CI** workflow).
   - Require branches to be up to date before merging: on.
 - **Require linear history:** optional (recommended; keep merges fast-forward /
   squash).
@@ -350,15 +384,19 @@ Add branch protection rule**):
 
 | CI step | Local equivalent |
 | --- | --- |
-| Deploy-workflow static checks | `sh tools/ci/check-deploy-workflow.sh` |
+| Deploy-path static checks | `sh tools/ci/check-deploy-workflow.sh` |
+| FTPS deploy end-to-end (`ftps-deploy-e2e` job) | `bash tools/ci/ftps-deploy-e2e.sh` (Linux + sudo + apt; installs vsftpd/lftp) |
 | `composer check` | `composer check` |
 | Integration tests | `composer test:integration` (needs `.env.testing` + a `*_test` MariaDB 10.11 DB) |
 | Legacy-import tests | `composer test:legacy-import` |
 | Artifact build | `sh tools/build-release.sh` |
 
-`check-deploy-workflow.sh` re-generates the lftp script and asserts: one valid
-`open` command, no password in the script, `lftp` invoked only as
-`lftp --norc -f <script>`, mirror/put targets strictly on the allowlist, and the
+`check-deploy-workflow.sh` renders the script via
+`tools/deploy/lftp-deploy.sh --print-script` and asserts: one valid
+`open` command, no password in the script, no `;` / `&&` / `||` / `` ` `` / `$(`
+in any generated line, `lftp` invoked only as
+`lftp --norc -f <script>` (inside the helper, never in the workflow),
+mirror/put targets strictly on the allowlist, and the
 `production-deployed` tag + summary steps gated on `UPLOAD_OK` (set only after
 all transfers).
 

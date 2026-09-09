@@ -1,18 +1,21 @@
 #!/usr/bin/env sh
-# Static safety checks for the FTPS deploy step in
-# .github/workflows/deploy.yml. No network and no lftp binary required.
+# Static safety checks for the FTPS deployment path. No network, no lftp binary.
 #
-# It re-generates the lftp script exactly as the workflow does (with sample,
-# already-sanitised host/port/user) and asserts:
-#   1. the script contains exactly one valid `open` command
-#   2. no password / password reference is present in the script
-#   3. the workflow invokes lftp ONLY as `lftp --norc -f "$script"`
-#      (no host/user/site/password on the command line)
-#   4. every mirror/put target is on the allowlist and nothing touches the
-#      remote root, `.env`, `var/`, or a parent directory
-#   5. the `production-deployed` tag step and the summary step are gated on
-#      `success() && env.UPLOAD_OK == '1'`, and UPLOAD_OK is set only after
-#      the lftp call
+# Deployment logic lives in ONE place - tools/deploy/lftp-deploy.sh - which both
+# production (.github/workflows/deploy.yml) and the end-to-end test
+# (tools/ci/ftps-deploy-e2e.sh) call. This checker renders the generated lftp
+# script with `--print-script` and asserts:
+#
+#   1. exactly one valid `open` command
+#   2. no password value / no password embedded in `open -u user,pass`
+#   3. no lftp command separators (';' '&&' '||') or command substitution
+#      ('`' , '$(' ) in ANY generated line - echo/status lines included
+#   4. mirror/put targets are exactly the allowlist; no remote-root mirror,
+#      no `.env` / `var/` reference
+#   5. the workflow calls the shared helper (not an inline lftp), and the helper
+#      invokes lftp only as `lftp --norc -f "$script"`
+#   6. the `production-deployed` tag + summary steps are gated on
+#      `success() && env.UPLOAD_OK == '1'`, set only after the helper call
 #
 # Exit non-zero on the first failed assertion.
 
@@ -20,105 +23,89 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 WF="$ROOT/.github/workflows/deploy.yml"
-[ -f "$WF" ] || { echo "FAIL: $WF not found" >&2; exit 1; }
+HELPER="$ROOT/tools/deploy/lftp-deploy.sh"
+[ -f "$WF" ]     || { echo "FAIL: $WF not found" >&2; exit 1; }
+[ -f "$HELPER" ] || { echo "FAIL: $HELPER not found" >&2; exit 1; }
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok()   { echo "ok  : $*"; }
 
-ALLOW_DIRS="public src config bin database vendor"
-ALLOW_FILES="composer.json composer.lock README.md .env.production.example"
+ALLOW_DIRS="bin config database public src vendor"                       # sorted
+ALLOW_FILES=".env.production.example README.md composer.json composer.lock"  # C-sorted
 
-# --- reproduce the generated lftp script (sanitised sample inputs) ----------
-host="web01.st-srv.eu"; port="21"; user="spezitest-deploy"; verify="true"
-url="ftp://${host}:${port}"
-# A stand-in password value: it must NOT end up anywhere in the script.
-LFTP_PASSWORD='PLACEHOLDER-not-a-real-secret-9Zx'
-export LFTP_PASSWORD
+# --- render the generated script exactly as production would ----------------
+STANDIN_PW='PLACEHOLDER-not-a-real-secret-9Zx'
+script=$(mktemp); trap 'rm -f "$script"' EXIT
+DEPLOY_HOST=web01.example.test \
+DEPLOY_PORT=21 \
+DEPLOY_USERNAME=spezitest-deploy \
+LFTP_PASSWORD="$STANDIN_PW" \
+DEPLOY_TLS_VERIFY=true \
+  bash "$HELPER" --print-script > "$script" || fail "helper --print-script failed"
 
-script=$(mktemp)
-trap 'rm -f "$script"' EXIT
-
-{
-  echo "set cmd:fail-exit yes"
-  echo "set net:max-retries 2"
-  echo "set net:timeout 20"
-  echo "set net:reconnect-interval-base 5"
-  echo "set ftp:ssl-force true"
-  echo "set ftp:ssl-protect-data true"
-  echo "set ftp:ssl-protect-list true"
-  echo "set ssl:verify-certificate ${verify}"
-  echo "open -u \"${user}\" --env-password \"${url}\""
-  echo "pwd"
-  echo "echo == FTPS session established; starting uploads =="
-  for d in $ALLOW_DIRS; do
-    echo "mirror -R --delete --no-perms --verbose --exclude-glob .DS_Store deploy-root/${d}/ ./${d}/"
-  done
-  for f in $ALLOW_FILES; do
-    echo "put -O ./ deploy-root/${f}"
-  done
-  echo "echo == all uploads completed =="
-  echo "bye"
-} > "$script"
-
-# 1. exactly one valid `open`
+# 1. exactly one valid open
 opens=$(grep -c '^open ' "$script" || true)
 [ "$opens" = "1" ] || fail "expected exactly one 'open' line, found $opens"
 grep -Eq '^open -u "[A-Za-z0-9._@-]+" --env-password "ftp://[A-Za-z0-9.-]+:[0-9]+"$' "$script" \
   || fail "open line not in the expected safe form: $(grep '^open ' "$script")"
 ok "one valid open command: $(grep '^open ' "$script")"
 
-# 2. password absent from the script
-grep -Fq "$LFTP_PASSWORD" "$script" && fail "password VALUE present in generated script"
-grep -Eq 'LFTP_PASSWORD[ =]' "$script" && fail "LFTP_PASSWORD assigned/expanded in generated script"
+# 2. no password
+grep -Fq "$STANDIN_PW" "$script" && fail "password VALUE present in generated script"
 grep -Eq 'open[^\n]* -u +"?[^" ]+,' "$script" && fail "password embedded in 'open -u user,pass'"
-# the only 'pass'-ish token allowed is the --env-password mechanism itself
 if grep -oE '[A-Za-z_-]*[Pp]ass[A-Za-z_-]*' "$script" | grep -qxv -- '--env-password'; then
   fail "unexpected password-related token in generated script"
 fi
-ok "no password value, no password assignment; only --env-password mechanism"
+ok "no password value; only the --env-password mechanism"
 
-# 3. lftp invoked only in script mode
-#    Look at non-comment lines whose first token (after trimming) is `lftp`.
-noncomment=$(grep -vE '^[[:space:]]*#' "$WF")
-inv=$(printf '%s\n' "$noncomment" | sed 's/^[[:space:]]*//' | grep -E '^lftp[[:space:]]')
-[ "$(printf '%s\n' "$inv" | grep -c .)" = "1" ] || fail "expected exactly one lftp invocation, got:
+# 3. no lftp command separators / substitution anywhere in the script
+if grep -Eq '(;|&&|\|\|)' "$script"; then
+  fail "generated script line contains an lftp command separator: $(grep -nE '(;|&&|\|\|)' "$script" | head -1)"
+fi
+if grep -Eq '\$\(|`' "$script"; then
+  fail "generated script line contains a command substitution: $(grep -nE '\$\(|`' "$script" | head -1)"
+fi
+if LC_ALL=C grep -q '[^[:print:][:space:]]' "$script"; then
+  fail "generated script contains control / non-printable characters"
+fi
+ok "no ';' '&&' '||' '\`' '\$(' and no control chars in any generated line"
+
+# 4. allowlist only, no root mirror, no .env / var reference
+mdirs=$(grep '^mirror ' "$script" | sed -E 's#.*"[^"]*/([A-Za-z]+)/" "\./[A-Za-z]+/".*#\1#' | LC_ALL=C sort | tr '\n' ' ')
+[ "$mdirs" = "$(printf '%s ' $ALLOW_DIRS)" ] || fail "mirror dirs [$mdirs] != allowlist [$(printf '%s ' $ALLOW_DIRS)]"
+pfiles=$(grep '^put ' "$script" | sed -E 's#.*/([^/"]+)"$#\1#' | LC_ALL=C sort | tr '\n' ' ')
+[ "$pfiles" = "$(printf '%s ' $ALLOW_FILES)" ] || fail "put files [$pfiles] != allowlist [$(printf '%s ' $ALLOW_FILES)]"
+grep -Eq 'mirror[^"]*"\.?/?" ' "$script" && fail "generated script mirrors the remote root"
+grep -Eiq 'mirror[^"]*"[^"]*/(var|\.env)/"' "$script" && fail "a mirror target references .env or var/"
+grep -q 'set ftp:ssl-force true' "$script" || fail "explicit FTPS (ssl-force) missing from the script"
+grep -Eq 'set ssl:verify-certificate (true|yes|on)' "$script" || fail "certificate verification missing from the script"
+ok "mirror + put targets are exactly the allowlist; explicit FTPS + cert verification present"
+
+# 5. workflow uses the shared helper; helper invokes lftp only in script mode
+wf_noncomment=$(grep -vE '^[[:space:]]*#' "$WF")
+printf '%s\n' "$wf_noncomment" | grep -Eq 'bash tools/deploy/lftp-deploy\.sh( |$)' \
+  || fail "deploy.yml does not call the shared helper 'bash tools/deploy/lftp-deploy.sh'"
+printf '%s\n' "$wf_noncomment" | sed 's/^[[:space:]]*//' | grep -Eq '^lftp[[:space:]]' \
+  && fail "deploy.yml still invokes lftp inline (should be only inside the helper)"
+hp_noncomment=$(grep -vE '^[[:space:]]*#' "$HELPER")
+inv=$(printf '%s\n' "$hp_noncomment" | sed 's/^[[:space:]]*//' | grep -E '^lftp[[:space:]]')
+[ "$(printf '%s\n' "$inv" | grep -c .)" = "1" ] || fail "helper must invoke lftp exactly once, got:
 $inv"
 printf '%s\n' "$inv" | grep -Eq '^lftp --norc -f "\$script"$' \
-  || fail "lftp invocation is not 'lftp --norc -f \"\$script\"': $inv"
+  || fail "helper lftp invocation is not 'lftp --norc -f \"\$script\"': $inv"
 printf '%s\n' "$inv" | grep -Eq -- '(-u |--user|--env-password|ftp://|,)' \
-  && fail "lftp command line carries host/user/site/password: $inv"
-printf '%s\n' "$noncomment" | sed 's/^[[:space:]]*//' | grep -E '^lftp[[:space:]]' \
-  | grep -Eq -- '(-u |--env-password|ftp://)' \
-  && fail "an lftp invocation carries connection args on the command line"
-ok "lftp invoked only as: $inv"
+  && fail "helper lftp command line carries host/user/site/password: $inv"
+ok "workflow calls the shared helper; helper runs 'lftp --norc -f \"\$script\"' only"
 
-# 4. allowlist only; never the remote root, .env, var/, or a parent
-mdirs=$(grep -oE 'deploy-root/[a-z]+/ \./[a-z]+/' "$script" | sed 's#deploy-root/##; s#/ .*##' | sort -u | tr '\n' ' ')
-want_d=$(printf '%s\n' $ALLOW_DIRS | sort -u | tr '\n' ' ')
-[ "$mdirs" = "$want_d" ] || fail "mirror dirs [$mdirs] != allowlist [$want_d]"
-pfiles=$(grep -oE 'put -O \./ deploy-root/[^ ]+$' "$script" | sed 's#.*deploy-root/##' | sort -u | tr '\n' ' ')
-want_f=$(printf '%s\n' $ALLOW_FILES | sort -u | tr '\n' ' ')
-[ "$pfiles" = "$want_f" ] || fail "put files [$pfiles] != allowlist [$want_f]"
-grep -Eq '(mirror|put|get|rm|mput|mget)[^\n]*(\.\./|/\.env( |$)|/var/)' "$script" \
-  && fail "a transfer command references a parent, .env, or var/"
-grep -Eq '^(cls|ls|find|mirror|nlist|du)[^-]* \.?/?$' "$script" \
-  && fail "a command enumerates or mirrors the remote root"
-# same guarantees hold in the real workflow text
-grep -Eq 'for d in public src config bin database vendor; do' "$WF" \
-  || fail "workflow mirror allowlist changed"
-grep -Eq 'for f in composer.json composer.lock README.md .env.production.example; do' "$WF" \
-  || fail "workflow file allowlist changed"
-ok "mirrors + puts strictly allowlisted; no root/.env/var/ access"
-
-# 5. tag + summary steps gated on UPLOAD_OK, set only after lftp
+# 6. tag + summary steps gated on UPLOAD_OK, set only after the helper call
 gated=$(grep -cE "if: success\(\) && env\.UPLOAD_OK == '1'" "$WF" || true)
 [ "$gated" -ge 2 ] || fail "expected >=2 steps gated on UPLOAD_OK (tag + summary), found $gated"
 grep -Fq 'echo "UPLOAD_OK=1" >> "$GITHUB_ENV"' "$WF" || fail "UPLOAD_OK is never set"
 awk '
-  /lftp --norc -f "\$script"/ { seen_lftp = 1 }
-  /UPLOAD_OK=1/ { if (!seen_lftp) { print "UPLOAD_OK set before the lftp call"; exit 1 } }
-' "$WF" || fail "UPLOAD_OK is set before the lftp call"
+  /bash tools\/deploy\/lftp-deploy\.sh/ { seen = 1 }
+  /UPLOAD_OK=1/ { if (!seen) { print "UPLOAD_OK set before the helper call"; exit 1 } }
+' "$WF" || fail "UPLOAD_OK is set before the deploy helper call"
 grep -Eq 'git (tag|push).*production-deployed' "$WF" || fail "production-deployed tag step missing"
-ok "production-deployed tag + summary gated on UPLOAD_OK (set only after all transfers)"
+ok "production-deployed tag + summary gated on UPLOAD_OK (set only after a successful deploy)"
 
 echo "ALL DEPLOY-WORKFLOW STATIC CHECKS PASSED"
