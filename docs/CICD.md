@@ -113,19 +113,41 @@ so the following are structurally safe — not merely "excluded":
 > Implicit-FTPS hosts: `lftp` with `ftp:ssl-force true` refuses a plaintext
 > session, so a misconfigured port fails loudly instead of downgrading.
 
-The deploy step connects, authenticates and runs `pwd` (a TLS/auth check that
-does **not** list or mirror the remote root) before any transfer. It sets an
-`UPLOAD_OK` marker only after every mirror and file upload succeeds; the
-`production-deployed` tag step is guarded on that marker, so a partial upload
-can never advance the tag.
+The deploy step runs lftp in **script mode only** — `lftp --norc -f <script>`,
+with no host/user/site/password on the command line. The generated script
+carries the connection command itself:
 
-> **Troubleshooting — `Unknown command ':<port>'`:** the `DEPLOY_HOST` (or
-> `DEPLOY_PORT`) secret contains a trailing newline. `lftp` then split the site
-> argument on the newline, opened `ftp://<host>`, and parsed the leftover
-> `:<port>` as a command. Re-enter the secret with no trailing newline. The
-> deploy step now also trims whitespace and validates both values before
-> building the URL, so this fails fast with a clear message rather than a
-> confusing lftp error.
+```
+set cmd:fail-exit yes
+set ftp:ssl-force true
+set ftp:ssl-protect-data true
+set ftp:ssl-protect-list true
+set ssl:verify-certificate true
+open -u "<username>" --env-password "ftp://<host>:<port>"
+pwd
+mirror -R --delete ... deploy-root/<dir>/ ./<dir>/     (x6 allowlisted dirs)
+put -O ./ deploy-root/<file>                            (x4 allowlisted files)
+```
+
+`host`, `port` and `username` are whitespace-trimmed and character-whitelisted
+(`[A-Za-z0-9.-]`, digits, `[A-Za-z0-9._@-]`) before the script is written, so
+none of them can carry a quote, space, newline, or lftp command into it. The
+password is read from `$LFTP_PASSWORD` by `--env-password` and never appears in
+the script, on a command line, or in logs.
+
+`pwd` right after `open` is a TLS/auth check that does **not** list or mirror the
+remote root. The step sets an `UPLOAD_OK` marker only after every mirror and file
+upload succeeds; the `production-deployed` tag step and the summary step are
+guarded on `success() && env.UPLOAD_OK == '1'`, so a partial upload can never
+advance the tag.
+
+> **Troubleshooting:**
+> - `Unknown command ':<port>'` — the `DEPLOY_HOST` / `DEPLOY_PORT` secret has a
+>   trailing newline. Re-enter it without one. The step now trims and validates
+>   both, failing fast with a clear message.
+> - `open: invalid option -- 'f'` — `lftp -f <file>` is a distinct invocation
+>   mode and cannot be combined with `-u` / `--env-password` / a site argument.
+>   The step now puts `open` inside the script and calls `lftp --norc -f`.
 
 ---
 
@@ -328,10 +350,17 @@ Add branch protection rule**):
 
 | CI step | Local equivalent |
 | --- | --- |
+| Deploy-workflow static checks | `sh tools/ci/check-deploy-workflow.sh` |
 | `composer check` | `composer check` |
 | Integration tests | `composer test:integration` (needs `.env.testing` + a `*_test` MariaDB 10.11 DB) |
 | Legacy-import tests | `composer test:legacy-import` |
 | Artifact build | `sh tools/build-release.sh` |
+
+`check-deploy-workflow.sh` re-generates the lftp script and asserts: one valid
+`open` command, no password in the script, `lftp` invoked only as
+`lftp --norc -f <script>`, mirror/put targets strictly on the allowlist, and the
+`production-deployed` tag + summary steps gated on `UPLOAD_OK` (set only after
+all transfers).
 
 The production runtime still needs **no Node.js, Docker, or SSH** — those appear
 only on the GitHub-hosted runner while building the artifact.
