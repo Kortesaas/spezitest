@@ -6,13 +6,22 @@ This repository is public and runs on **GitHub Free**. Two workflows live in
 | Workflow | File | Runs when | Does |
 | --- | --- | --- | --- |
 | **CI** | `ci.yml` | every pull request; every push to `main`; manual | Composer install, `composer check` (PHPStan max + unit tests + initial-data verify), integration tests against a MariaDB 10.11 service container, and the Python legacy-import tests. Fails fast. |
-| **Deploy to production** | `deploy.yml` | automatically after **CI succeeds on `main`**; or manually (rollback / migration releases) | Builds the existing production artifact (`tools/build-release.sh`) and uploads it over **explicit FTPS** to the `spezitest-deploy` account, mirroring only the managed code directories. Never touches the database. |
+| **Deploy to production** | `deploy.yml` | manually once to **adopt** the live server; then automatically after **CI succeeds on `main`**; manually again for rollback / migration releases | Builds the existing production artifact (`tools/build-release.sh`) and uploads it over **explicit FTPS** to the `spezitest-deploy` account, mirroring only the managed code directories. Never touches the database, `.env`, or `var/`. |
 
 Nothing deploys until the secrets below are set and `main`'s branch protection
-is configured. **The first production go-live is still the manual procedure in
-[`DEPLOYMENT.md`](DEPLOYMENT.md)** (create the DB + user, write `.env`, run
-`bin/migrate.php` as a one-off Plesk Scheduled Task, import the seed). This
-pipeline takes over for code releases *after* that.
+is configured.
+
+**Production is already live and initialized** — the database, `.env`, and
+`var/` images exist and the application was previously deployed by hand. The
+first pipeline deploy is an **adoption** step (§4a): run once manually, it
+uploads only application code and creates the `production-deployed` tag. It does
+**not** create, seed, migrate, or reset the database and does **not** write
+`.env` or `var/`.
+
+> [`DEPLOYMENT.md`](DEPLOYMENT.md) is **fresh-install documentation only** — for
+> standing up a brand-new empty server (create DB + user, `.env`, run
+> `bin/migrate.php`, import the seed). It is **not** the CI/CD first-deploy path
+> for the existing server and must never be run against it.
 
 ---
 
@@ -131,6 +140,33 @@ so the following are structurally safe — not merely "excluded":
 - `environment: production` — attach required reviewers here for a manual
   approval gate, and scope the `DEPLOY_*` secrets to this environment.
 
+### 4a. First deploy — adopting the existing production server
+
+Production is already running. The first pipeline deploy just points the
+pipeline at it. It **does not** touch the database, run migrations, import
+seed/legacy data, or recreate `.env` / `var/`.
+
+Until the `production-deployed` tag exists, an automatic (`workflow_run`) deploy
+stops with an instruction summary instead of uploading. Do this once:
+
+1. **Confirm the FTP root.** The `spezitest-deploy` account must log in **at the
+   existing `spezitest/` application directory** — the one that already contains
+   `public/`, `src/`, `.env`, and `var/` (not at `public/`, not at the
+   subscription root).
+2. **Add the four secrets** — `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USERNAME`,
+   `DEPLOY_PASSWORD` (§2), ideally on the `production` environment.
+3. **Actions → Deploy to production → Run workflow**, branch `main`, inputs left
+   at defaults (`ref` empty, `migrations_ack` unchecked).
+4. The run builds the artifact, uploads **only** the managed code directories
+   (`public src config bin database vendor`) plus `composer.json`,
+   `composer.lock`, `README.md`, `.env.production.example`, and then **creates**
+   `production-deployed` on the deployed commit.
+5. From then on, a successful CI run on `main` deploys automatically (subject to
+   the migration check in §5).
+
+If the deployed FTP account root or the live layout is ever wrong, fix the FTP
+account — never repoint it by editing server files.
+
 ---
 
 ## 5. Database migrations
@@ -172,9 +208,11 @@ matching code is deployed.
 5. **`migrations_ack = true` means one thing only:** *"I have already applied
    and verified the production schema change manually — allow CODE deployment."*
    It triggers no database action in the workflow.
-6. First deploy ever (no `production-deployed` tag): the auto path stops and
-   asks for a manual first deploy; initial schema creation is the manual
-   `DEPLOYMENT.md` procedure.
+6. First deploy (no `production-deployed` tag yet): there is no baseline to diff
+   against, so **no migration or seed requirement is implied**. The auto path
+   stops and asks for the one-time manual adoption deploy (§4a); the existing
+   production database, `.env`, and `var/` are left untouched. The diff check in
+   step 2 applies from the second deploy onward.
 
 This ordering is deliberate: the schema is always migrated and verified on a
 fresh backup *before* the code that depends on it goes live. Any future

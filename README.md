@@ -122,8 +122,10 @@ decimal comma.
 - `AGENTS.md`: mandatory guidance for future coding agents.
 - `docs/ARCHITECTURE.md`: architectural boundaries and runtime structure.
 - `docs/PRODUCTION.md`: hosting and production security constraints.
-- `docs/DEPLOYMENT.md`: the step-by-step Plesk deployment procedure, environment
-  checklist, database creation, initial-data import, and verification.
+- `docs/DEPLOYMENT.md`: the step-by-step Plesk **fresh-install** procedure for a
+  brand-new empty server (environment checklist, database creation, initial-data
+  import, verification). Not the CI/CD path for the already-live server — that is
+  `docs/CICD.md`.
 - `docs/INSTALLATION.md`: complete fresh-install instructions for another
   development computer and for building the two server deployment archives.
 - `docs/DATA_LIFECYCLE.md`: the canonical lifecycle of a drink and historical
@@ -415,9 +417,11 @@ suite, and the Python legacy-import tests on every pull request and every push
 to `main`. `.github/workflows/deploy.yml` builds the existing production
 artifact and uploads it to the Plesk host over explicit FTPS after CI succeeds
 on `main`, mirroring only the managed code directories and never touching
-`.env`, `var/`, or the database. The branching model, required GitHub secrets
-and settings, the migration hold, and the rollback procedure are documented in
-[`docs/CICD.md`](docs/CICD.md).
+`.env`, `var/`, or the database. Production is already live: the first pipeline
+deploy is a one-time manual **adoption** step (code upload only — no DB, seed,
+migration, `.env`, or `var/` changes). The branching model, required GitHub
+secrets and settings, the adoption deploy, the migration hold, and the rollback
+procedure are documented in [`docs/CICD.md`](docs/CICD.md).
 
 ## Legacy audit tooling
 
