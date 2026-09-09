@@ -257,47 +257,75 @@ jobs:
           # Optional repo variable. Leave unset for strict certificate validation.
           DEPLOY_TLS_VERIFY: ${{ vars.DEPLOY_TLS_VERIFY }}
         run: |
-          set -eu   # deliberately NOT set -x: never echo a command line with the password
-          : "${DEPLOY_HOST:?set the DEPLOY_HOST secret}"
-          : "${DEPLOY_PORT:?set the DEPLOY_PORT secret}"
-          : "${DEPLOY_USERNAME:?set the DEPLOY_USERNAME secret}"
-          : "${LFTP_PASSWORD:?set the DEPLOY_PASSWORD secret}"
+          set -euo pipefail   # deliberately NOT set -x: never echo the password
+
+          # --- Why the first run failed -----------------------------------
+          # A GitHub secret pasted through the UI often keeps a trailing newline
+          # (or CR). When "${DEPLOY_HOST}:${DEPLOY_PORT}" was substituted into
+          # the lftp site argument it became  ftp://<host>\n:<port> . lftp reads
+          # its arguments as commands and treats a newline as a command
+          # separator, so it ran  open ftp://<host>  and then tried to run the
+          # leftover  :<port>  as the next command  ->  "Unknown command ':<port>'".
+          # Fix: strip all whitespace from host/port/user and validate them, so
+          # the URL is always a single clean token.
+          host="$(printf '%s' "${DEPLOY_HOST:-}"     | tr -d '[:space:]')"
+          port="$(printf '%s' "${DEPLOY_PORT:-}"     | tr -d '[:space:]')"
+          user="$(printf '%s' "${DEPLOY_USERNAME:-}" | tr -d '[:space:]')"
+          : "${host:?DEPLOY_HOST secret is empty}"
+          : "${port:?DEPLOY_PORT secret is empty}"
+          : "${user:?DEPLOY_USERNAME secret is empty}"
+          : "${LFTP_PASSWORD:?DEPLOY_PASSWORD secret is empty}"
+          case "$host" in *[!A-Za-z0-9.-]*) echo "::error::DEPLOY_HOST has unexpected characters after trimming"; exit 1 ;; esac
+          case "$port" in ''|*[!0-9]*)      echo "::error::DEPLOY_PORT must be numeric"; exit 1 ;; esac
+
           command -v lftp >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq lftp; }
 
-          VERIFY="${DEPLOY_TLS_VERIFY:-true}"
+          verify="${DEPLOY_TLS_VERIFY:-true}"
+          url="ftp://${host}:${port}"     # explicit FTPS is ftp:// + ssl-force, on port 21
+          echo "Connecting over explicit FTPS on port ${port} (verify-certificate=${verify})"
 
-          SCRIPT="$(mktemp)"
-          trap 'rm -f "$SCRIPT"' EXIT
-          # Script holds no credentials. It is an ephemeral runner-only file,
-          # removed on exit. ftp:ssl-force makes lftp REFUSE a plaintext session
-          # rather than silently downgrading.
+          script="$(mktemp)"
+          trap 'rm -f "$script"' EXIT
+          # Script holds no credentials; ephemeral runner-only file, removed on
+          # exit. cmd:fail-exit + set -o pipefail mean the first failed lftp
+          # command aborts the whole session with a non-zero exit, so the step
+          # fails and the marker-tag step (guarded on UPLOAD_OK) never runs.
           {
             echo "set cmd:fail-exit yes"
             echo "set net:max-retries 2"
             echo "set net:timeout 20"
             echo "set net:reconnect-interval-base 5"
-            echo "set ftp:ssl-force true"
+            echo "set ftp:ssl-force true"          # refuse a plaintext session
             echo "set ftp:ssl-protect-data true"
             echo "set ftp:ssl-protect-list true"
-            echo "set ssl:verify-certificate ${VERIFY}"
+            echo "set ssl:verify-certificate ${verify}"
+            # Connection + auth + TLS check before any transfer. 'pwd' forces the
+            # control connection to open; it does not list or mirror the root.
             echo "pwd"
-            # managed code directories: upload + prune stale files INSIDE each dir only
+            echo "echo == FTPS session established; starting uploads =="
+            # Managed code directories only: upload and prune stale files INSIDE
+            # each named directory. The remote root is never listed or mirrored.
             for d in public src config bin database vendor; do
-              echo "mirror -R --delete --no-perms --verbose --exclude-glob .DS_Store deploy-root/$d/ ./$d/"
+              echo "mirror -R --delete --no-perms --verbose --exclude-glob .DS_Store deploy-root/${d}/ ./${d}/"
             done
-            # individual top-level runtime files: upload, never delete anything
-            echo "put -O ./ deploy-root/composer.json"
-            echo "put -O ./ deploy-root/composer.lock"
-            echo "put -O ./ deploy-root/README.md"
-            echo "put -O ./ deploy-root/.env.production.example"
+            # Individual top-level runtime files: upload only, never delete.
+            for f in composer.json composer.lock README.md .env.production.example; do
+              echo "put -O ./ deploy-root/${f}"
+            done
+            echo "echo == all uploads completed =="
             echo "bye"
-          } > "$SCRIPT"
-          echo "Deploying to ftp://${DEPLOY_HOST}:${DEPLOY_PORT} (explicit FTPS, verify-certificate=${VERIFY})"
-          lftp -u "$DEPLOY_USERNAME" --env-password "ftp://${DEPLOY_HOST}:${DEPLOY_PORT}" -f "$SCRIPT"
+          } > "$script"
+
+          # Password comes from LFTP_PASSWORD via --env-password: not on the
+          # command line, not in the script, not in the process list.
+          lftp -u "$user" --env-password "$url" -f "$script"
+
           echo "FTPS deploy finished."
+          echo "UPLOAD_OK=1" >> "$GITHUB_ENV"   # gates the marker-tag step
 
       - name: Create or move the production-deployed marker tag
-        if: success()
+        # Only after the FTPS step signalled that every upload succeeded.
+        if: success() && env.UPLOAD_OK == '1'
         run: |
           set -eu
           git config user.name  "spezitest-deploy-bot"
@@ -308,7 +336,7 @@ jobs:
           echo "production-deployed -> $(git rev-parse --short production-deployed)"
 
       - name: Deploy summary
-        if: success()
+        if: success() && env.UPLOAD_OK == '1'
         run: |
           {
             echo "## Production deploy"
