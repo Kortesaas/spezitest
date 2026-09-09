@@ -1,0 +1,110 @@
+name: CI
+
+# Runs on every pull request and on every push to main.
+# Fails fast: any failing step fails the job, and the job is the required
+# status check that gates merges into main (see docs/CICD.md).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One CI run per ref. A newer push cancels the older, still-running CI for the
+# same branch/PR to keep the queue short on GitHub Free.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_DATABASE: spezitest_test
+          MARIADB_USER: spezitest_test
+          MARIADB_PASSWORD: spezitest_test
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    env:
+      # Integration-suite configuration. The suite refuses to run unless
+      # APP_ENV=testing and DB_NAME ends with "_test", so it can never touch a
+      # real database. These are throw-away values for the ephemeral service
+      # container above, not secrets.
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: spezitest_test
+      DB_USER: spezitest_test
+      DB_PASSWORD: spezitest_test
+      DB_CHARSET: utf8mb4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo, pdo_mysql, fileinfo
+          coverage: none
+          tools: composer:v2
+        env:
+          fail-fast: "true"
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Static analysis, unit tests, initial-data verification
+        run: composer check
+
+      - name: Wait for MariaDB 10.11
+        run: |
+          php -r '
+            for ($i = 0; $i < 30; $i++) {
+                try {
+                    new PDO("mysql:host=127.0.0.1;port=3306", "root", "root");
+                    echo "MariaDB is up.\n";
+                    exit(0);
+                } catch (Throwable $e) {
+                    fwrite(STDERR, "waiting for MariaDB...\n");
+                    sleep(2);
+                }
+            }
+            fwrite(STDERR, "MariaDB did not become ready in time.\n");
+            exit(1);
+          '
+
+      - name: Integration tests (MariaDB 10.11)
+        run: composer test:integration
+
+      - name: Legacy-import tests (Python 3, stdlib only)
+        run: composer test:legacy-import

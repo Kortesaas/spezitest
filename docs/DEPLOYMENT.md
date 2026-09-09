@@ -347,20 +347,36 @@ it there too.
 
 ## 12. Future database migrations
 
-New migrations are forward-only SQL files in `database/migrations/`. On
+New migrations are forward-only SQL files in `database/migrations/`. The
+production database is **manually managed**: the schema change is applied and
+verified by hand **before** the code that depends on it is deployed. Order on
 production:
 
-1. Take a database backup (Plesk Backup Manager + a phpMyAdmin export).
-2. Upload the new release (section 3, preserving `.env` and `var/`).
-3. **Plesk → Scheduled Tasks →** run once:
+1. **Back up the database** — Plesk Backup Manager (Databases) *and* a
+   phpMyAdmin export kept locally.
+2. **Review** the new migration SQL against the deployed application version.
+3. **Apply it** — **Plesk → Scheduled Tasks →** run once:
    `/opt/plesk/php/8.3/bin/php <app-root>/bin/migrate.php`
-4. Confirm the task output lists the applied version(s), then disable the task.
-5. Run the section 10 checks.
+   Confirm the task output lists the expected `Applied migration:` version(s),
+   then disable the task.
+4. **Verify the production database** — run the section 10 checks, including the
+   ones that exercise the new schema.
+5. **Only then deploy the matching code** — either manually (upload the new
+   release per section 3, preserving `.env` and `var/`), or, with the GitHub
+   Actions pipeline, re-run **Deploy to production** with `migrations_ack = true`
+   (see `docs/CICD.md` §5).
 
 The runner applies only unrecorded files, records a SHA-256 per file, and
 refuses if an already-applied file was edited. MariaDB DDL can commit
 implicitly, so a failed migration may need manual cleanup in phpMyAdmin before
 retrying — hence the mandatory pre-migration backup.
+
+When the GitHub Actions deploy pipeline is in use (see `docs/CICD.md`), a push
+to `main` that adds or changes a migration file **stops before uploading
+anything** and reports that steps 1–4 above are required. Nothing in the
+pipeline holds production database credentials or runs `bin/migrate.php` — the
+one-off Plesk Scheduled Task is the only thing that ever changes the production
+schema. Releases without migration changes continue to deploy automatically.
 
 ---
 
