@@ -19,8 +19,9 @@ final class HuntMapTest extends TestCase
             ['749' => [49.2, 9.2]],
             [],
             [
-                'AT' => ['5020' => [47.7994, 13.044, 'Salzburg']],
+                'AT' => ['5020' => [47.7994, 13.044, 'Salzburg'], '1190' => [48.2, 16.3, 'Wien']],
                 'SE' => ['352' => [56.8777, 14.8091, 'Växjö']],
+                'LU' => ['185' => [49.615, 6.141, 'Luxembourg']],
             ],
         );
     }
@@ -66,6 +67,31 @@ final class HuntMapTest extends TestCase
         self::assertSame('Växjö', $map->points[0]['place']);
         self::assertSame(56.8777, $map->points[0]['latitude']);
         self::assertSame([], $map->unplaced);
+    }
+
+    public function testPlacesBareFourDigitAndLuxembourgOrigins(): void
+    {
+        $collection = new RatedDrinkCollection([
+            // No "A-" prefix, no region: 1190 is uniquely Austrian.
+            CatalogFixture::untested('Wien Cola', 'identified', null, false, '2026-01-01 00:00:00', '1190 Wien'),
+            CatalogFixture::untested('Lux Cola', 'identified', null, false, '2026-01-01 00:00:00', 'L-1855 Luxemburg'),
+        ]);
+
+        $map = HuntMap::fromDrinks($collection->all(), $this->geocoder());
+
+        self::assertSame(2, $map->placed);
+        self::assertSame([], $map->unplaced);
+
+        $byKey = [];
+        foreach ($map->points as $point) {
+            $byKey[$point['key']] = $point;
+        }
+
+        self::assertArrayHasKey('at-1190', $byKey);
+        self::assertSame('Österreich', $byKey['at-1190']['country']);
+
+        self::assertArrayHasKey('lu-185', $byKey);
+        self::assertSame('Luxemburg', $byKey['lu-185']['country']);
     }
 
     public function testFromDrinksPlacesWhateverListItIsGivenRegardlessOfLifecycle(): void

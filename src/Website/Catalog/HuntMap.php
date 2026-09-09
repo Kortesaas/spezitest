@@ -13,8 +13,9 @@ use Spezitest\Website\Catalog\Geo\PostalGeocoder;
  * identified drinks via {@see self::fromCollection()}.
  *
  * Each drink is positioned from the postal code in its `origin_location` via
- * {@see PostalGeocoder} — Germany, or Austria / Switzerland / Liechtenstein /
- * Sweden when a country prefix or `origin_region` says so. Drinks sharing a place
+ * {@see PostalGeocoder} — Germany, or a neighbour country (Austria, Switzerland,
+ * Liechtenstein, Luxembourg, Sweden) by its prefix, region, or a shared code's
+ * town name. Drinks sharing a place
  * become one point with a combined list. Drinks whose origin resolves to no
  * mapped postal code (other foreign origins, blank entries) are reported in
  * {@see self::$unplaced} rather than dropped or guessed.
@@ -27,6 +28,7 @@ final readonly class HuntMap
         'CH' => 'Schweiz',
         'LI' => 'Liechtenstein',
         'SE' => 'Schweden',
+        'LU' => 'Luxemburg',
     ];
 
     /**
@@ -269,9 +271,10 @@ final readonly class HuntMap
     {
         $location = trim((string) $location);
         // Drop a leading country tag and the postal code: "A-5020 Salzburg",
-        // "SE-352 46 Växjö" and "72768 Reutlingen" all leave just the town.
+        // "SE-352 46 Växjö", "L-1855 Luxemburg" and "72768 Reutlingen" all leave
+        // just the town.
         $withoutCode = preg_replace(
-            '/^\s*(?:(?:A|AT|CH|D|DE|FL|LI|SE)[-\s]*)?(?:\d{3}\s\d{2}|\d{4,5})[-\s]*/i',
+            '/^\s*(?:(?:A|AT|CH|D|DE|FL|LI|LU|L|SE)[-\s]*)?(?:\d{3}\s\d{2}|\d{4,5})[-\s]*/i',
             '',
             $location,
         );
@@ -279,7 +282,7 @@ final readonly class HuntMap
 
         // Drop a trailing country ("Växjö, Schweden") — the map adds it back itself.
         $place = (string) preg_replace(
-            '/,\s*(?:Schweden|Sweden|Sverige|Österreich|Oesterreich|Schweiz|Liechtenstein)\s*$/iu',
+            '/,\s*(?:Schweden|Sweden|Sverige|Österreich|Oesterreich|Schweiz|Liechtenstein|Luxemburg|Luxembourg)\s*$/iu',
             '',
             $place,
         );

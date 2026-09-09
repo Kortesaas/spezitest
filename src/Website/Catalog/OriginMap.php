@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Spezitest\Website\Catalog;
 
+use Spezitest\Website\Catalog\Geo\PostalGeocoder;
+
 /**
  * Places catalogued drinks on an abstracted map of Germany.
  *
@@ -192,7 +194,9 @@ final readonly class OriginMap
 
             if ($prefix === null) {
                 ++$unplaced;
-                $label = $drink->originRegion ?? 'Ohne Herkunftsangabe';
+                $label = $drink->originRegion
+                    ?? self::foreignCountry($drink->originLocation)
+                    ?? 'Ohne Herkunftsangabe';
                 $elsewhere[$label] = ($elsewhere[$label] ?? 0) + 1;
 
                 continue;
@@ -294,6 +298,26 @@ final readonly class OriginMap
         $share = ($count - 1) / ($this->largest - 1);
 
         return round(5.0 + $share * 7.0, 1);
+    }
+
+    private const FOREIGN_NAMES = [
+        'AT' => 'Österreich',
+        'CH' => 'Schweiz',
+        'LI' => 'Liechtenstein',
+        'LU' => 'Luxemburg',
+        'SE' => 'Schweden',
+    ];
+
+    /**
+     * The country name a non-German origin resolves to, for the "elsewhere"
+     * tally — so a drink with a real foreign postal code counts under its
+     * country, not under "Ohne Herkunftsangabe".
+     */
+    private static function foreignCountry(?string $location): ?string
+    {
+        $classification = PostalGeocoder::classify($location);
+
+        return $classification === null ? null : (self::FOREIGN_NAMES[$classification['country']] ?? null);
     }
 
     private static function postalPrefix(?string $location): ?string

@@ -102,13 +102,30 @@ final class PostalGeocoderTest extends TestCase
         self::assertSame(['country' => 'AT', 'code' => '7122'], PostalGeocoder::classify('AT-7122 Gols'));
         self::assertSame(['country' => 'CH', 'code' => '8001'], PostalGeocoder::classify('CH-8001 Zürich'));
         self::assertSame(['country' => 'LI', 'code' => '9490'], PostalGeocoder::classify('FL-9490 Vaduz'));
+        self::assertSame(['country' => 'LU', 'code' => '1855'], PostalGeocoder::classify('L-1855 Luxemburg'));
 
-        // A bare four-digit code needs the region to name the country.
-        self::assertSame(['country' => 'AT', 'code' => '5020'], PostalGeocoder::classify('5020 Salzburg', 'Österreich'));
-        self::assertNull(PostalGeocoder::classify('5020 Salzburg'));
+        // A five-digit code stays German without a Sweden hint.
+        self::assertSame(['country' => 'DE', 'code' => '90210'], PostalGeocoder::classify('90210 Musterstadt'));
         self::assertNull(PostalGeocoder::classify('90210 Beverly Hills', 'USA'));
         self::assertNull(PostalGeocoder::classify('Irgendwo'));
         self::assertNull(PostalGeocoder::classify(null));
+    }
+
+    public function testBareFourDigitCodesResolveAgainstTheNeighbourTables(): void
+    {
+        // A four-digit code is never German. When it belongs to exactly one
+        // neighbour it is placed there even with no region.
+        self::assertSame(['country' => 'AT', 'code' => '1190'], PostalGeocoder::classify('1190 Wien'));
+        self::assertSame(['country' => 'AT', 'code' => '6230'], PostalGeocoder::classify('6230 Brixlegg'));
+        self::assertSame(['country' => 'AT', 'code' => '5020'], PostalGeocoder::classify('5020 Salzburg'));
+
+        // A code shared by Austria and Switzerland needs the town name.
+        self::assertSame(['country' => 'AT', 'code' => '5330'], PostalGeocoder::classify('5330 Fuschl am See'));
+        self::assertSame(['country' => 'CH', 'code' => '5330'], PostalGeocoder::classify('5330 Bad Zurzach'));
+        self::assertNull(PostalGeocoder::classify('5330'));
+
+        // Luxembourg stays out of the bare-code guessing; it needs its prefix.
+        self::assertSame(['country' => 'LU', 'code' => '1855'], PostalGeocoder::classify('1855 Luxemburg', 'Luxemburg'));
     }
 
     public function testSwedishFiveDigitCodesAreNotMistakenForGermanOnes(): void
@@ -154,6 +171,22 @@ final class PostalGeocoderTest extends TestCase
         self::assertNotNull($vaexjoe);
         self::assertEqualsWithDelta(56.88, $vaexjoe->latitude, 0.2);
         self::assertEqualsWithDelta(14.81, $vaexjoe->longitude, 0.2);
+    }
+
+    public function testBundledTablePlacesLuxembourgAndBareAustrianCodes(): void
+    {
+        $geocoder = PostalGeocoder::default();
+
+        $luxembourg = $geocoder->locate('L-1855 Luxemburg');
+        self::assertNotNull($luxembourg);
+        self::assertEqualsWithDelta(49.6, $luxembourg->latitude, 0.3);
+        self::assertEqualsWithDelta(6.13, $luxembourg->longitude, 0.3);
+
+        // "5330 Fuschl am See" — no prefix, no region — lands in Austria.
+        $fuschl = $geocoder->locate('5330 Fuschl am See');
+        self::assertNotNull($fuschl);
+        self::assertEqualsWithDelta(47.8, $fuschl->latitude, 0.3);
+        self::assertEqualsWithDelta(13.3, $fuschl->longitude, 0.3);
     }
 
     public function testLocatesNeighbourCodesFromTheForeignTable(): void

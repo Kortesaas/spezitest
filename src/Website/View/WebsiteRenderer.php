@@ -1176,9 +1176,9 @@ final class WebsiteRenderer
                 : '';
 
             $pinLabel = HuntMap::pointLabel($point);
-            $place = $point['country'] !== null
+            $place = $point['country'] !== null && $point['place'] !== '' && strcasecmp($point['place'], $point['country']) !== 0
                 ? $point['place'] . ' · ' . $point['country']
-                : $point['place'];
+                : ($point['place'] !== '' ? $point['place'] : (string) $point['country']);
 
             $entries .= '<section class="map__entry" id="ort-' . Html::e($point['key']) . '">'
                 . '<h3 class="map__entry-title">' . Html::e($place) . $approx

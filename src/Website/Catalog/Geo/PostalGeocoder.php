@@ -15,11 +15,14 @@ use RuntimeException;
  * is made.
  *
  * Germany is the default — a five-digit code, optionally with a `D-` prefix.
- * Austria (`A-`/`AT-`), Switzerland (`CH-`) and Liechtenstein (`FL-`) are
- * recognised by their prefix, or by a bare four-digit code when `origin_region`
- * names the country. Sweden (`SE-`) shares Germany's five-digit format, so it
- * needs the `SE-` prefix or an `origin_region` of "Schweden" to be told apart;
- * its table is keyed by the three-digit prefix, which pins the postal town.
+ * Austria (`A-`/`AT-`), Switzerland (`CH-`), Liechtenstein (`FL-`) and
+ * Luxembourg (`L-`/`LU-`) are recognised by their prefix. A bare four-digit
+ * code is never German (Germany went five-digit in 1993), so it is matched
+ * against the bundled neighbour tables — by `origin_region` when it names the
+ * country, otherwise by the trailing town name when the code is shared (Austria
+ * and Switzerland overlap heavily). Sweden (`SE-`) shares Germany's five-digit
+ * format, so it needs the `SE-` prefix or an `origin_region` of "Schweden";
+ * its table, like Luxembourg's, is keyed by the three-digit postal town.
  * Anything else — other foreign entries, blanks — resolves to null and the map
  * lists them separately.
  *
@@ -40,14 +43,25 @@ final readonly class PostalGeocoder
         'schweden' => 'SE',
         'sweden' => 'SE',
         'sverige' => 'SE',
+        'luxemburg' => 'LU',
+        'luxembourg' => 'LU',
+        'letzebuerg' => 'LU',
     ];
 
     /**
      * Foreign countries whose table is keyed by a shortened postal code rather
-     * than the full one. Sweden's five-digit codes are dense; the three-digit
-     * prefix is the postal town, which is all the map needs.
+     * than the full one. Sweden's and Luxembourg's code lists are dense; the
+     * three-digit prefix is the postal town, which is all the map needs.
      */
-    private const FOREIGN_KEY_LENGTH = ['SE' => 3];
+    private const FOREIGN_KEY_LENGTH = ['SE' => 3, 'LU' => 3];
+
+    /**
+     * Neighbours a bare four-digit code is matched against by table lookup.
+     * Luxembourg is left out on purpose: its three-digit table covers nearly
+     * every prefix, so including it would make almost every Austrian or Swiss
+     * code ambiguous. Luxembourg needs its `L-` prefix or a naming region.
+     */
+    private const FOUR_DIGIT_NEIGHBOURS = ['AT', 'CH', 'LI'];
 
     /**
      * Words in `origin_region` that name a country we do not map. A five-digit
@@ -56,10 +70,11 @@ final readonly class PostalGeocoder
      */
     private const FOREIGN_REGION_WORDS = [
         'usa', 'vereinigtestaaten', 'frankreich', 'france', 'italien', 'italia', 'italy',
-        'niederlande', 'netherlands', 'belgien', 'belgium', 'luxemburg', 'luxembourg',
+        'niederlande', 'netherlands', 'belgien', 'belgium',
         'daenemark', 'denmark', 'polen', 'poland', 'tschechien', 'czechia',
         'grossbritannien', 'england', 'spanien', 'spain',
     ];
+
 
     /**
      * @param array<int|string, array{0: float, 1: float, 2?: string}> $exact German codes, keyed by five-digit postal code
@@ -231,6 +246,10 @@ final readonly class PostalGeocoder
             return ['country' => 'LI', 'code' => $matches[1]];
         }
 
+        if (preg_match('/^(?:L|LU)[-\s]*(\d{4})(?!\d)/i', $value, $matches) === 1) {
+            return ['country' => 'LU', 'code' => $matches[1]];
+        }
+
         // Sweden: "SE-35246 Växjö" or the "SE-352 46 Växjö" spaced form.
         if (preg_match('/^SE[-\s]*(\d{3})[-\s]?(\d{2})(?!\d)/i', $value, $matches) === 1) {
             return ['country' => 'SE', 'code' => $matches[1] . $matches[2]];
@@ -251,10 +270,17 @@ final readonly class PostalGeocoder
             return ['country' => 'DE', 'code' => $matches[1]];
         }
 
-        if (preg_match('/^(\d{4})(?!\d)/', $value, $matches) === 1) {
+        if (preg_match('/^(\d{4})(?!\d)\s*(.*)$/', $value, $matches) === 1) {
+            $code = $matches[1];
             $country = self::countryFromRegion($regionHint);
 
-            return $country === null || $country === 'DE' ? null : ['country' => $country, 'code' => $matches[1]];
+            if ($country !== null && $country !== 'DE') {
+                return ['country' => $country, 'code' => $code];
+            }
+
+            // A four-digit code is never German. Match it against the bundled
+            // neighbour tables, using the trailing town name to break a tie.
+            return self::matchForeignCode($code, $matches[2]);
         }
 
         return null;
@@ -280,7 +306,7 @@ final readonly class PostalGeocoder
 
     /**
      * The key a foreign postal code takes in its country table — the full code
-     * for AT/CH/LI, the three-digit prefix for Sweden.
+     * for AT/CH/LI, the three-digit prefix for Sweden and Luxembourg.
      */
     private static function foreignKey(string $country, string $code): string
     {
@@ -288,6 +314,51 @@ final readonly class PostalGeocoder
 
         return substr($code, 0, $length);
     }
+
+    /**
+     * Resolve a bare four-digit code against the four-digit neighbour tables.
+     * A code known to exactly one country wins outright; a shared code is
+     * awarded to the country whose recorded town matches `$townText`.
+     *
+     * @return array{country: string, code: string}|null
+     */
+    private static function matchForeignCode(string $code, string $townText): ?array
+    {
+        $candidates = [];
+
+        $table = ForeignCentroids::all();
+
+        foreach (self::FOUR_DIGIT_NEIGHBOURS as $country) {
+            $row = $table[$country][self::foreignKey($country, $code)] ?? null;
+
+            if ($row !== null) {
+                $candidates[$country] = (string) ($row[2] ?? '');
+            }
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        if (count($candidates) === 1) {
+            return ['country' => (string) array_key_first($candidates), 'code' => $code];
+        }
+
+        $wanted = self::normalise($townText);
+
+        if ($wanted !== '') {
+            foreach ($candidates as $country => $town) {
+                $known = self::normalise($town);
+
+                if ($known !== '' && (str_contains($wanted, $known) || str_contains($known, $wanted))) {
+                    return ['country' => $country, 'code' => $code];
+                }
+            }
+        }
+
+        return null; // shared code, no town match — do not guess
+    }
+
 
     /**
      * The leading five-digit German postal code of a location string, or null —
