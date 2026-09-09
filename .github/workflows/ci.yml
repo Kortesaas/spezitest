@@ -58,6 +58,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Static safety checks for the production deploy workflow
+        run: sh tools/ci/check-deploy-workflow.sh
+
       - name: Set up PHP 8.3
         uses: shivammathur/setup-php@v2
         with:

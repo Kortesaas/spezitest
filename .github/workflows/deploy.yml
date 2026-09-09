@@ -259,15 +259,19 @@ jobs:
         run: |
           set -euo pipefail   # deliberately NOT set -x: never echo the password
 
-          # --- Why the first run failed -----------------------------------
-          # A GitHub secret pasted through the UI often keeps a trailing newline
-          # (or CR). When "${DEPLOY_HOST}:${DEPLOY_PORT}" was substituted into
-          # the lftp site argument it became  ftp://<host>\n:<port> . lftp reads
-          # its arguments as commands and treats a newline as a command
-          # separator, so it ran  open ftp://<host>  and then tried to run the
-          # leftover  :<port>  as the next command  ->  "Unknown command ':<port>'".
-          # Fix: strip all whitespace from host/port/user and validate them, so
-          # the URL is always a single clean token.
+          # --- Why earlier runs failed -----------------------------------
+          # (1) A GitHub secret pasted through the UI often keeps a trailing
+          #     newline/CR. Substituted into an lftp URL it became
+          #     ftp://<host>\n:<port>; lftp split on the newline and ran the
+          #     leftover ":<port>" as a command -> "Unknown command ':<port>'".
+          # (2) lftp's "-f <file>" is a SEPARATE invocation mode: it cannot be
+          #     combined with -u/--env-password/<site> on the same command line.
+          #     "lftp -u ... --env-password <url> -f <script>" made lftp pass the
+          #     trailing "-f" to the implicit open -> "open: invalid option -- 'f'".
+          #
+          # Fix for both: sanitise + character-whitelist host/port/user, put the
+          # "open" command (with the URL built from those clean values) INSIDE the
+          # script, and invoke lftp only as:  lftp --norc -f "$script".
           host="$(printf '%s' "${DEPLOY_HOST:-}"     | tr -d '[:space:]')"
           port="$(printf '%s' "${DEPLOY_PORT:-}"     | tr -d '[:space:]')"
           user="$(printf '%s' "${DEPLOY_USERNAME:-}" | tr -d '[:space:]')"
@@ -275,8 +279,11 @@ jobs:
           : "${port:?DEPLOY_PORT secret is empty}"
           : "${user:?DEPLOY_USERNAME secret is empty}"
           : "${LFTP_PASSWORD:?DEPLOY_PASSWORD secret is empty}"
-          case "$host" in *[!A-Za-z0-9.-]*) echo "::error::DEPLOY_HOST has unexpected characters after trimming"; exit 1 ;; esac
-          case "$port" in ''|*[!0-9]*)      echo "::error::DEPLOY_PORT must be numeric"; exit 1 ;; esac
+          # Character whitelists: nothing here can carry an lftp command, a quote,
+          # whitespace, or a newline into the generated script.
+          case "$host" in *[!A-Za-z0-9.-]*)   echo "::error::DEPLOY_HOST has unexpected characters after trimming"; exit 1 ;; esac
+          case "$port" in ''|*[!0-9]*)        echo "::error::DEPLOY_PORT must be numeric"; exit 1 ;; esac
+          case "$user" in *[!A-Za-z0-9._@-]*) echo "::error::DEPLOY_USERNAME has unexpected characters after trimming"; exit 1 ;; esac
 
           command -v lftp >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq lftp; }
 
@@ -286,10 +293,10 @@ jobs:
 
           script="$(mktemp)"
           trap 'rm -f "$script"' EXIT
-          # Script holds no credentials; ephemeral runner-only file, removed on
-          # exit. cmd:fail-exit + set -o pipefail mean the first failed lftp
-          # command aborts the whole session with a non-zero exit, so the step
-          # fails and the marker-tag step (guarded on UPLOAD_OK) never runs.
+          # Script holds NO credentials; ephemeral runner-only file, removed on
+          # exit. `set cmd:fail-exit yes` makes the first failed lftp command
+          # abort the session with a non-zero exit; `set -e` then fails the step,
+          # so UPLOAD_OK is never written and the marker-tag step never runs.
           {
             echo "set cmd:fail-exit yes"
             echo "set net:max-retries 2"
@@ -299,6 +306,9 @@ jobs:
             echo "set ftp:ssl-protect-data true"
             echo "set ftp:ssl-protect-list true"
             echo "set ssl:verify-certificate ${verify}"
+            # Connect here, in script mode. Password is taken from $LFTP_PASSWORD
+            # by --env-password - it is never written to this file.
+            echo "open -u \"${user}\" --env-password \"${url}\""
             # Connection + auth + TLS check before any transfer. 'pwd' forces the
             # control connection to open; it does not list or mirror the root.
             echo "pwd"
@@ -316,9 +326,8 @@ jobs:
             echo "bye"
           } > "$script"
 
-          # Password comes from LFTP_PASSWORD via --env-password: not on the
-          # command line, not in the script, not in the process list.
-          lftp -u "$user" --env-password "$url" -f "$script"
+          # Script-mode only: no host/user/site/password on the command line.
+          lftp --norc -f "$script"
 
           echo "FTPS deploy finished."
           echo "UPLOAD_OK=1" >> "$GITHUB_ENV"   # gates the marker-tag step
