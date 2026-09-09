@@ -49,8 +49,8 @@ scope them to the `production` *Environment* — see section 4):
 
 | Secret | Value | Notes |
 | --- | --- | --- |
-| `DEPLOY_HOST` | FTP hostname, e.g. `www.spezitest.de` or the Plesk server host | Used as `ftp://<host>:<port>` with explicit TLS. Prefer a name the TLS certificate actually covers so strict validation passes. |
-| `DEPLOY_PORT` | `21` | Explicit FTPS (AUTH TLS) over the normal FTP control port. Use `990` only if the host requires *implicit* FTPS — then also see the note in section 3. |
+| `DEPLOY_HOST` | FTP hostname only, e.g. `web01.st-srv.eu` — no scheme, no port, **no trailing newline** | Used as `ftp://<host>:<port>` with explicit TLS. Prefer a name the TLS certificate actually covers so strict validation passes. The deploy step trims surrounding whitespace and rejects anything outside `[A-Za-z0-9.-]`. |
+| `DEPLOY_PORT` | `21` | Explicit FTPS (AUTH TLS) over the normal FTP control port. The deploy step trims whitespace and requires digits only. Use `990` only if the host requires *implicit* FTPS — then also see the note in section 3. |
 | `DEPLOY_USERNAME` | `spezitest-deploy` | The dedicated FTP account, already rooted at the `spezitest` folder (the directory that contains `public/`). |
 | `DEPLOY_PASSWORD` | the FTP account password | Passed to `lftp` via `LFTP_PASSWORD` (`--env-password`); never written to a file or command line; GitHub masks it in logs. |
 
@@ -112,6 +112,20 @@ so the following are structurally safe — not merely "excluded":
 
 > Implicit-FTPS hosts: `lftp` with `ftp:ssl-force true` refuses a plaintext
 > session, so a misconfigured port fails loudly instead of downgrading.
+
+The deploy step connects, authenticates and runs `pwd` (a TLS/auth check that
+does **not** list or mirror the remote root) before any transfer. It sets an
+`UPLOAD_OK` marker only after every mirror and file upload succeeds; the
+`production-deployed` tag step is guarded on that marker, so a partial upload
+can never advance the tag.
+
+> **Troubleshooting — `Unknown command ':<port>'`:** the `DEPLOY_HOST` (or
+> `DEPLOY_PORT`) secret contains a trailing newline. `lftp` then split the site
+> argument on the newline, opened `ftp://<host>`, and parsed the leftover
+> `:<port>` as a command. Re-enter the secret with no trailing newline. The
+> deploy step now also trims whitespace and validates both values before
+> building the URL, so this fails fast with a clear message rather than a
+> confusing lftp error.
 
 ---
 
