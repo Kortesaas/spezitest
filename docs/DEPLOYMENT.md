@@ -1,10 +1,19 @@
-# Deployment — first production release to Plesk
+# Deployment — fresh install of a brand-new production server
 
-This is the reviewed procedure for the first deployment of Spezitest to
-`https://www.spezitest.de` on Plesk shared hosting (PHP 8.3 · Apache + PHP-FPM ·
-MariaDB 10.11). It assumes **no SSH**: everything is done through the Plesk
-control panel, its File Manager / SFTP, phpMyAdmin, and Plesk Scheduled Tasks.
-The CLI migration script runs only as a one-off Plesk Scheduled Task; the legacy
+> **Scope: fresh install only.** This is the reviewed procedure for standing up
+> Spezitest on a **new, empty** Plesk server — creating the database and user,
+> writing `.env`, applying migrations, and importing the initial-data seed.
+>
+> **The current production server at `https://www.spezitest.de` is already live
+> and initialized.** Do **not** run any step of this document against it. Its
+> database holds authoritative live data and must never be seeded, reset, or
+> recreated. Ongoing releases to that server go through the GitHub Actions
+> pipeline in [`CICD.md`](CICD.md) — including the one-time manual **adoption**
+> deploy that only uploads application code.
+
+This procedure assumes **no SSH**: everything is done through the Plesk control
+panel, its File Manager / SFTP, phpMyAdmin, and Plesk Scheduled Tasks. The CLI
+migration script runs only as a one-off Plesk Scheduled Task; the legacy
 importer never runs on production.
 
 Nothing here connects to production automatically. Follow the steps in order.
@@ -346,6 +355,10 @@ it there too.
 ---
 
 ## 12. Future database migrations
+
+This section applies to the **live production server too** (it is the manual
+schema procedure referenced by [`CICD.md`](CICD.md) §5) — it changes an existing
+database in place and never seeds, resets, or recreates it.
 
 New migrations are forward-only SQL files in `database/migrations/`. The
 production database is **manually managed**: the schema change is applied and

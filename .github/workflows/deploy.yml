@@ -2,18 +2,22 @@ name: Deploy to production
 
 # WHAT TRIGGERS A DEPLOY
 #
-#  * Automatically: when the "CI" workflow finishes successfully for a push to
-#    main. Normal, migration-free releases go straight to production.
-#  * Manually (Actions -> "Deploy to production" -> Run workflow): used for
-#    rollback (pick an older commit/tag in "ref") and for releasing a
-#    migration-bearing commit AFTER the owner has already applied and verified
+#  * First time: run manually once (Actions -> "Deploy to production" -> Run
+#    workflow) to adopt the ALREADY-LIVE production server. This uploads code
+#    only and creates the "production-deployed" tag. It does not touch the
+#    existing database, .env, or var/. See the "first (adoption) deploy" step.
+#  * Automatically: after that, when the "CI" workflow finishes successfully for
+#    a push to main. Migration-free releases go straight to production.
+#  * Manually again: rollback (pick an older commit/tag in "ref") and releasing
+#    a migration-bearing commit AFTER the owner has already applied and verified
 #    the schema change manually ("migrations_ack" = true).
 #
 # This workflow has NO production database credentials and runs NO SQL or
-# migration command. If a release changes database/migrations/*.sql it stops
+# migration command. It never seeds, resets, or recreates the database and never
+# writes .env or var/. If a release changes database/migrations/*.sql it stops
 # before uploading anything; the production schema is changed only by the owner,
 # by hand, through the approved Plesk process, BEFORE the code is deployed.
-# See docs/CICD.md and docs/DEPLOYMENT.md.
+# See docs/CICD.md. Fresh-install-only setup is docs/DEPLOYMENT.md.
 
 on:
   workflow_run:
@@ -86,8 +90,15 @@ jobs:
           git fetch origin '+refs/tags/production-deployed:refs/tags/production-deployed' --force 2>/dev/null || true
           if git rev-parse -q --verify refs/tags/production-deployed >/dev/null; then
             echo "first=false" >> "$GITHUB_OUTPUT"
+            # Same safety check every time: what migration files changed since
+            # the commit last deployed to production.
             ADDED="$(git diff --name-only production-deployed HEAD -- 'database/migrations/*.sql' || true)"
           else
+            # No baseline yet: this is the first (adoption) deploy against an
+            # already-live server. There is nothing to diff against, so no
+            # migration/seed requirement is implied - production DB, .env and
+            # var/ are left exactly as they are. The baseline is set by the tag
+            # this run creates; the diff check applies from the next deploy on.
             echo "first=true" >> "$GITHUB_OUTPUT"
             ADDED=""
           fi
@@ -102,20 +113,47 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Require a manual first deploy
+      - name: First (adoption) deploy must be run manually once
         if: steps.mig.outputs.first == 'true' && github.event_name == 'workflow_run'
         run: |
           {
-            echo "## First deploy must be manual"
+            echo "## First CI/CD deploy — adopt the existing production server"
             echo ""
-            echo "There is no \`production-deployed\` tag yet, so this is the first"
-            echo "deploy. Do the one-time server setup from **docs/DEPLOYMENT.md**"
-            echo "(DB + user, \`.env\`, migrate.php via a Plesk Scheduled Task, seed"
-            echo "import), then run **Actions -> Deploy to production -> Run workflow**"
-            echo "once to publish the code and create the marker tag. Automatic"
-            echo "deploys take over from the next \`main\` push."
+            echo "Production is **already live and initialized**. There is no"
+            echo "\`production-deployed\` tag yet, so run this first deploy **manually**"
+            echo "once. It only points the pipeline at the running server and uploads"
+            echo "application code."
+            echo ""
+            echo "This deploy — now and on every future run — will **not**:"
+            echo ""
+            echo "- touch, seed, reset or recreate the production database"
+            echo "- run migrations"
+            echo "- import seed or legacy data"
+            echo "- create or overwrite \`.env\` or \`var/\` (images, uploads, tile cache)"
+            echo ""
+            echo "### One-time setup"
+            echo ""
+            echo "1. Confirm the \`spezitest-deploy\` FTP account logs in **at the existing**"
+            echo "   \`spezitest/\` application directory — the one that already contains"
+            echo "   \`public/\`, \`src/\`, \`.env\` and \`var/\`."
+            echo "2. Add the four deployment secrets \`DEPLOY_HOST\`, \`DEPLOY_PORT\`,"
+            echo "   \`DEPLOY_USERNAME\`, \`DEPLOY_PASSWORD\` (docs/CICD.md section 2)."
+            echo ""
+            echo "### Then"
+            echo ""
+            echo "3. **Actions → Deploy to production → Run workflow**, branch \`main\`,"
+            echo "   inputs left at their defaults."
+            echo "4. The workflow uploads only the managed code directories"
+            echo "   (\`public src config bin database vendor\`) plus \`composer.json\`,"
+            echo "   \`composer.lock\`, \`README.md\`, \`.env.production.example\`, then"
+            echo "   creates \`production-deployed\` on that commit."
+            echo "5. After that, successful CI runs on \`main\` deploy automatically."
+            echo ""
+            echo "> Fresh-install setup for a **brand-new empty server** (DB/user"
+            echo "> creation, migrations, seed import) is **docs/DEPLOYMENT.md** and"
+            echo "> does **not** apply to this existing server."
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error::First deploy must be run manually once (see job summary)."
+          echo "::error::First CI/CD deploy is an adoption step - run it manually once (see job summary)."
           exit 1
 
       - name: Hold deploy - manual production schema operation required
@@ -258,12 +296,13 @@ jobs:
           lftp -u "$DEPLOY_USERNAME" --env-password "ftp://${DEPLOY_HOST}:${DEPLOY_PORT}" -f "$SCRIPT"
           echo "FTPS deploy finished."
 
-      - name: Move the production-deployed marker tag
+      - name: Create or move the production-deployed marker tag
         if: success()
         run: |
           set -eu
           git config user.name  "spezitest-deploy-bot"
           git config user.email "deploy-bot@users.noreply.github.com"
+          # First (adoption) deploy creates the tag; later deploys move it.
           git tag -f production-deployed "${{ steps.pick.outputs.ref }}"
           git push -f origin refs/tags/production-deployed
           echo "production-deployed -> $(git rev-parse --short production-deployed)"
