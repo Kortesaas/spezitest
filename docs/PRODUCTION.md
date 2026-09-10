@@ -145,6 +145,12 @@ Composer declares Fileinfo as a runtime extension. WebP is accepted only when
 the deployed PHP image parser recognizes it. A deployment capability check is
 still required before advertising WebP upload support to administrators.
 
+Custom Spezistream wheel backgrounds use the same validator, size limit, and
+private storage root below the generated `admin/wheels/` prefix. They are
+served only to authenticated administrators. The validated original is
+retained and mapped to the circular wheel with a centered browser-side cover
+crop, so deployment does not require GD or Imagick.
+
 The initial admin username and password hash are deployment secrets supplied
 as `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`. Generate the hash with PHP's
 `password_hash()` and never put a plaintext password in configuration.

@@ -266,7 +266,10 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         );
 
         // Closing the evening stops it collecting further tests.
-        $complete = $this->request('POST', '/admin/testabende/1/complete', ['_csrf' => $this->csrfToken()]);
+        $complete = $this->request('POST', '/admin/testabende/1/complete', [
+            '_csrf' => $this->csrfToken(),
+            'confirm_finish' => '1',
+        ]);
         self::assertSame(303, $complete->getStatusCode());
 
         $second = $this->createDrink('Nach dem Spezistream', 'acquired');
@@ -338,6 +341,149 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertStringNotContainsString('javascript:alert(1)"', (string) $response->getBody());
     }
 
+    public function testOpenSpezistreamHasEditableLineupAndSpezirad(): void
+    {
+        $this->login();
+        $first = $this->createDrink('Kalte Kandidatin', 'acquired');
+        $second = $this->createDrink('Spezirad Spezi', 'acquired');
+        $later = $this->createDrink('Später dazu', 'acquired');
+        $identified = $this->createDrink('Noch nicht im Kühlschrank', 'identified');
+
+        $setup = (string) $this->request('GET', '/admin/testabende/new')->getBody();
+        self::assertStringContainsString('Kalte Kandidatin', $setup);
+        self::assertStringNotContainsString('Noch nicht im Kühlschrank', $setup);
+
+        $start = $this->request('POST', '/admin/testabende', [
+            '_csrf' => $this->csrfToken(),
+            'number' => '1',
+            'drink_ids' => [(string) $first, (string) $second],
+        ]);
+        self::assertSame(303, $start->getStatusCode());
+        self::assertSame(2, $this->lineupCount(1));
+
+        $wheel = (string) $this->request('GET', '/admin/testabende/1/spezirad')->getBody();
+        self::assertStringContainsString('data-lucky-wheel', $wheel);
+        self::assertStringContainsString('Kalte Kandidatin', $wheel);
+        self::assertStringNotContainsString('manipulieren', $wheel);
+
+        $add = $this->request('POST', '/admin/testabende/1/auswahl', [
+            '_csrf' => $this->csrfToken(),
+            'drink_ids' => [(string) $later],
+        ]);
+        self::assertSame(303, $add->getStatusCode());
+        self::assertSame(3, $this->lineupCount(1));
+
+        // Removing a bottle with a draft keeps its grades, but safely detaches
+        // the draft from this evening before removing the planning row.
+        $this->request('POST', "/admin/drinks/$later/test", [
+            '_csrf' => $this->csrfToken(),
+            'manu_optik' => '7',
+            'manu_sueffigkeit' => '7',
+            'manu_geschmack' => '7',
+        ]);
+        self::assertSame(1, $this->streamReference($later));
+        $removeDraft = $this->request('POST', "/admin/testabende/1/auswahl/$later/remove", [
+            '_csrf' => $this->csrfToken(),
+        ]);
+        self::assertSame(303, $removeDraft->getStatusCode());
+        self::assertNull($this->streamReference($later));
+        self::assertSame('draft', $this->testStatus($later));
+        $this->request('POST', '/admin/testabende/1/auswahl', [
+            '_csrf' => $this->csrfToken(),
+            'drink_ids' => [(string) $later],
+        ]);
+
+        $remove = $this->request('POST', "/admin/testabende/1/auswahl/$first/remove", [
+            '_csrf' => $this->csrfToken(),
+        ]);
+        self::assertSame(303, $remove->getStatusCode());
+        self::assertSame(2, $this->lineupCount(1));
+
+        $invalid = $this->request('POST', '/admin/testabende/1/auswahl', [
+            '_csrf' => $this->csrfToken(),
+            'drink_ids' => [(string) $identified],
+        ]);
+        self::assertSame(422, $invalid->getStatusCode());
+        self::assertSame(2, $this->lineupCount(1));
+
+        $testForm = (string) $this->request('GET', "/admin/drinks/$second/test")->getBody();
+        self::assertStringContainsString('href="/admin/testabende/1">Abbrechen</a>', $testForm);
+        self::assertMatchesRegularExpression('~<option value="1" selected>~', $testForm);
+
+        $this->request('POST', "/admin/drinks/$second/test/complete", $this->goldenBody());
+        $result = (string) $this->request('GET', "/admin/drinks/$second/test/result")->getBody();
+        self::assertStringContainsString('/admin/testabende/1/spezirad">Nächste Spezi drehen</a>', $result);
+        $wheelAfter = (string) $this->request('GET', '/admin/testabende/1/spezirad')->getBody();
+        self::assertStringNotContainsString('Spezirad Spezi', $wheelAfter);
+        self::assertStringContainsString('Später dazu', $wheelAfter);
+
+        self::assertSame(400, $this->request('POST', '/admin/testabende/1/auswahl', [
+            'drink_ids' => [(string) $first],
+        ])->getStatusCode());
+
+        $this->request('POST', '/admin/testabende/1/complete', [
+            '_csrf' => $this->csrfToken(),
+            'confirm_finish' => '1',
+        ]);
+        $closedWheel = (string) $this->request('GET', '/admin/testabende/1/spezirad')->getBody();
+        self::assertStringNotContainsString('data-lucky-wheel', $closedWheel);
+
+        $this->logout();
+        self::assertSame(302, $this->request('GET', '/admin/testabende/1/spezirad')->getStatusCode());
+    }
+
+    public function testWheelArtworkIsValidatedStoredPrivatelyAndReplaceable(): void
+    {
+        $this->login();
+        $id = $this->createDrink('Rad Spezi', 'acquired');
+        $this->request('POST', '/admin/testabende', [
+            '_csrf' => $this->csrfToken(),
+            'number' => '1',
+            'drink_ids' => [(string) $id],
+        ]);
+
+        $upload = $this->request('POST', '/admin/testabende/1/spezirad/bild', [
+            '_csrf' => $this->csrfToken(),
+        ], ['wheel_picture' => $this->tinyPngUpload('wheel.php')]);
+        self::assertSame(303, $upload->getStatusCode());
+
+        $statement = $this->connection->query('SELECT wheel_image_path FROM test_runs WHERE number = 1');
+        self::assertNotFalse($statement);
+        $firstPath = $statement->fetchColumn();
+        self::assertIsString($firstPath);
+        self::assertMatchesRegularExpression('~\Aadmin/wheels/[a-f0-9]{48}\.png\z~', $firstPath);
+        self::assertFileExists($this->temporaryRoot . '/' . $firstPath);
+
+        $served = $this->request('GET', '/admin/testabende/1/spezirad/bild');
+        self::assertSame(200, $served->getStatusCode());
+        self::assertSame('image/png', $served->getHeaderLine('Content-Type'));
+
+        $replace = $this->request('POST', '/admin/testabende/1/spezirad/bild', [
+            '_csrf' => $this->csrfToken(),
+        ], ['wheel_picture' => $this->tinyPngUpload('replacement.png')]);
+        self::assertSame(303, $replace->getStatusCode());
+        self::assertFileDoesNotExist($this->temporaryRoot . '/' . $firstPath);
+
+        $currentPathStatement = $this->connection->query(
+            'SELECT wheel_image_path FROM test_runs WHERE number = 1',
+        );
+        self::assertNotFalse($currentPathStatement);
+        $currentPath = $currentPathStatement->fetchColumn();
+        self::assertIsString($currentPath);
+
+        $bad = $this->request('POST', '/admin/testabende/1/spezirad/bild', [
+            '_csrf' => $this->csrfToken(),
+        ], ['wheel_picture' => $this->uploadBytes('<?php echo 1;', 'bad.php', 'image/png')]);
+        self::assertSame(422, $bad->getStatusCode());
+
+        $remove = $this->request('POST', '/admin/testabende/1/spezirad/bild/remove', [
+            '_csrf' => $this->csrfToken(),
+        ]);
+        self::assertSame(303, $remove->getStatusCode());
+        self::assertFileDoesNotExist($this->temporaryRoot . '/' . $currentPath);
+        self::assertSame(404, $this->request('GET', '/admin/testabende/1/spezirad/bild')->getStatusCode());
+    }
+
     private function streamReference(int $drinkId): ?int
     {
         $statement = $this->connection->prepare(
@@ -347,6 +493,14 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $value = $statement->fetchColumn();
 
         return $value === false || $value === null ? null : (int) $value;
+    }
+
+    private function lineupCount(int $number): int
+    {
+        $statement = $this->connection->prepare('SELECT COUNT(*) FROM test_run_drinks WHERE test_run_number = :number');
+        $statement->execute(['number' => $number]);
+
+        return (int) $statement->fetchColumn();
     }
 
     public function testIncompleteRatingCannotCompleteATest(): void
@@ -857,6 +1011,27 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         return $this->lastDrinkId();
     }
 
+    private function tinyPngUpload(string $name): UploadedFile
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($png);
+
+        return $this->uploadBytes($png, $name, 'image/png');
+    }
+
+    private function uploadBytes(string $bytes, string $name, string $clientMime): UploadedFile
+    {
+        $resource = fopen('php://temp', 'w+b');
+        self::assertIsResource($resource);
+        fwrite($resource, $bytes);
+        rewind($resource);
+
+        return new UploadedFile(new Stream($resource), $name, $clientMime, strlen($bytes));
+    }
+
     /**
      * @return array<string, string>
      */
@@ -988,7 +1163,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         $this->connection->exec(
             <<<'SQL'
                 DROP TABLE IF EXISTS
-                    ratings, drink_images, drink_tests, test_runs, legacy_import_runs,
+                    ratings, drink_images, drink_tests, test_run_drinks, test_runs, legacy_import_runs,
                     testers, drinks, schema_migrations
                 SQL,
         );

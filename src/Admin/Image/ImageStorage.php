@@ -16,7 +16,19 @@ final readonly class ImageStorage
 
     public function store(ValidatedImage $image): StoredImage
     {
-        $directory = $this->adminRoot . DIRECTORY_SEPARATOR . 'admin';
+        return $this->storeIn($image, 'admin');
+    }
+
+    /** Store a test-wheel image below the same private, controlled root. */
+    public function storeWheel(ValidatedImage $image): StoredImage
+    {
+        return $this->storeIn($image, 'admin/wheels');
+    }
+
+    private function storeIn(ValidatedImage $image, string $relativeDirectory): StoredImage
+    {
+        $directory = $this->adminRoot . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativeDirectory);
 
         if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
             throw new RuntimeException('Das Bild konnte nicht gespeichert werden.');
@@ -24,7 +36,7 @@ final readonly class ImageStorage
 
         for ($attempt = 0; $attempt < 5; ++$attempt) {
             $filename = bin2hex(random_bytes(24)) . '.' . $image->extension;
-            $relativePath = 'admin/' . $filename;
+            $relativePath = $relativeDirectory . '/' . $filename;
             $absolutePath = $directory . DIRECTORY_SEPARATOR . $filename;
             $handle = fopen($absolutePath, 'xb');
 

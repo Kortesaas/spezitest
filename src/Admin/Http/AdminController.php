@@ -18,6 +18,7 @@ use Spezitest\Admin\Persistence\TestRunRepository;
 use Spezitest\Admin\Security\AdminAuthenticator;
 use Spezitest\Admin\Security\CsrfTokenManager;
 use Spezitest\Admin\TestService;
+use Spezitest\Admin\TestRunService;
 use Spezitest\Admin\Testing\TestEntryValidator;
 use Spezitest\Admin\Testing\TestFormData;
 use Spezitest\Admin\Testing\TestRunValidator;
@@ -424,6 +425,8 @@ final class AdminController
                 $this->counts(),
                 $this->csrfTokens->token(),
                 $this->repository()->primaryImage($drinkId) !== null,
+                null,
+                $this->openRunForDrink($drinkId),
             ),
         );
     }
@@ -482,6 +485,7 @@ final class AdminController
                     $this->csrfTokens->token(),
                     $this->repository()->primaryImage($drinkId) !== null,
                     $exception->getMessage(),
+                    $this->openRunForDrink($drinkId),
                 ),
                 422,
             );
@@ -539,8 +543,19 @@ final class AdminController
                 $priceBelow,
                 $this->counts(),
                 $this->csrfTokens->token(),
+                $this->openRunForDrink($drinkId),
             ),
         );
+    }
+
+    private function openRunForDrink(int $drinkId): ?int
+    {
+        $repository = $this->runRepository();
+        $run = $repository->openRun();
+
+        return $run !== null && $repository->isSelected($run->number, $drinkId)
+            ? $run->number
+            : null;
     }
 
     /**
@@ -665,6 +680,21 @@ final class AdminController
         );
     }
 
+    public function newTestRun(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $repository = $this->runRepository();
+        $number = $repository->nextNumber();
+
+        return $this->html($response, $this->renderer->newTestRun(
+            $number,
+            $repository->availableDrinks($number),
+            $this->counts(),
+            $this->csrfTokens->token(),
+        ));
+    }
+
     /** @param array<string, string> $arguments */
     public function testRun(
         ServerRequestInterface $_request,
@@ -682,6 +712,8 @@ final class AdminController
             $response,
             $this->renderer->testRun(
                 $run,
+                $repository->lineup($run->number),
+                $run->isOpen() ? $repository->availableDrinks($run->number) : [],
                 $repository->tests($run->number),
                 $this->episode($run->number),
                 $this->counts(),
@@ -698,13 +730,18 @@ final class AdminController
         $repository = $this->runRepository();
 
         try {
-            $number = $this->runValidator->validateNumber($this->body($request)['number'] ?? null);
+            $body = $this->body($request);
+            $number = $this->runValidator->validateNumber($body['number'] ?? null);
+            $drinkIds = $this->runValidator->validateDrinkIds($body['drink_ids'] ?? []);
+            $this->runService()->start($number, $drinkIds);
         } catch (ValidationException $exception) {
+            $next = $repository->nextNumber();
+
             return $this->html(
                 $response,
-                $this->renderer->testRuns(
-                    $repository->all(),
-                    $repository->nextNumber(),
+                $this->renderer->newTestRun(
+                    $next,
+                    $repository->availableDrinks($next),
                     $this->counts(),
                     $this->csrfTokens->token(),
                     $exception->getMessage(),
@@ -713,25 +750,121 @@ final class AdminController
             );
         }
 
-        $open = $repository->openRun();
+        return $this->redirect($response, '/admin/testabende/' . $number);
+    }
 
-        if ($open !== null && $open->number !== $number) {
-            return $this->html(
-                $response,
-                $this->renderer->testRuns(
-                    $repository->all(),
-                    $repository->nextNumber(),
-                    $this->counts(),
-                    $this->csrfTokens->token(),
-                    'Spezistream #' . $open->number . ' läuft noch. Bitte zuerst abschließen.',
-                ),
-                422,
-            );
+    /** @param array<string, string> $arguments */
+    public function addTestRunDrinks(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+
+        try {
+            $ids = $this->runValidator->validateDrinkIds($this->body($request)['drink_ids'] ?? []);
+
+            if ($ids === []) {
+                throw new ValidationException('Bitte mindestens eine Spezi auswählen.');
+            }
+
+            $this->runService()->addDrinks($number, $ids);
+        } catch (ValidationException $exception) {
+            return $this->testRunError($response, $number, $exception->getMessage());
         }
 
-        $repository->open($number);
+        return $this->redirect($response, '/admin/testabende/' . $number . '#auswahl');
+    }
 
-        return $this->redirect($response, '/admin/testabende/' . $number);
+    /** @param array<string, string> $arguments */
+    public function removeTestRunDrink(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+
+        try {
+            $this->runService()->removeDrink($number, $this->drinkId($arguments));
+        } catch (ValidationException $exception) {
+            return $this->testRunError($response, $number, $exception->getMessage());
+        }
+
+        return $this->redirect($response, '/admin/testabende/' . $number . '#auswahl');
+    }
+
+    /** @param array<string, string> $arguments */
+    public function testRunWheel(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+        $run = $this->runRepository()->find($number);
+
+        if ($run === null) {
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
+        }
+
+        return $this->html($response, $this->renderer->testRunWheel(
+            $run,
+            $this->runRepository()->lineup($number),
+            $this->counts(),
+            $this->csrfTokens->token(),
+        ));
+    }
+
+    /** @param array<string, string> $arguments */
+    public function uploadTestRunWheelImage(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+
+        try {
+            $this->runService()->replaceWheelImage($number, $this->uploadedFile($request, 'wheel_picture'));
+        } catch (ValidationException|ImageValidationException $exception) {
+            return $this->testRunError($response, $number, $exception->getMessage());
+        }
+
+        return $this->redirect($response, '/admin/testabende/' . $number . '#spezirad');
+    }
+
+    /** @param array<string, string> $arguments */
+    public function removeTestRunWheelImage(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $number = $this->runNumber($arguments);
+
+        try {
+            $this->runService()->removeWheelImage($number);
+        } catch (ValidationException $exception) {
+            return $this->testRunError($response, $number, $exception->getMessage());
+        }
+
+        return $this->redirect($response, '/admin/testabende/' . $number . '#spezirad');
+    }
+
+    /** @param array<string, string> $arguments */
+    public function testRunWheelImage(
+        ServerRequestInterface $_request,
+        ResponseInterface $response,
+        array $arguments,
+    ): ResponseInterface {
+        $run = $this->runRepository()->find($this->runNumber($arguments));
+
+        if ($run === null || $run->wheelImagePath === null || $run->wheelImageMime === null) {
+            return $response->withStatus(404);
+        }
+
+        return (new ImageResponder($this->imageStorage))->respond(
+            $response,
+            $run->wheelImagePath,
+            $run->wheelImageMime,
+        );
     }
 
     /** @param array<string, string> $arguments */
@@ -763,6 +896,8 @@ final class AdminController
                 $response,
                 $this->renderer->testRun(
                     $run,
+                    $repository->lineup($number),
+                    $run->isOpen() ? $repository->availableDrinks($number) : [],
                     $repository->tests($number),
                     $this->episode($number),
                     $this->counts(),
@@ -778,11 +913,16 @@ final class AdminController
 
     /** @param array<string, string> $arguments */
     public function completeTestRun(
-        ServerRequestInterface $_request,
+        ServerRequestInterface $request,
         ResponseInterface $response,
         array $arguments,
     ): ResponseInterface {
         $number = $this->runNumber($arguments);
+
+        if (($this->body($request)['confirm_finish'] ?? null) !== '1') {
+            return $this->testRunError($response, $number, 'Bitte das Abschließen des Spezistreams bestätigen.');
+        }
+
         $this->runRepository()->complete($number);
 
         return $this->redirect($response, '/admin/testabende/' . $number);
@@ -892,6 +1032,18 @@ final class AdminController
         );
     }
 
+    private function runService(): TestRunService
+    {
+        $configuration = $this->runtime->configuration();
+
+        return new TestRunService(
+            $this->connection(),
+            $this->runRepository(),
+            new UploadedImageValidator($configuration->imageMaximumBytes()),
+            $this->imageStorage,
+        );
+    }
+
     private function service(): DrinkService
     {
         $configuration = $this->runtime->configuration();
@@ -919,7 +1071,12 @@ final class AdminController
 
     private function picture(ServerRequestInterface $request): ?UploadedFileInterface
     {
-        $picture = $request->getUploadedFiles()['picture'] ?? null;
+        return $this->uploadedFile($request, 'picture');
+    }
+
+    private function uploadedFile(ServerRequestInterface $request, string $field): ?UploadedFileInterface
+    {
+        $picture = $request->getUploadedFiles()[$field] ?? null;
 
         if ($picture === null) {
             return null;
@@ -930,6 +1087,27 @@ final class AdminController
         }
 
         return $picture;
+    }
+
+    private function testRunError(ResponseInterface $response, int $number, string $message): ResponseInterface
+    {
+        $repository = $this->runRepository();
+        $run = $repository->find($number);
+
+        if ($run === null) {
+            return $this->html($response, $this->renderer->notFound($this->counts(), $this->csrfTokens->token()), 404);
+        }
+
+        return $this->html($response, $this->renderer->testRun(
+            $run,
+            $repository->lineup($number),
+            $run->isOpen() ? $repository->availableDrinks($number) : [],
+            $repository->tests($number),
+            $this->episode($number),
+            $this->counts(),
+            $this->csrfTokens->token(),
+            $message,
+        ), 422);
     }
 
     /** @param array<string, string> $arguments */

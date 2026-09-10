@@ -54,7 +54,7 @@ final readonly class TestService
             $testId = $test['id'] ?? $this->tests->createDraft($drinkId);
             $this->replaceRatings($testId, $input);
             $this->tests->updateDraftDetails($testId, $input->notes);
-            $this->applyStreamPosition($testId, $test, $position);
+            $this->applyStreamPosition($drinkId, $testId, $test, $position);
 
             unset($drink);
 
@@ -88,7 +88,7 @@ final readonly class TestService
             }
 
             $this->tests->markCompleted($testId, $input->notes);
-            $this->applyStreamPosition($testId, $test, $position);
+            $this->applyStreamPosition($drinkId, $testId, $test, $position);
 
             if ($drink['lifecycle_status'] !== 'tested') {
                 $this->drinks->updateStatus($drinkId, 'tested');
@@ -108,7 +108,12 @@ final readonly class TestService
      *
      * @param array{stream_reference?: ?int}|null $existing
      */
-    private function applyStreamPosition(int $testId, ?array $existing, ?TestStreamPosition $position): void
+    private function applyStreamPosition(
+        int $drinkId,
+        int $testId,
+        ?array $existing,
+        ?TestStreamPosition $position,
+    ): void
     {
         if ($position !== null) {
             $this->tests->updateStreamPosition(
@@ -117,6 +122,10 @@ final readonly class TestService
                 $position->offset,
                 $position->duration,
             );
+
+            if ($position->runNumber !== null && $this->runs->find($position->runNumber)?->isOpen() === true) {
+                $this->runs->ensureSelected($position->runNumber, $drinkId);
+            }
 
             return;
         }
@@ -132,6 +141,7 @@ final readonly class TestService
         }
 
         $this->tests->updateStreamPosition($testId, $open->number, null, null);
+        $this->runs->ensureSelected($open->number, $drinkId);
     }
 
     private function replaceRatings(int $testId, TestEntryInput $input): void

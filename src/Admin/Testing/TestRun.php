@@ -21,6 +21,8 @@ final readonly class TestRun
         public ?string $streamUrl,
         public string $status,
         public ?string $notes,
+        public ?string $wheelImagePath,
+        public ?string $wheelImageMime,
         public ?string $completedAt,
         /** How many tests carry this run's number. */
         public int $testCount = 0,

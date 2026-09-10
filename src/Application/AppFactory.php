@@ -211,9 +211,16 @@ final class AppFactory
                 $group->post('/logout', [$adminController, 'logout'])->add($csrfMiddleware);
                 $group->get('/test', [$adminController, 'testQueue']);
                 $group->get('/testabende', [$adminController, 'testRuns']);
+                $group->get('/testabende/new', [$adminController, 'newTestRun']);
                 $group->post('/testabende', [$adminController, 'startTestRun'])->add($csrfMiddleware);
                 $group->get('/testabende/{number:[1-9][0-9]*}', [$adminController, 'testRun']);
                 $group->post('/testabende/{number:[1-9][0-9]*}', [$adminController, 'updateTestRun'])->add($csrfMiddleware);
+                $group->post('/testabende/{number:[1-9][0-9]*}/auswahl', [$adminController, 'addTestRunDrinks'])->add($csrfMiddleware);
+                $group->post('/testabende/{number:[1-9][0-9]*}/auswahl/{id:[1-9][0-9]*}/remove', [$adminController, 'removeTestRunDrink'])->add($csrfMiddleware);
+                $group->get('/testabende/{number:[1-9][0-9]*}/spezirad', [$adminController, 'testRunWheel']);
+                $group->get('/testabende/{number:[1-9][0-9]*}/spezirad/bild', [$adminController, 'testRunWheelImage']);
+                $group->post('/testabende/{number:[1-9][0-9]*}/spezirad/bild', [$adminController, 'uploadTestRunWheelImage'])->add($csrfMiddleware);
+                $group->post('/testabende/{number:[1-9][0-9]*}/spezirad/bild/remove', [$adminController, 'removeTestRunWheelImage'])->add($csrfMiddleware);
                 $group->post('/testabende/{number:[1-9][0-9]*}/complete', [$adminController, 'completeTestRun'])->add($csrfMiddleware);
                 $group->get('/drinks', [$adminController, 'drinks']);
                 $group->get('/drinks/new', [$adminController, 'createForm']);

@@ -360,6 +360,7 @@ final class HtmlRenderer
         string $csrfToken,
         bool $hasImage = false,
         ?string $error = null,
+        ?int $returnRunNumber = null,
     ): string {
         $id = $drink['id'];
         $panels = '';
@@ -410,7 +411,7 @@ final class HtmlRenderer
             . $this->csrfField($csrfToken)
             . $this->testBar($drink, $data, $hasImage, $filled)
             . $panels
-            . $this->streamPanel($data, $runs)
+            . $this->streamPanel($data, $runs, $returnRunNumber)
             . '<section class="panel panel--pad"><div class="panel__head"><h2 class="panel__title">Testnotiz</h2>'
             . '<span class="meta">optional</span></div>'
             . '<div class="field"><label class="visually-hidden" for="tn">Testnotiz</label>'
@@ -424,7 +425,9 @@ final class HtmlRenderer
             . ($data->isCompleted()
                 ? '<a class="btn btn--secondary" href="/admin/drinks/' . $id . '/test/result">Ergebnis ansehen</a>'
                 : '<button class="btn btn--secondary" type="submit">Zwischenspeichern</button>')
-            . '<a class="btn btn--ghost" href="/admin/test">Abbrechen</a>'
+            . '<a class="btn btn--ghost" href="' . ($returnRunNumber === null
+                ? '/admin/test'
+                : '/admin/testabende/' . $returnRunNumber) . '">Abbrechen</a>'
             . '<span class="meta formbar__end">' . ($data->isCompleted()
                 ? 'Speichern rechnet die Wertung neu. Alle 9 Noten nötig.'
                 : 'Abschließen setzt den Status auf „Getestet“. Alle 9 Noten nötig.') . '</span>'
@@ -512,6 +515,7 @@ final class HtmlRenderer
         ?RatedDrink $priceBelow,
         array $counts,
         string $csrfToken,
+        ?int $returnRunNumber = null,
     ): string {
         $result = $drink->result;
         $subtitle = array_values(array_filter([$drink->manufacturer, $drink->displayOrigin()]));
@@ -545,7 +549,11 @@ final class HtmlRenderer
             . '</div>'
             . $this->placementPanel($drink, $gesamtTotal, $rankAbove, $rankBelow, $pricePosition, $priceTotal, $priceAbove, $priceBelow)
             . '<div class="form-actions" style="margin-top:var(--sp-5)">'
-            . '<a class="btn btn--accent" href="/admin/test">Weiter zur nächsten Spezi</a>'
+            . ($returnRunNumber === null
+                ? '<a class="btn btn--accent" href="/admin/test">Weiter zur nächsten Spezi</a>'
+                : '<a class="btn btn--accent" href="/admin/testabende/' . $returnRunNumber
+                    . '/spezirad">Nächste Spezi drehen</a>'
+                    . '<a class="btn btn--secondary" href="/admin/testabende/' . $returnRunNumber . '">Zum Abend</a>')
             . '<a class="btn btn--secondary" href="/admin/drinks/' . $drink->id . '/test">Ergebnis bearbeiten</a>'
             . '<a class="btn btn--ghost" href="/admin/drinks/' . $drink->id . '/edit">Stammdaten</a>'
             . '</div>';
@@ -611,10 +619,7 @@ final class HtmlRenderer
         }
 
         $start = $open === null
-            ? '<form method="post" action="/admin/testabende" class="cluster cluster--tight">'
-                . $this->csrfField($csrfToken)
-                . '<input type="hidden" name="number" value="' . $nextNumber . '">'
-                . '<button class="btn btn--accent" type="submit">Spezistream #' . $nextNumber . ' starten</button></form>'
+            ? '<a class="btn btn--accent" href="/admin/testabende/new">Spezistream #' . $nextNumber . ' planen</a>'
             : '<a class="btn btn--primary" href="/admin/testabende/' . $open->number . '">'
                 . 'Spezistream #' . $open->number . ' öffnen</a>';
 
@@ -644,42 +649,183 @@ final class HtmlRenderer
     }
 
     /**
+     * @param list<array{id: int, name: string, manufacturer: ?string, has_primary_image: bool}> $drinks
+     * @param array{identified: int, acquired: int, tested: int} $counts
+     */
+    public function newTestRun(
+        int $number,
+        array $drinks,
+        array $counts,
+        string $csrfToken,
+        ?string $error = null,
+    ): string {
+        $cards = '';
+
+        foreach ($drinks as $drink) {
+            $cards .= '<label class="run-picker__item">'
+                . '<input type="checkbox" name="drink_ids[]" value="' . $drink['id'] . '">'
+                . $this->thumbnail($drink['id'], $drink['has_primary_image'])
+                . '<span><strong>' . $this->escape($drink['name']) . '</strong>'
+                . '<small>' . $this->cellOrDash($drink['manufacturer']) . '</small></span></label>';
+        }
+
+        $body = $this->head(
+            'Spezistream #' . $number . ' vorbereiten',
+            'Welche Spezis testen wir heute?',
+            '',
+            $this->breadcrumb([['/admin/testabende', 'Spezistreams'], [null, 'Vorbereiten']]),
+        )
+            . $this->error($error)
+            . '<form method="post" action="/admin/testabende" class="stack-lg">'
+            . $this->csrfField($csrfToken)
+            . '<input type="hidden" name="number" value="' . $number . '">'
+            . '<section class="panel panel--pad stack"><div class="panel__head">'
+            . '<div><h2 class="panel__title">Heutige Auswahl</h2></div>'
+            . '<div class="cluster cluster--tight"><button class="btn btn--quiet btn--sm" type="button" data-check-all>Alle</button>'
+            . '<button class="btn btn--quiet btn--sm" type="button" data-check-none>Keine</button></div></div>'
+            . ($cards === ''
+                ? $this->emptyState('Keine Spezi bereit', 'Setzt zuerst mindestens eine Spezi auf „Erworben“.', '', true)
+                : '<div class="run-picker">' . $cards . '</div>')
+            . '</section>'
+            . '<div class="form-actions"><button class="btn btn--accent" type="submit">Spezistream starten</button>'
+            . '<a class="btn btn--ghost" href="/admin/testabende">Abbrechen</a></div>'
+            . '</form>';
+
+        return $this->document('Spezistream vorbereiten', $body, $counts, $csrfToken, 'runs');
+    }
+
+    /**
      * One Spezistream in full: its details form and the report of what was
      * tasted that evening, in the order the segments appear in the stream.
      *
+     * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup
+     * @param list<array{id: int, name: string, manufacturer: ?string, has_primary_image: bool}> $available
      * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, status: string, recorded_time: ?string, duration_value: ?int, notes: ?string, completed_at: ?string}> $tests
      * @param array{identified: int, acquired: int, tested: int} $counts
      */
     public function testRun(
         TestRun $run,
+        array $lineup,
+        array $available,
         array $tests,
         ?StreamEpisode $episode,
         array $counts,
         string $csrfToken,
         ?string $error = null,
     ): string {
+        $wheelItems = $this->wheelItems($run, $lineup);
+        $canSpin = $wheelItems !== [];
+
         $body = $this->head(
             $this->escape($run->displayTitle()),
             $run->isOpen()
-                ? 'Dieser Spezistream läuft. Jeder abgeschlossene Test wird ihm automatisch zugeordnet.'
+                ? 'Spezistream läuft.'
                 : 'Abgeschlossener Spezistream.',
             $run->isOpen()
-                ? '<form method="post" action="/admin/testabende/' . $run->number . '/complete" style="display:inline">'
-                    . $this->csrfField($csrfToken)
-                    . '<button class="btn btn--accent" type="submit">Spezistream abschließen</button></form>'
-                    . '<a class="btn btn--ghost btn--sm" href="/admin/test">Zur Warteschlange</a>'
+                ? ($canSpin
+                    ? '<button class="btn btn--accent" type="button" data-wheel-open>Spezirad öffnen</button>'
+                    : '<a class="btn btn--ghost btn--sm" href="/admin/testabende">Alle Spezistreams</a>')
                 : '<a class="btn btn--ghost btn--sm" href="/admin/testabende">Alle Spezistreams</a>',
             $this->breadcrumb([['/admin/testabende', 'Spezistreams'], [null, '#' . $run->number]]),
             $this->runBadge($run),
         )
             . $this->error($error)
-            . '<div class="split split--sidebar"><div class="stack-lg">'
+            . '<div class="split split--sidebar run-cockpit"><div class="stack-lg">'
+            . $this->runLineup($run, $lineup, $available, $csrfToken)
             . $this->runReport($run, $tests, $episode)
             . '</div><aside class="stack-lg">'
+            . $this->wheelSettings($run, $lineup, $csrfToken)
             . $this->runDetailsForm($run, $csrfToken)
-            . '</aside></div>';
+            . ($run->isOpen() ? $this->finishRunPanel($run, $lineup, $csrfToken) : '')
+            . '</aside></div>'
+            . ($canSpin
+                ? '<dialog class="wheel-modal" data-wheel-modal>'
+                    . '<form method="dialog" class="wheel-modal__bar">'
+                    . '<button class="btn btn--ghost btn--sm" value="close">Schließen</button></form>'
+                    . $this->wheelStage($run, $wheelItems)
+                    . '</dialog>'
+                : '');
 
         return $this->document('Spezistream #' . $run->number, $body, $counts, $csrfToken, 'runs');
+    }
+
+    /**
+     * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup
+     * @param array{identified: int, acquired: int, tested: int} $counts
+     */
+    public function testRunWheel(TestRun $run, array $lineup, array $counts, string $csrfToken): string
+    {
+        $items = $this->wheelItems($run, $lineup);
+
+        $content = $items === []
+            ? $this->emptyState(
+                'Keine Spezi im Rad',
+                $run->isOpen()
+                    ? 'Fügt der heutigen Auswahl eine erworbene Spezi hinzu.'
+                    : 'Dieser Spezistream ist abgeschlossen.',
+                '<a class="btn btn--secondary" href="/admin/testabende/' . $run->number . '">Zur Übersicht</a>',
+            )
+            : '<div class="wheel-page">' . $this->wheelStage($run, $items) . '</div>';
+
+        $body = $this->head(
+            'Spezirad',
+            'Spezistream #' . $run->number . ' · ' . count($items) . ' übrig',
+            '',
+            $this->breadcrumb([['/admin/testabende', 'Spezistreams'], ['/admin/testabende/' . $run->number, '#' . $run->number], [null, 'Spezirad']]),
+        ) . $content;
+
+        return $this->document('Spezirad', $body, $counts, $csrfToken, 'runs');
+    }
+
+    /**
+     * The evening's still-testable picks, as the wheel wants them.
+     *
+     * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup
+     * @return list<array{id: int, name: string}>
+     */
+    private function wheelItems(TestRun $run, array $lineup): array
+    {
+        if (!$run->isOpen()) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($lineup as $drink) {
+            if ($drink['lifecycle_status'] === 'acquired' && $drink['test_status'] !== 'completed') {
+                $items[] = ['id' => $drink['drink_id'], 'name' => $drink['name']];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * The wheel itself plus its result card. Shared by the standalone Spezirad
+     * page and the modal that opens over the Spezistream overview.
+     *
+     * @param list<array{id: int, name: string}> $items
+     */
+    private function wheelStage(TestRun $run, array $items): string
+    {
+        $json = htmlspecialchars(
+            (string) json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8',
+        );
+        $imageStyle = $run->wheelImagePath === null
+            ? ''
+            : ' style="--wheel-art:url(&quot;/admin/testabende/' . $run->number . '/spezirad/bild&quot;)"';
+
+        return '<section class="wheel-stage" data-lucky-wheel data-items="' . $json . '"' . $imageStyle . '>'
+            . '<div class="lucky-wheel__wrap"><span class="lucky-wheel__pointer" aria-hidden="true"></span>'
+            . '<div class="lucky-wheel" data-wheel><div class="lucky-wheel__art"></div><div class="lucky-wheel__segments" data-wheel-labels></div></div>'
+            . '<button class="lucky-wheel__spin" type="button" data-wheel-spin aria-label="Testen" title="Testen">'
+            . '<img src="/assets/spezitest-icon-memory.svg" alt="" width="120" height="120"></button></div>'
+            . '<div class="wheel-controls panel panel--pad stack">'
+            . '<div class="wheel-result" data-wheel-result aria-live="polite"><span class="eyebrow">Als Nächstes</span>'
+            . '<strong>Noch nicht gedreht</strong><a class="btn btn--accent" data-wheel-test hidden href="#">Test erfassen</a></div>'
+            . '</div></section>';
     }
 
     /** @param array{identified: int, acquired: int, tested: int} $counts */
@@ -1188,13 +1334,14 @@ final class HtmlRenderer
      *
      * @param list<TestRun> $runs
      */
-    private function streamPanel(TestFormData $data, array $runs): string
+    private function streamPanel(TestFormData $data, array $runs, ?int $returnRunNumber = null): string
     {
         $options = '<option value="">– keinem Spezistream zugeordnet –</option>';
+        $selectedRun = $data->streamReference ?? $returnRunNumber;
 
         foreach ($runs as $run) {
             $options .= '<option value="' . $run->number . '"'
-                . ($data->streamReference === $run->number ? ' selected' : '') . '>'
+                . ($selectedRun === $run->number ? ' selected' : '') . '>'
                 . '#' . $run->number . ' ' . $this->escape($run->displayTitle())
                 . ($run->isOpen() ? ' (läuft)' : '') . '</option>';
         }
@@ -1217,6 +1364,117 @@ final class HtmlRenderer
             . '</div></section>';
     }
 
+    /**
+     * @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup
+     * @param list<array{id: int, name: string, manufacturer: ?string, has_primary_image: bool}> $available
+     */
+    private function runLineup(TestRun $run, array $lineup, array $available, string $csrfToken): string
+    {
+        $rows = '';
+        $completed = 0;
+
+        foreach ($lineup as $drink) {
+            $isCompleted = $drink['test_status'] === 'completed' || $drink['lifecycle_status'] === 'tested';
+            $isDraft = $drink['test_status'] === 'draft';
+            $isAvailable = $drink['lifecycle_status'] === 'acquired';
+            $completed += $isCompleted ? 1 : 0;
+            $status = $isCompleted
+                ? '<span class="state state--tested">Getestet</span>'
+                : ($isDraft
+                    ? '<span class="badge">Entwurf</span>'
+                    : ($isAvailable
+                        ? '<span class="state state--acquired">Bereit</span>'
+                        : '<span class="badge">Nicht verfügbar</span>'));
+            $action = $isCompleted
+                ? '<a class="btn btn--quiet" href="/admin/drinks/' . $drink['drink_id'] . '/test/result">Ergebnis</a>'
+                : ($isAvailable
+                    ? '<a class="btn btn--primary btn--sm" href="/admin/drinks/' . $drink['drink_id'] . '/test">Testen</a>'
+                    : '<a class="btn btn--quiet btn--sm" href="/admin/drinks/' . $drink['drink_id'] . '/edit">Bearbeiten</a>');
+
+            if ($run->isOpen() && !$isCompleted) {
+                $action .= '<form method="post" action="/admin/testabende/' . $run->number . '/auswahl/'
+                    . $drink['drink_id'] . '/remove">' . $this->csrfField($csrfToken)
+                    . '<button class="btn btn--sm btn--icon btn--danger" type="submit" aria-label="Aus dem Spezistream entfernen" title="Entfernen">'
+                    . $this->trashIcon() . '</button></form>';
+            }
+
+            $rows .= '<li class="run-lineup__item">' . $this->thumbnail($drink['drink_id'], $drink['has_primary_image'])
+                . '<span class="run-lineup__body"><strong>' . $this->escape($drink['name']) . '</strong>'
+                . '<small>' . $this->cellOrDash($drink['manufacturer']) . '</small></span>'
+                . $status . '<span class="run-lineup__actions">' . $action . '</span></li>';
+        }
+
+        $add = '';
+
+        if ($run->isOpen() && $available !== []) {
+            $options = '';
+
+            foreach ($available as $drink) {
+                $options .= '<label class="run-add__option"><input type="checkbox" name="drink_ids[]" value="'
+                    . $drink['id'] . '">'
+                    . $this->thumbnail($drink['id'], $drink['has_primary_image'])
+                    . '<span><strong>' . $this->escape($drink['name']) . '</strong><small>'
+                    . $this->cellOrDash($drink['manufacturer']) . '</small></span></label>';
+            }
+
+            $add = '<details class="run-add"><summary class="btn btn--secondary btn--sm">Spezis hinzufügen</summary>'
+                . '<form method="post" action="/admin/testabende/' . $run->number . '/auswahl" class="stack">'
+                . $this->csrfField($csrfToken) . '<div class="run-add__list">' . $options . '</div>'
+                . '<button class="btn btn--primary" type="submit">Auswahl hinzufügen</button></form></details>';
+        }
+
+        return '<section class="panel panel--pad stack" id="auswahl"><div class="panel__head"><div>'
+            . '<h2 class="panel__title">Heutige Spezis</h2><p class="meta">' . $completed . ' von ' . count($lineup) . ' getestet</p>'
+            . '</div></div>'
+            . ($rows === ''
+                ? $this->emptyState('Noch keine Auswahl', 'Fügt die Spezis hinzu, die heute in den Kühlschrank kommen.', '', true)
+                : '<ul class="run-lineup">' . $rows . '</ul>')
+            . $add . '</section>';
+    }
+
+    /** @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup */
+    private function wheelSettings(TestRun $run, array $lineup, string $csrfToken): string
+    {
+        $remaining = count(array_filter($lineup, static fn (array $drink): bool =>
+            $drink['lifecycle_status'] === 'acquired' && $drink['test_status'] !== 'completed'));
+        $preview = $run->wheelImagePath === null
+            ? '<div class="wheel-thumb wheel-thumb--empty"><span>Standardrad</span></div>'
+            : '<img class="wheel-thumb" src="/admin/testabende/' . $run->number . '/spezirad/bild" alt="Eigenes Speziradmotiv">';
+        $controls = '';
+
+        if ($run->isOpen()) {
+            $controls = '<details class="run-tools"><summary>Radmotiv ändern</summary>'
+                . '<form method="post" enctype="multipart/form-data" action="/admin/testabende/' . $run->number
+                . '/spezirad/bild" class="stack-sm">' . $this->csrfField($csrfToken)
+                . $this->pictureField('wheel-picture', '', false, 'wheel_picture', true)
+                . '<button class="btn btn--secondary btn--block" type="submit">Motiv speichern</button></form>'
+                . ($run->wheelImagePath === null ? '' : '<form method="post" action="/admin/testabende/' . $run->number
+                    . '/spezirad/bild/remove">' . $this->csrfField($csrfToken)
+                    . '<button class="btn btn--quiet btn--block" type="submit">Motiv entfernen</button></form>')
+                . '</details>';
+        }
+
+        return '<section class="panel panel--pad stack" id="spezirad"><div class="panel__head">'
+            . '<h2 class="panel__title">Spezirad</h2><span class="meta">' . $remaining . ' übrig</span></div>'
+            . $preview
+            . $controls . '</section>';
+    }
+
+    /** @param list<array{drink_id: int, name: string, manufacturer: ?string, lifecycle_status: string, has_primary_image: bool, test_status: ?string}> $lineup */
+    private function finishRunPanel(TestRun $run, array $lineup, string $csrfToken): string
+    {
+        $remaining = count(array_filter($lineup, static fn (array $drink): bool => $drink['test_status'] !== 'completed'));
+
+        return '<details class="panel panel--pad run-tools run-tools--danger">'
+            . '<summary class="panel__title">Abend beenden</summary>'
+            . ($remaining > 0 ? '<p class="hint">' . $remaining . ' ausgewählte Spezis sind noch nicht getestet. Sie bleiben erworben.</p>' : '')
+            . '<form method="post" action="/admin/testabende/' . $run->number . '/complete" class="stack-sm">'
+            . $this->csrfField($csrfToken)
+            . '<label class="check"><input type="checkbox" name="confirm_finish" value="1" required> '
+            . '<span>Spezistream wirklich abschließen</span></label>'
+            . '<button class="btn btn--danger btn--block" type="submit">Spezistream abschließen</button></form></details>';
+    }
+
     private function runBadge(TestRun $run): string
     {
         return $run->isOpen()
@@ -1226,8 +1484,8 @@ final class HtmlRenderer
 
     private function runDetailsForm(TestRun $run, string $csrfToken): string
     {
-        return '<section class="panel panel--pad stack">'
-            . '<div class="panel__head"><h2 class="panel__title">Angaben</h2></div>'
+        return '<details class="panel panel--pad run-tools">'
+            . '<summary class="panel__title">Angaben</summary>'
             . '<form method="post" action="/admin/testabende/' . $run->number . '" class="stack">'
             . $this->csrfField($csrfToken)
             . '<div class="field"><label class="label" for="rt-title">Titel</label>'
@@ -1245,7 +1503,7 @@ final class HtmlRenderer
             . '<div class="field"><label class="label" for="rt-notes">Notiz</label>'
             . '<textarea class="textarea" id="rt-notes" name="notes">' . $this->escape($run->notes ?? '') . '</textarea></div>'
             . '<button class="btn btn--primary btn--block" type="submit">Angaben speichern</button>'
-            . '</form></section>';
+            . '</form></details>';
     }
 
     /**
@@ -1257,16 +1515,10 @@ final class HtmlRenderer
     private function runReport(TestRun $run, array $tests, ?StreamEpisode $episode = null): string
     {
         if ($tests === []) {
-            return '<section class="panel panel--pad">'
-                . '<div class="panel__head"><h2 class="panel__title">Bericht</h2></div>'
-                . $this->emptyState(
-                    'Noch nichts getestet',
-                    $run->isOpen()
-                        ? 'Sobald ein Test abgeschlossen wird, erscheint er hier.'
-                        : 'Diesem Spezistream ist kein Test zugeordnet.',
-                    $run->isOpen() ? '<a class="btn btn--accent btn--sm" href="/admin/test">Zur Warteschlange</a>' : '',
-                    true,
-                ) . '</section>';
+            return '<section class="panel panel--pad run-report-empty">'
+                . '<h2 class="panel__title">Bericht</h2><p class="meta">'
+                . ($run->isOpen() ? 'Noch nichts getestet.' : 'Keine Tests zugeordnet.')
+                . '</p></section>';
         }
 
         $completed = 0;
@@ -1657,6 +1909,13 @@ final class HtmlRenderer
             . '</div>';
     }
 
+    private function trashIcon(): string
+    {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"'
+            . ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+            . '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+    }
+
     private function thumbnail(int $id, bool $hasImage): string
     {
         return $hasImage
@@ -1668,15 +1927,21 @@ final class HtmlRenderer
      * The branded upload control, used everywhere a picture is chosen so the
      * admin never falls back to the unstyled browser file input.
      */
-    private function pictureField(string $id, string $label, bool $showOptionalTag = true): string
-    {
+    private function pictureField(
+        string $id,
+        string $label,
+        bool $showOptionalTag = true,
+        string $name = 'picture',
+        bool $required = false,
+    ): string {
         $optionalTag = $showOptionalTag ? ' <span class="label__opt">optional</span>' : '';
         $labelHtml = $label === '' ? '' : '<span class="label">' . $this->escape($label) . $optionalTag . '</span>';
 
         return '<div class="field">' . $labelHtml
             . '<label class="uploader uploader--sm" for="' . $this->escape($id) . '">'
-            . '<input type="file" id="' . $this->escape($id) . '" name="picture" '
-            . 'accept="image/jpeg,image/png,image/webp" class="visually-hidden" data-uploader>'
+            . '<input type="file" id="' . $this->escape($id) . '" name="' . $this->escape($name) . '" '
+            . 'accept="image/jpeg,image/png,image/webp" class="visually-hidden" data-uploader'
+            . ($required ? ' required' : '') . '>'
             . '<strong>Foto auswählen</strong><span class="meta" data-uploader-name>JPEG, PNG, WebP</span></label></div>';
     }
 

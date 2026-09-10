@@ -113,6 +113,13 @@ Images are file-backed: only relative references and detected metadata are
 modeled, never BLOBs. Packet 7 implements the single-primary-image workflow
 described below.
 
+Test-evening planning is also relational rather than a second drink dataset.
+`test_run_drinks` relates an existing drink to one `test_runs` evening and
+stores only stable selection order. Draft/completed state continues to come
+from `drink_tests`, while lifecycle remains on `drinks`. The Spezirad is a
+browser view over the selected, acquired, not-yet-completed rows and its random
+choice never becomes authoritative data.
+
 ## Rating boundary
 
 Rating calculation is a compatibility requirement, not a greenfield design

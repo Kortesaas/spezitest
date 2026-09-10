@@ -50,6 +50,10 @@ migrations run before the reviewed data-only seed during a fresh install, so
 a constraint would reject the seed's `drink_tests` rows. Episode details are
 therefore optional per stream number.
 
+`20260910090000_add_test_run_lineup_and_wheel.sql` adds the editable
+`test_run_drinks` planning relationship and the optional private wheel-image
+reference on `test_runs`. Selection never creates a test or changes lifecycle.
+
 MariaDB DDL can commit implicitly. A failed multi-statement migration may
 therefore leave partial schema changes even though its version is not recorded.
 Production migrations require review, a verified backup, a recovery plan, and
