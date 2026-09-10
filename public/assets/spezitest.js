@@ -696,4 +696,140 @@
       row.style.removeProperty('--peek-x');
     });
   });
+
+  // Spezistream planning: quick bulk selection remains an optional convenience;
+  // the form and every state change still work without JavaScript.
+  Array.prototype.forEach.call(document.querySelectorAll('.run-picker'), function (picker) {
+    var form = picker.closest('form');
+    if (!form) {
+      return;
+    }
+    var setAll = function (checked) {
+      Array.prototype.forEach.call(picker.querySelectorAll('input[type="checkbox"]'), function (input) {
+        input.checked = checked;
+      });
+    };
+    var all = form.querySelector('[data-check-all]');
+    var none = form.querySelector('[data-check-none]');
+    if (all) {
+      all.addEventListener('click', function () { setAll(true); });
+    }
+    if (none) {
+      none.addEventListener('click', function () { setAll(false); });
+    }
+  });
+
+  // Open the Spezirad as a viewport-sized modal over the Spezistream overview.
+  (function () {
+    var opener = document.querySelector('[data-wheel-open]');
+    var modal = document.querySelector('[data-wheel-modal]');
+    if (!opener || !modal) {
+      return;
+    }
+    opener.addEventListener('click', function () {
+      if (typeof modal.showModal === 'function') {
+        modal.showModal();
+      } else {
+        modal.setAttribute('open', '');
+      }
+    });
+    // Click on the backdrop (outside the dialog box) closes it.
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) {
+        modal.close();
+      }
+    });
+  })();
+
+  // The Spezirad randomly chooses from the acquired, untested evening lineup.
+  (function () {
+    var stage = document.querySelector('[data-lucky-wheel]');
+    if (!stage) {
+      return;
+    }
+
+    var wheel = stage.querySelector('[data-wheel]');
+    var labels = stage.querySelector('[data-wheel-labels]');
+    var spin = stage.querySelector('[data-wheel-spin]');
+    var result = stage.querySelector('[data-wheel-result]');
+    var testLink = stage.querySelector('[data-wheel-test]');
+    var items;
+
+    try {
+      items = JSON.parse(stage.getAttribute('data-items') || '[]');
+    } catch (_error) {
+      return;
+    }
+
+    if (!wheel || !labels || !spin || !result || items.length === 0) {
+      return;
+    }
+
+    var step = 360 / items.length;
+    var colors = [];
+    items.forEach(function (item, index) {
+      var label = document.createElement('span');
+      label.textContent = item.name;
+      var mid = index * step + step / 2;
+      var angle = mid * Math.PI / 180;
+      var radius = items.length <= 4 ? 24 : 28;
+      label.style.left = (50 + Math.sin(angle) * radius) + '%';
+      label.style.top = (50 - Math.cos(angle) * radius) + '%';
+      label.style.setProperty('--wheel-label-angle', (mid - 90) + 'deg');
+      labels.appendChild(label);
+      var navy = index % 2 === 0;
+      colors.push((navy ? 'rgba(0,45,85,.9)' : 'rgba(230,0,5,.86)') + ' ' + (index * step) + 'deg ' + ((index + 1) * step) + 'deg');
+    });
+    wheel.style.setProperty('--wheel-segments', 'conic-gradient(from 0deg,' + colors.join(',') + ')');
+
+    var turns = 0;
+    var spinning = false;
+    var randomIndex = function () {
+      if (window.crypto && window.crypto.getRandomValues) {
+        var values = new Uint32Array(1);
+        window.crypto.getRandomValues(values);
+        return values[0] % items.length;
+      }
+      return Math.floor(Math.random() * items.length);
+    };
+
+    spin.addEventListener('click', function () {
+      if (spinning) {
+        return;
+      }
+      var index = randomIndex();
+
+      spinning = true;
+      spin.disabled = true;
+      result.classList.remove('is-ready');
+      result.querySelector('strong').textContent = 'Das Rad dreht …';
+      testLink.hidden = true;
+
+      // Land the chosen wedge under the pointer on the right (90deg from top).
+      // A random offset within the wedge (kept clear of the edges) stops it
+      // always halting dead-centre, so the label still reads roughly straight
+      // across but the wheel never looks mechanical.
+      var centre = index * step + step / 2;
+      var jitter = (Math.random() - 0.5) * Math.min(step * 0.62, 34);
+      var desired = ((90 - centre - jitter) % 360 + 360) % 360;
+      var current = ((turns % 360) + 360) % 360;
+      var advance = (desired - current + 360) % 360;
+      turns += 360 * 7 + advance;
+      wheel.style.transform = 'rotate(' + turns + 'deg)';
+
+      var done = function () {
+        if (!spinning) {
+          return;
+        }
+        spinning = false;
+        spin.disabled = false;
+        result.querySelector('strong').textContent = items[index].name;
+        result.classList.add('is-ready');
+        testLink.href = '/admin/drinks/' + items[index].id + '/test';
+        testLink.hidden = false;
+      };
+      wheel.addEventListener('transitionend', done, { once: true });
+      window.setTimeout(done, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 100 : 9300);
+    });
+  })();
 })();

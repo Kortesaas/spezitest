@@ -29,6 +29,30 @@ final class TestRunValidator
 
     private const MAX_DURATION_SECONDS = 86399;
 
+    /** @return list<int> */
+    public function validateDrinkIds(mixed $values): array
+    {
+        if ($values === null) {
+            return [];
+        }
+
+        if (!is_array($values) || count($values) > 500) {
+            throw new ValidationException('Die Spezi-Auswahl ist ungültig.');
+        }
+
+        $ids = [];
+
+        foreach ($values as $value) {
+            if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
+                throw new ValidationException('Die Spezi-Auswahl ist ungültig.');
+            }
+
+            $ids[(int) $value] = (int) $value;
+        }
+
+        return array_values($ids);
+    }
+
     public function validateNumber(mixed $number): int
     {
         if (is_int($number)) {

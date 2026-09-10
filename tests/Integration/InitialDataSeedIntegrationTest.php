@@ -111,6 +111,7 @@ final class InitialDataSeedIntegrationTest extends TestCase
                     ratings,
                     drink_images,
                     drink_tests,
+                    test_run_drinks,
                     test_runs,
                     legacy_import_runs,
                     testers,

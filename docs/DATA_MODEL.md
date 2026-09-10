@@ -133,13 +133,32 @@ bytes and detected metadata, generates safe filenames, stores portable paths,
 and coordinates replacement/removal with database transactions. Gallery
 management and automatic processing are not implemented.
 
+### `test_runs` and `test_run_drinks`
+
+`test_runs` stores one livestream/test evening by its stable stream number,
+optional metadata, and `open` or `completed` state. The nullable
+`wheel_image_path` / `wheel_image_mime` pair identifies one validated private
+background image for that evening's Spezirad. The relative path is unique;
+the image bytes remain outside the public document root.
+
+`test_run_drinks` is the editable operational lineup for an evening:
+
+`test_runs 1 -> many test_run_drinks many <- 1 drinks`
+
+Its composite key prevents selecting one drink twice for the same evening and
+`selection_order` provides stable display and wheel order. This table stores no
+rating, completion flag, or lifecycle copy. Whether a selected drink has a
+draft or completed result is derived from `drink_tests`; putting a bottle in
+the lineup never makes it tested.
+
 ## Relationship summary
 
 ```text
 drinks 1 ─── * drink_tests 1 ─── * ratings * ─── 1 testers
    │              │
    │              └╌╌ stream_reference ╌╌> test_runs (no FK)
-   └──────── * drink_images
+   ├──────── * drink_images
+   └──────── * test_run_drinks * ─── 1 test_runs
 ```
 
 There are no source, manufacturer, city, region, inventory, or acquisition

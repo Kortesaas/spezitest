@@ -28,7 +28,11 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
 - **Spezistreams**: each livestream episode is a record with its own number,
   date and video address; every test knows which evening it was tasted in and
   at which point in the recording, so the public detail page can link straight
-  into the video at that timestamp. Closing an evening produces its report.
+  into the video at that timestamp. Before starting, the admin selects the
+  acquired bottles that are actually ready that day. The open-evening cockpit
+  keeps this lineup editable and offers the Spezirad for randomly choosing the
+  next bottle, including one validated private custom background. Closing an
+  evening produces its report.
 - **Three first-party browser games** under `/spiele`: an origin guessing game
   with five rounds or endless practice, classic bottle Memory in three board
   sizes, and a ten-round real-or-invented name quiz. The quiz draws fictional

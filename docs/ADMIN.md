@@ -62,9 +62,16 @@ is still CSRF-protected.
 | POST | `/admin/drinks/{id}/test/complete` | Validate all nine grades, run the engine, set `tested` |
 | GET | `/admin/drinks/{id}/test/result` | Full test result: per-tester grade matrix and averages, plus the blurred ranking places |
 | GET | `/admin/testabende` | Spezistreams (livestream episodes) with their Spezi and timestamp counts |
-| POST | `/admin/testabende` | Start the next Spezistream; refuses while another one is open |
-| GET | `/admin/testabende/{number}` | One Spezistream: its details form and the report of that evening |
+| GET | `/admin/testabende/new` | Select acquired drinks for the next evening |
+| POST | `/admin/testabende` | Start the next Spezistream with its initial lineup; refuses while another one is open |
+| GET | `/admin/testabende/{number}` | Evening cockpit with lineup, details and report |
 | POST | `/admin/testabende/{number}` | Save title, recording date, stream address and note |
+| POST | `/admin/testabende/{number}/auswahl` | Add acquired drinks to an open evening |
+| POST | `/admin/testabende/{number}/auswahl/{id}/remove` | Remove a selected drink that has no completed result in the evening |
+| GET | `/admin/testabende/{number}/spezirad` | Spin among the selected drinks still awaiting testing |
+| GET | `/admin/testabende/{number}/spezirad/bild` | Authenticated custom wheel-image response |
+| POST | `/admin/testabende/{number}/spezirad/bild` | Validate and replace the custom wheel image |
+| POST | `/admin/testabende/{number}/spezirad/bild/remove` | Remove the custom wheel image |
 | POST | `/admin/testabende/{number}/complete` | Mark the Spezistream finished |
 
 ### List controls
@@ -220,6 +227,24 @@ status.
   under that evening automatically; the test form can still assign a different
   one explicitly. A test that already carries a number keeps it, so re-saving an
   old test never moves it into tonight's evening.
+- Starting an evening can select any subset of currently `acquired` drinks as
+  its operational lineup. Selection is planning only: it creates no test,
+  rating, or lifecycle transition. Acquired drinks can be added while the
+  evening is open. Removing a drink preserves any rating draft but detaches the
+  draft from that evening; a completed result remains permanently in its
+  evening and report.
+- The Spezirad contains only selected drinks that are still `acquired` and have
+  no completed result in the evening. The choice uses browser randomness and is
+  not stored as authoritative application data.
+- Opening test entry from an active lineup preselects that Spezistream. Cancel
+  returns to the evening; after completion the result page links directly to
+  the next Spezirad spin.
+- An open evening may have one custom wheel background. It passes the same
+  actual-content JPEG/PNG/WebP validation and private size limit as product
+  uploads, receives a generated filename below `admin/wheels/`, and is served
+  only through an authenticated route. CSS maps the validated original to the
+  circle with a centered cover crop; no server-side image processing is
+  assumed.
 - "Spezistream abschließen" closes the evening. Later tests are then unassigned
   until the next one is started.
 - The stream address is validated to an absolute `http(s)` URL before it is
