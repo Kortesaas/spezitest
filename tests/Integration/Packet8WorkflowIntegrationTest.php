@@ -788,7 +788,7 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
         self::assertStringContainsString('max-age=', $response->getHeaderLine('Cache-Control'));
 
-        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string, description: string, place: string, manufacturer?: string, image?: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
+        /** @var array{type: string, features: list<array{type: string, id: int, properties: array{name: string, description: string, place: string, status: string, _umap_options: array{color: string}, manufacturer?: string, image?: string}, geometry: array{type: string, coordinates: array{0: float, 1: float}}}>} $document */
         $document = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('FeatureCollection', $document['type']);
@@ -798,8 +798,8 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         foreach ($document['features'] as $feature) {
             self::assertSame('Feature', $feature['type']);
             self::assertSame('Point', $feature['geometry']['type']);
-            self::assertSame([], array_diff(['name', 'description', 'place'], array_keys($feature['properties'])));
-            self::assertSame([], array_diff(array_keys($feature['properties']), ['name', 'description', 'place', 'manufacturer', 'image']));
+            self::assertSame([], array_diff(['name', 'description', 'place', 'status', '_umap_options'], array_keys($feature['properties'])));
+            self::assertSame([], array_diff(array_keys($feature['properties']), ['name', 'description', 'place', 'status', '_umap_options', 'manufacturer', 'image']));
             [$longitude, $latitude] = $feature['geometry']['coordinates'];
             self::assertGreaterThanOrEqual(-180.0, $longitude);
             self::assertLessThanOrEqual(180.0, $longitude);
@@ -815,10 +815,36 @@ final class Packet8WorkflowIntegrationTest extends TestCase
         self::assertEqualsWithDelta(8.69, $longitude, 0.3);
         self::assertEqualsWithDelta(49.41, $latitude, 0.3);
 
-        // Not on the public map: an acquired drink, and an origin outside
-        // Germany and its neighbours.
-        self::assertArrayNotHasKey('GeoJSON Erworben', $byName);
+        // Every status is on the feed, each with its uMap colour: grey still
+        // sought, navy blue acquired.
+        self::assertSame('identified', $byName['GeoJSON Sichtbar']['properties']['status']);
+        self::assertSame('#646567', $byName['GeoJSON Sichtbar']['properties']['_umap_options']['color']);
+        self::assertArrayHasKey('GeoJSON Erworben', $byName);
+        self::assertSame('acquired', $byName['GeoJSON Erworben']['properties']['status']);
+        self::assertSame('#002D55', $byName['GeoJSON Erworben']['properties']['_umap_options']['color']);
+
+        // Not on the public map: an origin outside Germany and its neighbours.
         self::assertArrayNotHasKey('GeoJSON Übersee', $byName);
+
+        // ?status= narrows the feed; unknown values are ignored.
+        /** @var array{features: list<array{properties: array{name: string}}>} $sought */
+        $sought = json_decode(
+            (string) $this->requestWithQuery('GET', '/api/map/spezis.geojson', ['status' => 'identified'])->getBody(),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        $soughtNames = array_map(static fn (array $f): string => $f['properties']['name'], $sought['features']);
+        self::assertContains('GeoJSON Sichtbar', $soughtNames);
+        self::assertNotContains('GeoJSON Erworben', $soughtNames);
+        /** @var array{features: list<mixed>} $bogus */
+        $bogus = json_decode(
+            (string) $this->requestWithQuery('GET', '/api/map/spezis.geojson', ['status' => 'nonsense'])->getBody(),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        self::assertSame(count($document['features']), count($bogus['features']));
 
         // An Austrian origin is placed, with its country in the "Ort" line.
         self::assertArrayHasKey('GeoJSON Alpen', $byName);
