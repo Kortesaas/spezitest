@@ -1824,7 +1824,7 @@ final class HtmlRenderer
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . $this->escape($title) . ' · Spezitest Verwaltung</title>'
             . '<meta name="robots" content="noindex, nofollow">'
-            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p46">'
+            . '<link rel="stylesheet" href="/assets/spezitest.css?v=p47">'
             . '<link rel="icon" href="/assets/spezitest-icon.svg" type="image/svg+xml">'
             . '</head><body><a class="skip-link" href="#main">Zum Inhalt springen</a>' . $shell
             . '<script src="/assets/spezitest.js?v=p46" defer></script>'

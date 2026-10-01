@@ -934,6 +934,20 @@ table{border-collapse:collapse;width:100%}
   .karte__list .map__entry{scroll-snap-align:start;scroll-margin-top:var(--sp-1)}
 }
 .karte__approx{color:var(--text-muted);font-weight:var(--fw-bold)}
+/* Status colours on the hunt map: same tokens as the status badges. */
+.karte-dot{display:inline-block;width:.7em;height:.7em;border-radius:var(--radius-pill);flex:none;vertical-align:baseline;margin-right:.4em;background:var(--state-identified-line)}
+.karte-dot--identified{background:var(--state-identified-line)}
+.karte-dot--acquired{background:var(--state-acquired-line)}
+.karte-dot--tested{background:var(--state-tested-line)}
+.karte__legend{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-5);margin:0;padding:0;list-style:none;font-size:var(--fs-sm);color:var(--text-body)}
+.karte__legend[hidden]{display:none}
+.karte__legend strong{color:var(--text-strong);font-variant-numeric:tabular-nums}
+.karte-pin-wrap{background:none;border:0}
+.karte-pin{box-sizing:border-box;border:2px solid var(--white);border-radius:var(--radius-pill);box-shadow:0 1px 3px rgba(0,26,49,.45)}
+.karte-pin--approx{border-style:dashed}
+.leaflet-marker-icon:focus-visible .karte-pin,.leaflet-marker-icon.leaflet-interactive:hover .karte-pin{border-color:var(--white);box-shadow:0 0 0 3px var(--navy)}
+.karte-pop__status,.map__status{display:flex;align-items:center;font-size:var(--fs-xs);color:var(--text-muted)}
+.map__status .karte-dot{margin-right:.4em}
 .map__entry-dist{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);color:var(--text-muted);font-variant-numeric:tabular-nums;flex:none}
 .map__rest a{font-weight:var(--fw-bold);text-decoration:none}
 .map__rest a:hover{text-decoration:underline;text-decoration-thickness:2px}

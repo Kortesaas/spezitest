@@ -9,12 +9,16 @@ use Spezitest\Website\Catalog\HuntMap;
 /**
  * Builds the public GeoJSON feed consumed by the uMap map viewer.
  *
- * The set of pins is exactly the hunt map's: a drink is included only when its
- * lifecycle status is `identified` and its `origin_location` resolves to a
- * postal-code coordinate — German, Austrian, Swiss or Liechtenstein (see
- * {@see HuntMap}). Deleting, renaming,
- * moving or changing the status of a drink in the admin therefore changes this
- * feed on the next request — there is no separate map data to keep in sync.
+ * The pins are the hunt map's: a drink is included when its `origin_location`
+ * resolves to a postal-code coordinate — German, Austrian, Swiss or
+ * Liechtenstein (see {@see HuntMap}) — whatever its lifecycle status, unless
+ * the caller narrows it to some statuses. Every feature carries its `status`
+ * (`identified` / `acquired` / `tested`) and uMap's own `_umap_options.color`
+ * for it — grey still sought, navy blue bought, red tested, the colours of the
+ * site's status badges — so uMap draws the same picture as `/karte`. Deleting,
+ * renaming, moving or changing the status of a drink in the admin therefore
+ * changes this feed on the next request — there is no separate map data to keep
+ * in sync.
  *
  * Each drink becomes one Point feature carrying its stable database id, its
  * name, and a `description` written in uMap's own text syntax: the package
@@ -30,19 +34,32 @@ final readonly class GeoJsonFeed
     /** Popup thumbnail width in pixels — small; the popup is narrow. */
     private const IMAGE_WIDTH = 110;
 
+    /** Lifecycle status → [pin colour, label], matching the `/karte` map. */
+    public const STATUSES = [
+        'identified' => ['#646567', 'Noch gesucht'],
+        'acquired' => ['#002D55', 'Erworben'],
+        'tested' => ['#E60005', 'Getestet'],
+    ];
+
     /**
      * @param list<array{
      *     id: int, name: string, latitude: float, longitude: float,
      *     image: ?string, manufacturer: ?string, place: string,
-     *     approximate: bool, link: string
+     *     approximate: bool, link: string, status: string
      * }> $features
      */
     private function __construct(private array $features)
     {
     }
 
-    public static function fromHuntMap(HuntMap $map, string $siteUrl = 'https://www.spezitest.de'): self
-    {
+    /**
+     * @param list<string> $statuses only these lifecycle statuses; empty = all
+     */
+    public static function fromHuntMap(
+        HuntMap $map,
+        string $siteUrl = 'https://www.spezitest.de',
+        array $statuses = [],
+    ): self {
         $base = rtrim($siteUrl, '/');
         $features = [];
 
@@ -58,6 +75,10 @@ final readonly class GeoJsonFeed
             }
 
             foreach ($point['drinks'] as $drink) {
+                if ($statuses !== [] && !in_array($drink['status'], $statuses, true)) {
+                    continue;
+                }
+
                 $manufacturer = $drink['manufacturer'] ?? '';
 
                 $features[] = [
@@ -70,6 +91,7 @@ final readonly class GeoJsonFeed
                     'place' => $place,
                     'approximate' => $point['approximate'],
                     'link' => $base . '/spezi/' . $drink['id'],
+                    'status' => $drink['status'],
                 ];
             }
         }
@@ -88,7 +110,8 @@ final readonly class GeoJsonFeed
      *         id: int,
      *         properties: array{
      *             name: string, description: string, manufacturer?: string,
-     *             place: string, image?: string
+     *             place: string, image?: string, status: string,
+     *             _umap_options: array{color: string}
      *         },
      *         geometry: array{type: 'Point', coordinates: array{0: float, 1: float}}
      *     }>
@@ -103,6 +126,8 @@ final readonly class GeoJsonFeed
                 'name' => $feature['name'],
                 'description' => self::describe($feature),
                 'place' => $feature['place'],
+                'status' => $feature['status'],
+                '_umap_options' => ['color' => self::colour($feature['status'])],
             ];
 
             if ($feature['manufacturer'] !== null) {
@@ -137,7 +162,7 @@ final readonly class GeoJsonFeed
      *
      * @param array{
      *     image: ?string, manufacturer: ?string, place: string,
-     *     approximate: bool, link: string
+     *     approximate: bool, link: string, status: string
      * } $feature
      */
     private static function describe(array $feature): string
@@ -161,11 +186,17 @@ final readonly class GeoJsonFeed
         }
 
         $rows[] = 'Ort: **' . $place . '**';
+        $rows[] = 'Status: **' . (self::STATUSES[$feature['status']][1] ?? $feature['status']) . '**';
         $blocks[] = implode("\n", $rows);
 
         $blocks[] = '[[' . $feature['link'] . '|Auf spezitest.de ansehen]]';
 
         return implode("\n\n", $blocks);
+    }
+
+    private static function colour(string $status): string
+    {
+        return (self::STATUSES[$status] ?? self::STATUSES['identified'])[0];
     }
 
     public function count(): int

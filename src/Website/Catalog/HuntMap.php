@@ -42,7 +42,7 @@ final readonly class HuntMap
      *     longitude: float,
      *     approximate: bool,
      *     count: int,
-     *     drinks: list<array{id: int, name: string, slug: string, manufacturer: ?string, hasImage: bool}>
+     *     drinks: list<array{id: int, name: string, slug: string, manufacturer: ?string, hasImage: bool, status: string}>
      * }> $points
      * @param list<array{name: string, slug: string, location: ?string}> $unplaced
      */
@@ -78,7 +78,7 @@ final readonly class HuntMap
          *     key: string, postalCode: string, countryCode: string, country: ?string,
          *     place: string, latitude: float, longitude: float,
          *     approximate: bool, count: int,
-         *     drinks: list<array{id: int, name: string, slug: string, manufacturer: ?string, hasImage: bool}>
+         *     drinks: list<array{id: int, name: string, slug: string, manufacturer: ?string, hasImage: bool, status: string}>
          * }> $grouped
          */
         $grouped = [];
@@ -123,6 +123,7 @@ final readonly class HuntMap
                 'slug' => $drink->slug(),
                 'manufacturer' => $drink->manufacturer,
                 'hasImage' => $drink->hasImage,
+                'status' => $drink->lifecycleStatus,
             ];
         }
 
@@ -157,7 +158,7 @@ final readonly class HuntMap
      * @return list<array{
      *     lat: float, lon: float, place: string, key: string, postalCode: string,
      *     country: ?string, approximate: bool,
-     *     drinks: list<array{name: string, slug: string, sub: string, image: ?string}>
+     *     drinks: list<array{name: string, slug: string, sub: string, image: ?string, status: string}>
      * }>
      */
     public function markers(): array
@@ -173,6 +174,7 @@ final readonly class HuntMap
                     'slug' => $drink['slug'],
                     'sub' => $drink['manufacturer'] ?? '',
                     'image' => $drink['hasImage'] ? '/spezi/' . $drink['id'] . '/bild' : null,
+                    'status' => $drink['status'],
                 ];
             }
 
