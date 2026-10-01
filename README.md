@@ -46,9 +46,12 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   to the tested ones and `/karte/gesucht` to the ones still being sought
   (`identified` only; acquired drinks are already possessed) — three crawlable pages, switched by a tab bar
   that works without JavaScript. `/karte/spezi/{id}` is a one-pin mini map for a
-  single Spezi, linked from its detail page. The public GeoJSON feed
-  (`/api/map/spezis.geojson`) is unaffected by the filter — it always carries
-  the `identified` drinks. Germany is the
+  single Spezi, linked from its detail page. Pins are coloured by lifecycle
+  status, like the status badges: grey = still sought (`identified`), navy blue
+  = bought (`acquired`), red = `tested`; a place that mixes statuses is drawn as
+  a pie, still-sought places sit on top, and a legend counts each status. The
+  public GeoJSON feed (`/api/map/spezis.geojson`) is unaffected by the `/karte`
+  tabs. Germany is the
   default; Austrian (`A-`/`AT-`), Swiss (`CH-`) and Liechtenstein (`FL-`)
   origins are placed too — recognised by that prefix, or by a bare four-digit
   code when `origin_region` names the country. Each place has "open in maps"
@@ -80,9 +83,12 @@ Packet 6 controlled importer and the Packet 7 admin, Packet 8 added:
   zoom range so the route cannot be used as a general proxy; if the upstream is
   unreachable the map still works, just without the basemap.
 - **Public map feed** (`GET /api/map/spezis.geojson`): the same pins as `/karte`
-  as a GeoJSON `FeatureCollection` — one `Point` per `identified` drink whose
-  origin resolves to a coordinate. Each feature carries the database id, the
-  name, the `place`, the `manufacturer` where known, the `image` URL where a
+  as a GeoJSON `FeatureCollection` — one `Point` per drink (any status) whose
+  origin resolves to a coordinate. `?status=identified` (or a comma list of
+  `identified`, `acquired`, `tested`) narrows it, e.g. to the still-sought
+  drinks. Each feature carries the database id, the name, its `status`, uMap's
+  per-feature colour in `_umap_options.color` (grey / navy / red, as on
+  `/karte`), the `place`, the `manufacturer` where known, the `image` URL where a
   package photo exists, and a `description` written in uMap's own text syntax
   (photo + manufacturer + place + a link back to the drink page) so the default
   uMap popup shows everything with no template setup.

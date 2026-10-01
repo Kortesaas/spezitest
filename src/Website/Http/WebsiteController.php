@@ -253,19 +253,32 @@ final class WebsiteController
     }
 
     /**
-     * The live public map feed, as GeoJSON, for the uMap map viewer. Always the
-     * `identified` drinks whose origin resolves to a coordinate — the "still
-     * wanted" set, regardless of how the {@see karte()} page is filtered —
-     * rebuilt from the database on every request and cached briefly. See
-     * {@see GeoJsonFeed}.
+     * The live public map feed, as GeoJSON, for the uMap map viewer: every
+     * Spezi whose origin resolves to a coordinate, each with its lifecycle
+     * `status` and the matching uMap colour. `?status=identified,acquired`
+     * (any of `identified`, `acquired`, `tested`) narrows it, e.g. to the
+     * still-sought ones. Rebuilt from the database on every request and cached
+     * briefly. See {@see GeoJsonFeed}.
      */
     public function mapSpezisGeoJson(
-        ServerRequestInterface $_request,
+        ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        // Always the identified drinks, whatever the /karte page is filtered to.
-        $map = HuntMap::fromCollection($this->catalogRepository()->ratedDrinks(), PostalGeocoder::default());
-        $collection = GeoJsonFeed::fromHuntMap($map, $this->siteUrl)->toFeatureCollection();
+        $requested = $request->getQueryParams()['status'] ?? '';
+        $statuses = [];
+
+        if (is_string($requested)) {
+            foreach (explode(',', $requested) as $status) {
+                $status = trim($status);
+
+                if (isset(GeoJsonFeed::STATUSES[$status])) {
+                    $statuses[$status] = $status;
+                }
+            }
+        }
+
+        $map = HuntMap::fromDrinks($this->catalogRepository()->ratedDrinks()->byName(), PostalGeocoder::default());
+        $collection = GeoJsonFeed::fromHuntMap($map, $this->siteUrl, array_values($statuses))->toFeatureCollection();
 
         return $this->geoJson($response, $collection, 'public, max-age=60');
     }

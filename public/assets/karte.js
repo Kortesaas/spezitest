@@ -11,8 +11,16 @@
   'use strict';
 
   var NAVY = '#002D55';
-  var RED = '#E60005';
   var WHITE = '#FFFFFF';
+
+  // Lifecycle colours, the same as the status badges: still sought = grey,
+  // bought = navy blue, tested = red. Draw order puts the still-sought on top.
+  var STATUS = {
+    identified: { color: '#646567', label: 'Noch gesucht' },
+    acquired: { color: '#002D55', label: 'Erworben' },
+    tested: { color: '#E60005', label: 'Getestet' }
+  };
+  var STATUS_ORDER = ['identified', 'acquired', 'tested'];
 
   var container = document.getElementById('karte-map');
   var blob = document.getElementById('karte-data');
@@ -129,14 +137,50 @@
         var thumb = drink.image
           ? '<img class="karte-pop__thumb" src="' + encodeURI(drink.image) + '" alt="" loading="lazy" width="44" height="70">'
           : '';
+        var st = STATUS[drink.status] || STATUS.identified;
         return (
           '<li>' + thumb +
           '<span class="karte-pop__drink"><a href="/spezi/' + encodeURIComponent(drink.slug) + '">' +
-          escapeHtml(drink.name) + '</a>' + sub + '</span></li>'
+          escapeHtml(drink.name) + '</a>' + sub +
+          '<span class="karte-pop__status"><i class="karte-dot" style="background:' + st.color + '"></i>' +
+          st.label + '</span></span></li>'
         );
       })
       .join('');
     return head + '<ul class="karte-pop__list">' + items + '</ul>' + actionsHtml(point);
+  }
+
+  // Per-status counts for one place, in STATUS_ORDER.
+  function statusCounts(point) {
+    var counts = { identified: 0, acquired: 0, tested: 0 };
+    point.drinks.forEach(function (drink) {
+      counts[STATUS[drink.status] ? drink.status : 'identified'] += 1;
+    });
+    return counts;
+  }
+
+  // One status = a solid dot; a place that mixes statuses = a pie of them, so
+  // "this place still has a grey slice" is visible without opening it. An
+  // approximate position (no exact postal code) gets a dashed ring.
+  function pinBackground(counts, total) {
+    var present = STATUS_ORDER.filter(function (key) { return counts[key] > 0; });
+    if (present.length === 1) { return STATUS[present[0]].color; }
+    var from = 0;
+    var stops = present.map(function (key) {
+      var to = from + (counts[key] / total) * 360;
+      var stop = STATUS[key].color + ' ' + from.toFixed(1) + 'deg ' + to.toFixed(1) + 'deg';
+      from = to;
+      return stop;
+    });
+    return 'conic-gradient(' + stops.join(', ') + ')';
+  }
+
+  function pinIcon(point, counts, size) {
+    var el = document.createElement('div');
+    el.className = 'karte-pin' + (point.approximate ? ' karte-pin--approx' : '');
+    el.style.width = el.style.height = size + 'px';
+    el.style.background = pinBackground(counts, point.drinks.length);
+    return L.divIcon({ html: el, className: 'karte-pin-wrap', iconSize: [size, size] });
   }
 
   var latlngs = [];
@@ -146,24 +190,42 @@
     var latlng = [point.lat, point.lon];
     latlngs.push(latlng);
 
-    var radius = Math.min(7 + (point.drinks.length - 1) * 3, 16);
+    var counts = statusCounts(point);
+    var size = Math.min(14 + (point.drinks.length - 1) * 6, 32);
 
-    var marker = L.circleMarker(latlng, {
-      radius: radius,
-      color: WHITE,
-      weight: 2,
-      fillColor: point.approximate ? NAVY : RED,
-      fillOpacity: 0.9
+    var marker = L.marker(latlng, {
+      icon: pinIcon(point, counts, size),
+      // Still-sought places stay on top of bought and tested ones.
+      zIndexOffset: counts.identified ? 2000 : (counts.acquired ? 1000 : 0),
+      keyboard: true,
+      title: pinLabel(point)
     })
       .addTo(map)
       .bindPopup(popupHtml(point), { className: 'karte-pop' })
       .bindTooltip(
         point.place + ' · ' + point.drinks.length + (point.drinks.length === 1 ? ' Spezi' : ' Spezis'),
-        { direction: 'top' }
+        { direction: 'top', offset: [0, -size / 2] }
       );
 
     byKey[point.key] = { marker: marker, latlng: latlng };
   });
+
+  // Legend under the map: which colour means what, with how many Spezis.
+  (function () {
+    var legend = document.querySelector('[data-karte-legend]');
+    if (!legend) { return; }
+    var totals = { identified: 0, acquired: 0, tested: 0 };
+    markers.forEach(function (point) {
+      var c = statusCounts(point);
+      STATUS_ORDER.forEach(function (key) { totals[key] += c[key]; });
+    });
+    legend.innerHTML = STATUS_ORDER.filter(function (key) { return totals[key] > 0; })
+      .map(function (key) {
+        return '<li><i class="karte-dot" style="background:' + STATUS[key].color + '"></i>' +
+          STATUS[key].label + ' <strong>' + totals[key] + '</strong></li>';
+      }).join('');
+    legend.hidden = false;
+  })();
 
   // Frame the drinks and lock that framing: zooming out or panning past it only
   // reveals empty grey where there are no tiles.

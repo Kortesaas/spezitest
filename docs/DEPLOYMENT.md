@@ -307,7 +307,7 @@ it will show empty-state pages until the data is imported, which is expected.
 | `GET /karte` | 200, "Wo die Spezis herkommen", tab bar (Alle · Getestet · Noch gesucht) |
 | `GET /karte/getestet` · `GET /karte/gesucht` | 200, matching heading, that tab current |
 | `GET /karte/spezi/109` | 200, one-pin map "Wo … herkommt"; `GET /karte/spezi/999999` → 404 |
-| `GET /api/map/spezis.geojson` | 200, `application/geo+json`, `Access-Control-Allow-Origin: *`, a GeoJSON `FeatureCollection` of the identified drinks (unaffected by the `/karte` filter) |
+| `GET /api/map/spezis.geojson` | 200, `application/geo+json`, `Access-Control-Allow-Origin: *`, a GeoJSON `FeatureCollection` of all placed drinks with `status` + `_umap_options.color`; `?status=identified` narrows it (unaffected by the `/karte` tabs) |
 | `GET /api/map/test-spezis.geojson` | 200, same headers, three `TEST Spezi …` features (temporary — remove once uMap is verified) |
 | `GET /nonsense` | 404, branded page, no stack trace |
 | `GET /.env` | 404 |

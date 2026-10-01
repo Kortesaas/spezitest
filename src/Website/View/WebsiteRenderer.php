@@ -273,7 +273,7 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p46">',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p47">',
             '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/spiele.js?v=p4" defer></script>',
         );
     }
@@ -1099,6 +1099,7 @@ final class WebsiteRenderer
             . ' aria-label="Karte mit den Herkunftsorten der Spezis">'
             . '<noscript><p class="karte__noscript">Die interaktive Karte braucht JavaScript. '
             . 'Die vollständige Liste mit allen Orten steht daneben.</p></noscript></div>'
+            . '<ul class="karte__legend" data-karte-legend aria-label="Legende" hidden></ul>'
             . '<p class="karte__credit">Karte: © <a href="https://www.openstreetmap.org/copyright" rel="nofollow noopener">OpenStreetMap</a>-Mitwirkende'
             . ' · PLZ-Koordinaten: <a href="https://www.geonames.org/" rel="nofollow noopener">GeoNames</a> (CC BY 4.0)</p>'
             . '</div>'
@@ -1144,9 +1145,20 @@ final class WebsiteRenderer
             [],
             null,
             'website',
-            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p46">',
-            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p46" defer></script>',
+            '<link rel="stylesheet" href="/assets/leaflet/leaflet.css?v=p47">',
+            '<script src="/assets/leaflet/leaflet.js" defer></script><script src="/assets/karte.js?v=p47" defer></script>',
         );
+    }
+
+    /** The map's wording for a lifecycle status (the tab calls identified "Noch gesucht"). */
+    private static function mapStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'identified' => 'Noch gesucht',
+            'acquired' => 'Erworben',
+            'tested' => 'Getestet',
+            default => Html::stateLabel($status),
+        };
     }
 
     private function pluralOrte(int $count): string
@@ -1168,7 +1180,9 @@ final class WebsiteRenderer
                     : '';
                 $drinks .= '<li>' . $thumb
                     . '<span class="map__drink-body"><a href="/spezi/' . Html::e($drink['slug']) . '">' . Html::e($drink['name']) . '</a>'
-                    . '<span class="map__place">' . Html::e($sub) . '</span></span></li>';
+                    . '<span class="map__place">' . Html::e($sub) . '</span>'
+                    . '<span class="map__status"><i class="karte-dot karte-dot--' . Html::e($drink['status']) . '"></i>'
+                    . Html::e(self::mapStatusLabel($drink['status'])) . '</span></span></li>';
             }
 
             $approx = $point['approximate']

@@ -42,9 +42,11 @@ final class GeoJsonFeedTest extends TestCase
         self::assertSame(
             [
                 'name' => 'Alpha Cola',
-                'description' => "Hersteller: **Brauerei A**\nOrt: **74939 Zuzenhausen**\n\n"
+                'description' => "Hersteller: **Brauerei A**\nOrt: **74939 Zuzenhausen**\nStatus: **Noch gesucht**\n\n"
                     . "[[https://www.spezitest.de/spezi/{$alpha->id}|Auf spezitest.de ansehen]]",
                 'place' => '74939 Zuzenhausen',
+                'status' => 'identified',
+                '_umap_options' => ['color' => '#646567'],
                 'manufacturer' => 'Brauerei A',
             ],
             $feature['properties'],
@@ -73,9 +75,11 @@ final class GeoJsonFeedTest extends TestCase
         self::assertSame(
             [
                 'name' => 'Foto Cola',
-                'description' => "{{{$image}|110}}\n\nHersteller: **Sprudel AG**\nOrt: **74939 Zuzenhausen**\n\n"
+                'description' => "{{{$image}|110}}\n\nHersteller: **Sprudel AG**\nOrt: **74939 Zuzenhausen**\nStatus: **Noch gesucht**\n\n"
                     . "[[https://www.spezitest.de/spezi/{$withPhoto->id}|Auf spezitest.de ansehen]]",
                 'place' => '74939 Zuzenhausen',
+                'status' => 'identified',
+                '_umap_options' => ['color' => '#646567'],
                 'manufacturer' => 'Sprudel AG',
                 'image' => $image,
             ],
@@ -86,9 +90,11 @@ final class GeoJsonFeedTest extends TestCase
         self::assertSame(
             [
                 'name' => 'Ohne Foto',
-                'description' => "Ort: **30419 Hannover**\n\n"
+                'description' => "Ort: **30419 Hannover**\nStatus: **Noch gesucht**\n\n"
                     . "[[https://www.spezitest.de/spezi/{$without->id}|Auf spezitest.de ansehen]]",
                 'place' => '30419 Hannover',
+                'status' => 'identified',
+                '_umap_options' => ['color' => '#646567'],
             ],
             $byName['Ohne Foto'],
         );
@@ -124,6 +130,39 @@ final class GeoJsonFeedTest extends TestCase
         );
 
         self::assertSame(['Sichtbar'], $names);
+    }
+
+    public function testColoursEveryStatusAndCanFilterByIt(): void
+    {
+        $drinks = [
+            CatalogFixture::untested('Gesucht', 'identified', null, false, '2026-01-01 00:00:00', '74939 Zuzenhausen'),
+            CatalogFixture::untested('Gekauft', 'acquired', null, false, '2026-01-01 00:00:00', '74939 Zuzenhausen'),
+            CatalogFixture::untested('Getestet', 'tested', null, false, '2026-01-01 00:00:00', '30419 Hannover'),
+        ];
+        $map = HuntMap::fromDrinks($drinks, $this->geocoder());
+
+        $colours = [];
+        foreach (GeoJsonFeed::fromHuntMap($map)->toFeatureCollection()['features'] as $feature) {
+            $colours[$feature['properties']['name']] = [
+                $feature['properties']['status'],
+                $feature['properties']['_umap_options']['color'],
+            ];
+        }
+
+        self::assertEquals(
+            [
+                'Gesucht' => ['identified', '#646567'],
+                'Gekauft' => ['acquired', '#002D55'],
+                'Getestet' => ['tested', '#E60005'],
+            ],
+            $colours,
+        );
+
+        $names = array_map(
+            static fn (array $f): string => $f['properties']['name'],
+            GeoJsonFeed::fromHuntMap($map, 'https://www.spezitest.de', ['identified', 'acquired'])->toFeatureCollection()['features'],
+        );
+        self::assertEqualsCanonicalizing(['Gesucht', 'Gekauft'], $names);
     }
 
     public function testEmptyCatalogYieldsAnEmptyFeatureCollection(): void
